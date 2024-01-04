@@ -15,14 +15,11 @@ def get_cookie_information():
 
 # Remplacez ceci par la valeur réelle de votre cookie
 cookie = {
+    'name': 'CONSENT', 
+    'value': 'PENDING+117',
     'domain': '.youtube.com', 
     'expiry': 1738961135, 
-    'httpOnly': False, 
-    'name': 'CONSENT', 
-    'path': '/', 
-    'sameSite': 'Lax',
-    'secure': True,
-    'value': 'PENDING+117'
+    'path': '/'
     }
 # Configurez votre driver Selenium (Chrome dans cet exemple)
 driver = webdriver.Chrome()

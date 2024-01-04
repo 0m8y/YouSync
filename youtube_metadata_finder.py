@@ -20,6 +20,8 @@ def get_selenium_driver(url):
 
     driver = webdriver.Chrome(options=chrome_options)
 
+    print("url is: " + url)
+    
     driver.get(url)
 
     show_description = WebDriverWait(driver, 20).until(

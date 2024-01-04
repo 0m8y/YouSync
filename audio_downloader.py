@@ -56,8 +56,8 @@ def download_audio_from_youtube(url, path_to_save_audio):
                 return False
 
     print(title + " is finded!")
-    # path_to_save_audio_with_title = f"{path_to_save_audio}\\{title}.mp3"
-    # download_audio(yt, path_to_save_audio_with_title)
+    path_to_save_audio_with_title = f"{path_to_save_audio}\\{title}.mp3"
+    download_audio(yt, path_to_save_audio_with_title)
 
     with open(downloaded_links_file, 'a') as file:
         file.write(url + '\n')
