@@ -1,12 +1,16 @@
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 from pytube import YouTube
-from moviepy.editor import *
-import requests
-from metadata_finder import *
-import eyed3
 import eyed3.id3
+import requests
+import eyed3
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+
+from moviepy.editor import *
 import json
+from metadata_finder import *
+from utils import *
+
 class YoutubeAudioManager:
 
     def __init__(self, url, path_to_save_audio, data_filepath):
@@ -29,11 +33,20 @@ class YoutubeAudioManager:
             data.append(self.to_dict())
             with open(self.data_filepath, 'w') as file:
                 json.dump(data, file, indent=4)
+            self.add_metadata()
         else:
             for item in data:
                 if item['url'] == self.url:
                     self.__from_dict(item)
                     print(self.url + " is already loaded !")
+
+    def save_data_to_file(self, data, data_filepath):
+        """Enregistre les données modifiées dans le fichier JSON."""
+        with open(data_filepath, 'w') as file:
+            json.dump(data, file, indent=4)
+
+    def get_url(self):
+        return self.url
 
     def load_data(self):
         try:
@@ -57,23 +70,22 @@ class YoutubeAudioManager:
 
     def download_mp3(self):
         if self.is_downloaded:
-            return True
+            return
 
-        print(self.video_title + " is finded!")
+        print("downloading " + self.url + "...")
         self.__download_audio(self.yt, self.path_to_save_audio_with_title)
 
-        print(self.video_title + " is downloaded!")
+        print(self.url + " is downloaded!")
         self.is_downloaded = True
         self.__update_is_downloaded()
-
-        return True
+        self.add_metadata()
     
     def add_metadata(self):
         if self.is_downloaded is False or self.metadata_updated is True:
             print("Audio is not downloaded")
             return
 
-        selenium_driver = self.__get_selenium_driver(self.url)
+        selenium_driver = self.__get_selenium_driver()
 
         self.video_title = find_title_url(self.url)
         self.title_driver = find_title(selenium_driver)
@@ -96,12 +108,12 @@ class YoutubeAudioManager:
             else:
                 self.image_url = None
         audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
-        print("Metadata is added in " + self.title + "." )
+        print("Metadata is added in " + self.url)
         self.metadata_updated = True
         self.__update_data()
 
 
-    def __download_audio(yt, path_to_save_audio_with_title):
+    def __download_audio(self, yt, path_to_save_audio_with_title):
         audio_stream = yt.streams.filter(only_audio=True).first()
         downloaded_file = audio_stream.download()
         
@@ -111,20 +123,25 @@ class YoutubeAudioManager:
         os.remove(downloaded_file)
 
     def __get_selenium_driver(self):
-        chrome_profile_path = r'C:\Users\msoub\AppData\Local\Google\Chrome\User Data'
-        chrome_options = Options()
-        chrome_options.add_argument(f"user-data-dir={chrome_profile_path}")
-        chrome_options.add_argument("--profile-directory=Default")
-        chrome_options.add_argument("--headless")
+        driver = get_selenium_driver(self.url)
 
-        driver = webdriver.Chrome(options=chrome_options)
+        success = False
+        attempts = 0
+        while not success and attempts < 3:
+            try:
+                show_description = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//tp-yt-paper-button[@id='expand']"))
+                )
+                show_description.click()
+                success = True  # Si le clic réussit, sortir de la boucle
+            except StaleElementReferenceException:
+                attempts += 1  # Augmenter le nombre de tentatives si l'élément est devenu obsolète
+            except TimeoutException:
+                print("Le bouton 'Afficher plus' n'est pas trouvé après l'attente.")
+                break  # Sortir de la boucle si le bouton n'est pas trouvé
 
-        print("url is: " + self.url)
-        
-        driver.get(self.url)
-
-        show_description = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//tp-yt-paper-button[@id='expand']")))
-        show_description.click()
+        if not success:
+            print("Impossible de cliquer sur le bouton 'Afficher plus' après plusieurs tentatives.")
 
         return driver
     
@@ -161,12 +178,18 @@ class YoutubeAudioManager:
                 item['album'] = self.album
                 item['image_url'] = self.image_url
                 break 
+        self.save_data_to_file(data, self.data_filepath)
     
     def __update_is_downloaded(self):
         data = self.load_data()
+        updated = False
         for item in data:
-            if item['url'] == self.url:
+            if item['url'] == self.url and not item['is_downloaded']:
                 item['is_downloaded'] = self.is_downloaded
+                updated = True
+                break
+        if updated:
+            self.save_data_to_file(data, self.data_filepath)
 
     def __update_metadata_updated(self):
         data = self.load_data()

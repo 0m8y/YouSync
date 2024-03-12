@@ -2,6 +2,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import platform, re, os
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 def check_yousync_folder(yousync_folder_path):
     if not os.path.exists(yousync_folder_path):
@@ -46,3 +48,12 @@ def accept_cookies(driver):
         except Exception as e:
             print(f"Erreur lors de la tentative de clic sur le bouton 'Tout accepter': {e}")
     
+def get_selenium_driver(url):
+    chrome_options = Options()
+    # chrome_options.add_argument("--headless")
+
+    driver = webdriver.Chrome(options=chrome_options)
+
+    driver.get(url)
+    accept_cookies(driver)
+    return driver

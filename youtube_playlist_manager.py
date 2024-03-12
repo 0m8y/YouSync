@@ -1,10 +1,8 @@
 import time
 import threading
-from selenium import webdriver
 from youtube_audio_manager import *
 from selenium.webdriver.common.by import By
 from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from utils import *
@@ -21,23 +19,21 @@ class YoutubePlaylistManager:
         self.name = get_playlist_id(playlist_url)
         self.__init()
 
-        # def download_video(url, path_to_save_audio):
-        #     if self.download_audio_from_youtube(url, path_to_save_audio):
-        #         return url
-        #     return None
-
-        # with ThreadPoolExecutor(max_workers=4) as executor:
-        #     futures = [executor.submit(download_video, url, path_to_save_audio) for url in self.video_urls]
-        #     for future in futures:
-        #         result = future.result()
-        #         if result:
-        #             videos_downloaded.append(result)
+    def download_audio(self, audio_manager):
+        audio_manager.download_mp3()
 
     def download(self):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in self.audios_manager]
+            for future in futures:
+                future.result()
         print("downloading video...")
 
     def __init(self):
-        driver = self.__get_selenium_driver()
+        driver = get_selenium_driver(self.playlist_url)
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
+        )
         self.__scroll_down_page(driver)
         self.video_urls = self.__get_video_urls_from_driver(driver)
         driver.quit()        
@@ -57,7 +53,10 @@ class YoutubePlaylistManager:
         #TODO: check if data have deleted video from playlist
 
     def update(self):
-        driver = self.__get_selenium_driver()
+        driver = get_selenium_driver(self.playlist_url)
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
+        )
         self.__get_playlist_name(driver)
         self.__scroll_down_page(driver)
         video_urls_updated = self.__get_video_urls_from_driver(driver)
@@ -115,15 +114,3 @@ class YoutubePlaylistManager:
                 break
             last_height = new_height
 
-    def __get_selenium_driver(self):
-        chrome_options = Options()
-        # chrome_options.add_argument("--headless")
-
-        driver = webdriver.Chrome(options=chrome_options)
-
-        driver.get(self.playlist_url)
-        accept_cookies(driver)
-        WebDriverWait(driver, 10).until(
-                EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
-            )
-        return driver
