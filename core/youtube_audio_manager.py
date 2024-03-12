@@ -8,12 +8,13 @@ from selenium.common.exceptions import StaleElementReferenceException, TimeoutEx
 
 from moviepy.editor import *
 import json
-from metadata_finder import *
-from utils import *
+from core.metadata_finder import *
+from core.utils import *
 
 class YoutubeAudioManager:
 
-    def __init__(self, url, path_to_save_audio, data_filepath):
+    def __init__(self, url, path_to_save_audio, data_filepath, lock):
+        self.lock = lock
         self.url = url
         self.path_to_save_audio = path_to_save_audio
         self.yt = YouTube(self.url)
@@ -31,8 +32,7 @@ class YoutubeAudioManager:
         data = self.load_data()
         if not any(item['url'] == self.url for item in data):
             data.append(self.to_dict())
-            with open(self.data_filepath, 'w') as file:
-                json.dump(data, file, indent=4)
+            self.save_data_to_file(data, self.data_filepath)
             self.add_metadata()
         else:
             for item in data:
@@ -42,8 +42,9 @@ class YoutubeAudioManager:
 
     def save_data_to_file(self, data, data_filepath):
         """Enregistre les données modifiées dans le fichier JSON."""
-        with open(data_filepath, 'w') as file:
-            json.dump(data, file, indent=4)
+        with  self.lock:
+            with open(data_filepath, 'w') as file:
+                json.dump(data, file, indent=4)
 
     def get_url(self):
         return self.url

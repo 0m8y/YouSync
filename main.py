@@ -1,4 +1,4 @@
-from youtube_playlist_manager import *
+from core.youtube_playlist_manager import *
 
 playlist_url = 'https://www.youtube.com/playlist?list=PLsOoDQgfBdd3rEtl2weVQ6XnQN421ODzq'
 path_to_save_audio = "D:\\OneDrive\\Mix\\All"

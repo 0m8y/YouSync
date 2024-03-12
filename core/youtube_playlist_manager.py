@@ -1,15 +1,17 @@
-import time
-import threading
-from youtube_audio_manager import *
-from selenium.webdriver.common.by import By
-from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from utils import *
+from selenium.webdriver.support.ui import WebDriverWait
+from concurrent.futures import ThreadPoolExecutor
+from selenium.webdriver.common.by import By
+from core.youtube_audio_manager import *
+from threading import Lock
+from core.utils import *
+import threading
+import time
 
 class YoutubePlaylistManager:
 
     def __init__(self, playlist_url, path_to_save_audio):
+        self.lock = Lock()
         self.playlist_url = playlist_url
         self.path_to_save_audio = path_to_save_audio
         self.video_urls = []
@@ -47,7 +49,7 @@ class YoutubePlaylistManager:
                 fichier.write("[]")
 
         for video_url in self.video_urls:
-            youtube_audio = YoutubeAudioManager(video_url, self.path_to_save_audio, self.playlist_data_filepath)
+            youtube_audio = YoutubeAudioManager(video_url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             self.audios_manager.append(youtube_audio)
 
         #TODO: check if data have deleted video from playlist
