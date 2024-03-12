@@ -1,10 +1,10 @@
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 from pytube import YouTube
 import eyed3.id3
 import requests
 import eyed3
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
 from moviepy.editor import *
 import json
@@ -32,44 +32,39 @@ class YoutubeAudioManager:
         data = self.load_data()
         if not any(item['url'] == self.url for item in data):
             data.append(self.to_dict())
-            self.save_data_to_file(data, self.data_filepath)
-            self.add_metadata()
+            self.save_data_to_file(data)
         else:
             for item in data:
                 if item['url'] == self.url:
                     self.__from_dict(item)
                     print(self.url + " is already loaded !")
 
-    def save_data_to_file(self, data, data_filepath):
-        """Enregistre les données modifiées dans le fichier JSON."""
-        with  self.lock:
-            with open(data_filepath, 'w') as file:
-                json.dump(data, file, indent=4)
+#----------------------------------Download Process-------------------------------------#
 
-    def get_url(self):
-        return self.url
+    def __get_selenium_driver(self):
+        driver = get_selenium_driver(self.url)
 
-    def load_data(self):
-        try:
-            with open(self.data_filepath, 'r') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            return []
+        success = False
+        attempts = 0
+        while not success and attempts < 3:
+            try:
+                show_description = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//tp-yt-paper-button[@id='expand']"))
+                )
+                show_description.click()
+                success = True  # Si le clic réussit, sortir de la boucle
+            except StaleElementReferenceException:
+                attempts += 1  # Augmenter le nombre de tentatives si l'élément est devenu obsolète
+            except TimeoutException:
+                print("Le bouton 'Afficher plus' n'est pas trouvé après l'attente.")
+                break  # Sortir de la boucle si le bouton n'est pas trouvé
 
-    def to_dict(self):
-        return {
-            "url": self.url,
-            "path_to_save_audio": self.path_to_save_audio,
-            "is_downloaded": self.is_downloaded,
-            "metadata_updated": self.metadata_updated,
-            "video_title": self.video_title,
-            "title": self.title,
-            "artist": self.artist,
-            "album": self.album,
-            "image_url": self.image_url
-        }
+        if not success:
+            print("Impossible de cliquer sur le bouton 'Afficher plus' après plusieurs tentatives.")
 
-    def download_mp3(self):
+        return driver
+    
+    def download(self):
         if self.is_downloaded:
             return
 
@@ -81,6 +76,15 @@ class YoutubeAudioManager:
         self.__update_is_downloaded()
         self.add_metadata()
     
+    def __download_audio(self, yt, path_to_save_audio_with_title):
+        audio_stream = yt.streams.filter(only_audio=True).first()
+        downloaded_file = audio_stream.download()
+        
+        audio_clip = AudioFileClip(downloaded_file)
+        audio_clip.write_audiofile(path_to_save_audio_with_title)
+        audio_clip.close()
+        os.remove(downloaded_file)
+
     def add_metadata(self):
         if self.is_downloaded is False or self.metadata_updated is True:
             print("Audio is not downloaded")
@@ -113,38 +117,32 @@ class YoutubeAudioManager:
         self.metadata_updated = True
         self.__update_data()
 
-
-    def __download_audio(self, yt, path_to_save_audio_with_title):
-        audio_stream = yt.streams.filter(only_audio=True).first()
-        downloaded_file = audio_stream.download()
+#-------------------------------------Load & Save--------------------------------------#
+    
+    def load_data(self):
+        try:
+            with open(self.data_filepath, 'r') as file:
+                data = json.load(file)
+            # Assurez-vous de retourner la liste des audios
+            return data.get("audios", [])
+        except FileNotFoundError:
+            return []
         
-        audio_clip = AudioFileClip(downloaded_file)
-        audio_clip.write_audiofile(path_to_save_audio_with_title)
-        audio_clip.close()
-        os.remove(downloaded_file)
-
-    def __get_selenium_driver(self):
-        driver = get_selenium_driver(self.url)
-
-        success = False
-        attempts = 0
-        while not success and attempts < 3:
+    def save_data_to_file(self, audios_data):
+        with self.lock:
             try:
-                show_description = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, "//tp-yt-paper-button[@id='expand']"))
-                )
-                show_description.click()
-                success = True  # Si le clic réussit, sortir de la boucle
-            except StaleElementReferenceException:
-                attempts += 1  # Augmenter le nombre de tentatives si l'élément est devenu obsolète
-            except TimeoutException:
-                print("Le bouton 'Afficher plus' n'est pas trouvé après l'attente.")
-                break  # Sortir de la boucle si le bouton n'est pas trouvé
+                with open(self.data_filepath, 'r') as file:
+                    data = json.load(file)
+            except FileNotFoundError:
+                data = {}  # Créez une nouvelle structure si le fichier n'existe pas
 
-        if not success:
-            print("Impossible de cliquer sur le bouton 'Afficher plus' après plusieurs tentatives.")
+            # Mettez à jour le champ "audios" avec les données fournies
+            data["audios"] = audios_data
 
-        return driver
+            with open(self.data_filepath, 'w') as file:
+                json.dump(data, file, indent=4)
+
+#-----------------------------------------DICT------------------------------------------#
     
     @staticmethod
     def from_dict(data, data_filepath):
@@ -166,6 +164,21 @@ class YoutubeAudioManager:
         self.artist = data["artist"]
         self.album = data["album"]
         self.image_url = data["image_url"]
+
+    def to_dict(self):
+        return {
+            "url": self.url,
+            "path_to_save_audio": self.path_to_save_audio,
+            "is_downloaded": self.is_downloaded,
+            "metadata_updated": self.metadata_updated,
+            "video_title": self.video_title,
+            "title": self.title,
+            "artist": self.artist,
+            "album": self.album,
+            "image_url": self.image_url
+        }
+    
+#----------------------------------------UPDATE-----------------------------------------#
     
     def __update_data(self):
         data = self.load_data()
@@ -179,7 +192,7 @@ class YoutubeAudioManager:
                 item['album'] = self.album
                 item['image_url'] = self.image_url
                 break 
-        self.save_data_to_file(data, self.data_filepath)
+        self.save_data_to_file(data)
     
     def __update_is_downloaded(self):
         data = self.load_data()
@@ -190,7 +203,7 @@ class YoutubeAudioManager:
                 updated = True
                 break
         if updated:
-            self.save_data_to_file(data, self.data_filepath)
+            self.save_data_to_file(data)
 
     def __update_metadata_updated(self):
         data = self.load_data()
@@ -227,3 +240,8 @@ class YoutubeAudioManager:
         for item in data:
             if item['url'] == self.url:
                 item['image_url'] = self.image_url
+
+#----------------------------------------GETTER----------------------------------------#
+
+    def get_url(self):
+        return self.url

@@ -1,9 +1,9 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import platform, re, os
-from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium import webdriver
+import platform, re, os, time
 
 def check_yousync_folder(yousync_folder_path):
     if not os.path.exists(yousync_folder_path):
@@ -57,3 +57,16 @@ def get_selenium_driver(url):
     driver.get(url)
     accept_cookies(driver)
     return driver
+
+def scroll_down_page(driver):
+    last_height = driver.execute_script("return document.documentElement.scrollHeight")
+
+    while True:
+        driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
+
+        time.sleep(1)
+
+        new_height = driver.execute_script("return document.documentElement.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
