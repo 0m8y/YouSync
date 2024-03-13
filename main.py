@@ -9,6 +9,9 @@ path_to_save_audio_test = "D:\\OneDrive\\Epsi\\dev_perso\\YouSync\\MyPlaylistTes
 def main():
    playlist_manager = YoutubePlaylistManager(playlist_url_test, path_to_save_audio_test)
 
+
+   playlist_manager.update()
    playlist_manager.download()
+
 
 if __name__ == "__main__": main()

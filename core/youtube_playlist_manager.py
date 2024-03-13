@@ -30,6 +30,7 @@ class YoutubePlaylistManager:
                 fichier.write("[]")
             self.__initialize_playlist_data()
         else:
+            print("FROM DICT")
             self.__from_dict(self.load_playlist_data())
 
         for video_url in self.video_urls:
@@ -37,21 +38,49 @@ class YoutubePlaylistManager:
             self.audios_manager.append(youtube_audio)
 
         #TODO: check if data have deleted video from playlist
+    
+    def __add_audio(self, url):
+            print("Adding audio: " + url)
+            youtube_audio = YoutubeAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
+            self.audios_manager.append(youtube_audio)
+            self.video_urls.append(url)
+
+    def __remove_audio(self, url):
+        audio_manager_index = next((i for i, am in enumerate(self.audios_manager) if am.get_url() == url), None)
+
+        if audio_manager_index is not None:
+            self.audios_manager[audio_manager_index].delete()
+
+            del self.audios_manager[audio_manager_index]
+
+            self.video_urls = [video_url for video_url in self.video_urls if video_url != url]
+
+            print(f"Audio supprimé : {url}")
+        else:
+            print(f"Audio non trouvé : {url}")
+
 
     def update(self):
-        driver = get_selenium_driver(self.playlist_url)
-        WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
-        )
-        scroll_down_page(driver)
-        video_urls_updated = self.__get_video_urls_from_driver(driver)
-        driver.quit()
+        print("Updating playlist " + self.id)
+        #TODO: Not working, to update with new logic
+        new_video_urls = self.__get_video_urls()
+        for video_url in self.video_urls:
+            print("video url: " + video_url)
+        for new_video_url in new_video_urls:
+            print("new video url: " + new_video_url)
 
-        for video_url_updated in video_urls_updated:
-            if video_url_updated not in self.video_urls:
-                self.video_urls.append(video_url_updated)
+        for new_video_url in new_video_urls:
+            new_video_id = extract_video_id(new_video_url)
+            existing_video_ids = [extract_video_id(video_url) for video_url in self.video_urls]
+            if new_video_id not in existing_video_ids:
+                self.__add_audio(new_video_url)
 
-        print(str(len(self.video_urls_updated)) + " new videos finded !")
+        for video_url in list(self.video_urls):
+            video_id = extract_video_id(video_url)
+            new_video_ids = [extract_video_id(new_video_url) for new_video_url in new_video_urls]
+            if video_id not in new_video_ids:
+                self.__remove_audio(video_url)
+
 
 #----------------------------------------GETTER----------------------------------------#
 
@@ -78,13 +107,13 @@ class YoutubePlaylistManager:
     def __get_video_urls_from_driver(self, driver):
         video_links = driver.find_elements(By.CSS_SELECTOR, 'a.yt-simple-endpoint.style-scope.ytd-playlist-video-renderer')
 
-        video_urls = [video.get_attribute('href') for video in video_links if video.get_attribute('href') and 'watch?v=' in video.get_attribute('href')]
+        urls = [video.get_attribute('href') for video in video_links if video.get_attribute('href') and 'watch?v=' in video.get_attribute('href')]
 
         recommended_videos_present = len(driver.find_elements(By.XPATH, "//div[@id='title' and contains(text(),'Vidéos recommandées')]")) > 0
         if recommended_videos_present:
-            video_urls = video_urls[:-5]
+            urls = urls[:-5]
 
-        return video_urls
+        return urls
 
     def __get_video_urls(self):
         driver = get_selenium_driver(self.playlist_url)
@@ -92,9 +121,9 @@ class YoutubePlaylistManager:
             EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
         )
         scroll_down_page(driver)
-        video_urls = self.__get_video_urls_from_driver(driver)
+        urls = self.__get_video_urls_from_driver(driver)
         driver.quit()
-        return video_urls
+        return urls
 #----------------------------------Download Process-------------------------------------#
 
     def download_audio(self, audio_manager):
@@ -123,7 +152,6 @@ class YoutubePlaylistManager:
                 json.dump(data, file, indent=4)
 
     def __from_dict(self, data):
-        self.video_urls = data["video_urls"]
         self.path_to_save_audio = data["path_to_save_audio"]
         audios = data["audios"]
         for audio in audios:
@@ -133,7 +161,6 @@ class YoutubePlaylistManager:
         data = {
             "playlist_url": self.playlist_url,
             "path_to_save_audio": self.path_to_save_audio,
-            "video_urls": self.video_urls,
         }
         with self.lock:
             with open(self.playlist_data_filepath, 'w') as file:

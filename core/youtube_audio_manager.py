@@ -66,6 +66,9 @@ class YoutubeAudioManager:
     
     def download(self):
         if self.is_downloaded:
+            if not self.metadata_updated:
+                self.add_metadata()
+                return
             return
 
         print("downloading " + self.url + "...")
@@ -144,19 +147,8 @@ class YoutubeAudioManager:
 
 #-----------------------------------------DICT------------------------------------------#
     
-    @staticmethod
-    def from_dict(data, data_filepath):
-        manager = YoutubeAudioManager(data["url"], data["path_to_save_audio"], data_filepath)
-        manager.is_downloaded = data["is_downloaded"]
-        manager.metadata_updated = data["metadata_updated"]
-        manager.video_title = data["video_title"]
-        manager.title = data["title"]
-        manager.artist = data["artist"]
-        manager.album = data["album"]
-        manager.image_url = data["image_url"]
-        return manager
-    
     def __from_dict(self, data):
+        self.path_to_save_audio_with_title = data["path_to_save_audio_with_title"]
         self.is_downloaded = data["is_downloaded"]
         self.metadata_updated = data["metadata_updated"]
         self.video_title = data["video_title"]
@@ -168,7 +160,7 @@ class YoutubeAudioManager:
     def to_dict(self):
         return {
             "url": self.url,
-            "path_to_save_audio": self.path_to_save_audio,
+            "path_to_save_audio_with_title": self.path_to_save_audio_with_title,
             "is_downloaded": self.is_downloaded,
             "metadata_updated": self.metadata_updated,
             "video_title": self.video_title,
@@ -240,6 +232,25 @@ class YoutubeAudioManager:
         for item in data:
             if item['url'] == self.url:
                 item['image_url'] = self.image_url
+
+    def __delete_audio_file(self):
+        if os.path.exists(self.path_to_save_audio_with_title):
+            os.remove(self.path_to_save_audio_with_title)
+            print(f"Fichier audio supprimé : {self.path_to_save_audio_with_title}")
+
+    def __delete_audio_info(self):
+        audios_data = self.load_data()
+        audios_data = [audio for audio in audios_data if audio['url'] != self.url]
+        self.save_data_to_file(audios_data)
+        print("Informations audio supprimées du fichier JSON.")
+
+    def delete(self):
+        try:
+            self.__delete_audio_file()
+            self.__delete_audio_info()
+        except Exception as e:
+            print(f"Erreur lors de la suppression de l'audio : {e}")
+
 
 #----------------------------------------GETTER----------------------------------------#
 

@@ -2,6 +2,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from urllib.parse import urlparse, parse_qs
 from selenium import webdriver
 import platform, re, os, time
 
@@ -29,6 +30,12 @@ def get_playlist_id(playlist_url):
         return match.group(1)
     else:
         return None
+
+def extract_video_id(url):
+    query = urlparse(url).query
+    params = parse_qs(query)
+    return params.get('v', [None])[0]
+
 
 def accept_cookies(driver):
     wait = WebDriverWait(driver, 10)
