@@ -57,7 +57,8 @@ def accept_cookies(driver):
     
 def get_selenium_driver(url):
     chrome_options = Options()
-    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--mute-audio")
 
     driver = webdriver.Chrome(options=chrome_options)
 
