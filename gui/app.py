@@ -19,15 +19,12 @@ class App(customtkinter.CTk):
         center_x = int(screen_width/2 - window_width/2)
         center_y = int(screen_height/2 - window_height/2)
 
-        # Modifier la géométrie pour positionner la fenêtre au centre
         self.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
 
-        # set grid layout 1x2
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # load images with light and dark mode image
-        image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_images")
+        image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
         self.logo_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "YouSyncLogo_light.png")), 
                                                  dark_image=Image.open(os.path.join(image_path, "YouSyncLogo_dark.png")), size=(180, 65))
         self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "home_dark.png")), dark_image=Image.open(os.path.join(image_path, "home_light.png")), size=(20, 20))
@@ -36,7 +33,6 @@ class App(customtkinter.CTk):
         self.settings_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "chat_dark.png")),
                                                      dark_image=Image.open(os.path.join(image_path, "chat_light.png")), size=(20, 20))
 
-        # create navigation frame
         self.navigation_frame = customtkinter.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
         self.navigation_frame.grid_rowconfigure(4, weight=1)
@@ -69,7 +65,6 @@ class App(customtkinter.CTk):
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, image_path, fg_color="transparent")
 
-        # Configure all frames to the grid but initially lower the non-home pages
         self.home_page.grid(row=0, column=1, sticky="nsew")
         self.second_frame.grid(row=0, column=1, sticky="nsew")
         self.third_frame.grid(row=0, column=1, sticky="nsew")
@@ -79,18 +74,14 @@ class App(customtkinter.CTk):
         self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
 
-        # Select the default frame
         self.select_frame_by_name("home")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")
 
     def select_frame_by_name(self, name):
-        # Lower all frames first for clarity
         for frame in [self.home_page, self.second_frame, self.third_frame, self.new_youtube_playlist_page]:
             frame.lower()
-        
-        # Then lift the requested frame
         if name == "home":
             self.home_page.lift()
         elif name == "frame_2":
@@ -99,16 +90,6 @@ class App(customtkinter.CTk):
             self.third_frame.lift()
         elif name == "new_youtube_playlist":
             self.new_youtube_playlist_page.lift()
-
-
-
-    def home_button_1_event(self):
-        # Action pour le Bouton 1
-        print("Bouton 1 cliqué!")
-
-    def home_button_2_event(self):
-        # Action pour le Bouton 2
-        print("Bouton 2 cliqué!")
 
     def home_button_event(self):
         print("Home button clicked")

@@ -20,28 +20,25 @@ class HomePage(customtkinter.CTkFrame):
     def __create_youtube_button__(self):
         youtube_image = Image.open(os.path.join(self.image_path, "Youtube_logo.png"))
         padded_image = ImageOps.expand(youtube_image, border=0, fill='black')
-        resized_image = padded_image.resize((179, 75))  # Taille de l'image ajustée
-
+        resized_image = padded_image.resize((179, 75))
         tk_image = ImageTk.PhotoImage(resized_image)
 
-        # Ajuster la taille du bouton et changer le fond
-        self.youtube_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,  # Taille ajustée
+        self.youtube_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
                                                          command=self.youtube_button_event, text="",
-                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))  # Couleur de fond modifiée
+                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
         self.youtube_button.image = tk_image
         self.youtube_button.grid(row=1, column=0, padx=(50, 0), pady=(30, 0))
 
     def __create_soundcloud_button__(self):
         soundcloud_image = Image.open(os.path.join(self.image_path, "SoundCloud_logo.png"))
         padded_image = ImageOps.expand(soundcloud_image, border=0, fill='black')
-        resized_image = padded_image.resize((160, 91))  # Taille de l'image ajustée
+        resized_image = padded_image.resize((160, 91))
 
         tk_image = ImageTk.PhotoImage(resized_image)
 
-        # Ajuster la taille du bouton et changer le fond
-        self.soundcloud_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,  # Taille ajustée
+        self.soundcloud_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
                                                          command=self.soundcloud_button_event, text="",
-                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))  # Couleur de fond modifiée
+                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
         self.soundcloud_button.image = tk_image
         self.soundcloud_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
 

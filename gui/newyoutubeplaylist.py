@@ -22,10 +22,9 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         resized_image = padded_image.resize((179, 75))
         tk_logo = ImageTk.PhotoImage(resized_image)
 
-        self.grid_columnconfigure(0, weight=1)  # Espace supplémentaire gauche
-        self.grid_columnconfigure(1, weight=0)  # Colonne pour le logo
-        self.grid_columnconfigure(2, weight=1)  # Espace supplémentaire droit
-
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
+        self.grid_columnconfigure(2, weight=1)
 
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
         dark_back_image = Image.open(os.path.join(self.image_path, "back_dark.png"))
@@ -56,7 +55,6 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.browse_button = customtkinter.CTkButton(self, text="", command=self.browse_file, width=45, height=45, image=self.folder_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
         self.browse_button.grid(row=4, column=1, sticky="e")
 
-        # Création du bouton avec les CTkImage
         self.save_button = customtkinter.CTkButton(self, text="Save", command=self.save, width=120, height=45,
                                                     fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"), text_color=("#282828", "#E5E4DE"))
         self.save_button.grid(row=5, column=1, padx=(0, 0), pady=40)
@@ -77,11 +75,11 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         url = self.url_entry.get()
         path = self.path_entry.get()
         if not self.validate_youtube_url(url):
-            self.notification_label.configure(text="Please enter a valid YouTube URL.", text_color=("red"))  # Red message
+            self.notification_label.configure(text="Please enter a valid YouTube URL.", text_color=("red"))
         elif not self.validate_path(path):
-            self.notification_label.configure(text="Please enter a valid path.", text_color=("red"))  # Red message
+            self.notification_label.configure(text="Please enter a valid path.", text_color=("red"))
         else:
-            self.notification_label.configure(text="The YouTube URL is valid.", text_color=("green"))  # Green message
+            self.notification_label.configure(text="The YouTube URL is valid.", text_color=("green"))
 
     def validate_youtube_url(self, url):
         youtube_regex = (
