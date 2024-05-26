@@ -5,6 +5,7 @@ import os
 class HomePage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
         self.image_path = image_path
+        self.parent_app = parent
         super().__init__(parent, **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -15,7 +16,6 @@ class HomePage(customtkinter.CTkFrame):
     def create_label(self, text):
         label = customtkinter.CTkLabel(self, text=text, text_color=("#282828", "#E5E4DE"), font=('Roboto Medium', 32))
         label.grid(row=0, column=0, columnspan=2, pady=(30, 0), sticky="ew")
-
 
     def __create_youtube_button__(self):
         youtube_image = Image.open(os.path.join(self.image_path, "Youtube_logo.png"))
@@ -49,6 +49,4 @@ class HomePage(customtkinter.CTkFrame):
         print("SoundCloud cliqué!")
 
     def youtube_button_event(self):
-        print("Youtube cliqué!")
-
-# Assurez-vous d'ajuster les chemins et configurations selon votre setup
+        self.parent_app.show_new_youtube_playlist()

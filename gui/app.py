@@ -3,6 +3,7 @@ import customtkinter
 import os
 from PIL import Image, ImageOps
 from homepage import HomePage
+from newyoutubeplaylist import NewYoutubePlaylist
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -29,8 +30,7 @@ class App(customtkinter.CTk):
         image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_images")
         self.logo_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "YouSyncLogo_light.png")), 
                                                  dark_image=Image.open(os.path.join(image_path, "YouSyncLogo_dark.png")), size=(180, 65))
-        self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "home_dark.png")),
-                                                 dark_image=Image.open(os.path.join(image_path, "home_light.png")), size=(20, 20))
+        self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "home_dark.png")), dark_image=Image.open(os.path.join(image_path, "home_light.png")), size=(20, 20))
         self.playlist_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "chat_dark.png")),
                                                  dark_image=Image.open(os.path.join(image_path, "chat_light.png")), size=(20, 20))
         self.settings_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "chat_dark.png")),
@@ -65,35 +65,42 @@ class App(customtkinter.CTk):
         self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         self.home_page = HomePage(self, image_path, corner_radius=0, fg_color="transparent")
-
-        # create second frame
         self.second_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
-
-        # create third frame
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.new_youtube_playlist_page = NewYoutubePlaylist(self, image_path, fg_color="transparent")
 
-        # select default frame
+        # Configure all frames to the grid but initially lower the non-home pages
+        self.home_page.grid(row=0, column=1, sticky="nsew")
+        self.second_frame.grid(row=0, column=1, sticky="nsew")
+        self.third_frame.grid(row=0, column=1, sticky="nsew")
+        self.new_youtube_playlist_page.grid(row=0, column=1, sticky="nsew")
+
+        self.second_frame.lower()
+        self.third_frame.lower()
+        self.new_youtube_playlist_page.lower()
+
+        # Select the default frame
         self.select_frame_by_name("home")
 
-    def select_frame_by_name(self, name):
-        # set button color for selected button
-        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" else "transparent")
-        self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "frame_2" else "transparent")
-        self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
+    def show_new_youtube_playlist(self):
+        self.select_frame_by_name("new_youtube_playlist")
 
-        # show selected frame
+    def select_frame_by_name(self, name):
+        # Lower all frames first for clarity
+        for frame in [self.home_page, self.second_frame, self.third_frame, self.new_youtube_playlist_page]:
+            frame.lower()
+        
+        # Then lift the requested frame
         if name == "home":
-            self.home_page.grid(row=0, column=1, sticky="nsew")
-        else:
-            self.home_page.grid_forget()
-        if name == "frame_2":
-            self.second_frame.grid(row=0, column=1, sticky="nsew")
-        else:
-            self.second_frame.grid_forget()
-        if name == "frame_3":
-            self.third_frame.grid(row=0, column=1, sticky="nsew")
-        else:
-            self.third_frame.grid_forget()
+            self.home_page.lift()
+        elif name == "frame_2":
+            self.second_frame.lift()
+        elif name == "frame_3":
+            self.third_frame.lift()
+        elif name == "new_youtube_playlist":
+            self.new_youtube_playlist_page.lift()
+
+
 
     def home_button_1_event(self):
         # Action pour le Bouton 1
@@ -104,6 +111,7 @@ class App(customtkinter.CTk):
         print("Bouton 2 cliqué!")
 
     def home_button_event(self):
+        print("Home button clicked")
         self.select_frame_by_name("home")
 
     def frame_2_button_event(self):
@@ -115,6 +123,8 @@ class App(customtkinter.CTk):
     def change_appearance_mode_event(self, new_appearance_mode):
         customtkinter.set_appearance_mode(new_appearance_mode)
 
+    def go_back(self):
+        self.home_page.lift()
 
 if __name__ == "__main__":
     app = App()
