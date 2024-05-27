@@ -15,7 +15,7 @@ def check_yousync_folder(yousync_folder_path):
         FILE_ATTRIBUTE_HIDDEN = 0x02
 
         ret = ctypes.windll.kernel32.SetFileAttributesW(yousync_folder_path, FILE_ATTRIBUTE_HIDDEN)
-        if not ret:  # Si l'opération échoue, ret est 0
+        if not ret:
             raise ctypes.WinError()
 
 def check_playlist_data_filepath(playlist_filepath):

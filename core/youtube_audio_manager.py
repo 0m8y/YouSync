@@ -52,12 +52,12 @@ class YoutubeAudioManager:
                     EC.element_to_be_clickable((By.XPATH, "//tp-yt-paper-button[@id='expand']"))
                 )
                 show_description.click()
-                success = True  # Si le clic réussit, sortir de la boucle
+                success = True
             except StaleElementReferenceException:
-                attempts += 1  # Augmenter le nombre de tentatives si l'élément est devenu obsolète
+                attempts += 1
             except TimeoutException:
                 print("Le bouton 'Afficher plus' n'est pas trouvé après l'attente.")
-                break  # Sortir de la boucle si le bouton n'est pas trouvé
+                break
 
         if not success:
             print("Impossible de cliquer sur le bouton 'Afficher plus' après plusieurs tentatives.")
@@ -126,7 +126,6 @@ class YoutubeAudioManager:
         try:
             with open(self.data_filepath, 'r') as file:
                 data = json.load(file)
-            # Assurez-vous de retourner la liste des audios
             return data.get("audios", [])
         except FileNotFoundError:
             return []
@@ -137,9 +136,8 @@ class YoutubeAudioManager:
                 with open(self.data_filepath, 'r') as file:
                     data = json.load(file)
             except FileNotFoundError:
-                data = {}  # Créez une nouvelle structure si le fichier n'existe pas
+                data = {}
 
-            # Mettez à jour le champ "audios" avec les données fournies
             data["audios"] = audios_data
 
             with open(self.data_filepath, 'w') as file:
