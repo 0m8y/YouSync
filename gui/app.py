@@ -4,6 +4,7 @@ import os
 from PIL import Image, ImageOps
 from homepage import HomePage
 from newyoutubeplaylist import NewYoutubePlaylist
+from playlistspage import PlaylistsPage
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -56,36 +57,40 @@ class App(customtkinter.CTk):
                                                       image=self.settings_image, anchor="w", command=self.frame_3_button_event)
         self.frame_3_button.grid(row=3, column=0, sticky="ew")
 
-        self.appearance_mode_menu = customtkinter.CTkOptionMenu(self.navigation_frame, values=["Dark", "Light", "System"],
-                                                                command=self.change_appearance_mode_event, fg_color=("gray70", "gray30"), button_color=("gray80", "gray40"), button_hover_color=("gray90", "gray50"), text_color=("#282828", "#E5E4DE"))
-        self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
+        # self.appearance_mode_menu = customtkinter.CTkOptionMenu(self.navigation_frame, values=["Dark", "Light", "System"],
+                                                                # command=self.change_appearance_mode_event, fg_color=("gray70", "gray30"), button_color=("gray80", "gray40"), button_hover_color=("gray90", "gray50"), text_color=("#282828", "#E5E4DE"))
+        # self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         self.home_page = HomePage(self, image_path, corner_radius=0, fg_color="transparent")
-        self.second_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.playlist_page = PlaylistsPage(self, image_path, corner_radius=0, fg_color="transparent")
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, image_path, fg_color="transparent")
 
         self.home_page.grid(row=0, column=1, sticky="nsew")
-        self.second_frame.grid(row=0, column=1, sticky="nsew")
+        self.playlist_page.grid(row=0, column=1, sticky="nsew")
         self.third_frame.grid(row=0, column=1, sticky="nsew")
         self.new_youtube_playlist_page.grid(row=0, column=1, sticky="nsew")
 
-        self.second_frame.lower()
+        self.playlist_page.lower()
         self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
 
-        self.select_frame_by_name("home")
+        self.select_frame_by_name("playlist_page")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")
 
     def select_frame_by_name(self, name):
-        for frame in [self.home_page, self.second_frame, self.third_frame, self.new_youtube_playlist_page]:
+        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" else "transparent")
+        self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlist_page" else "transparent")
+        self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
+
+        for frame in [self.home_page, self.playlist_page, self.third_frame, self.new_youtube_playlist_page]:
             frame.lower()
         if name == "home":
             self.home_page.lift()
-        elif name == "frame_2":
-            self.second_frame.lift()
+        elif name == "playlist_page":
+            self.playlist_page.lift()
         elif name == "frame_3":
             self.third_frame.lift()
         elif name == "new_youtube_playlist":
@@ -96,13 +101,14 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("home")
 
     def frame_2_button_event(self):
-        self.select_frame_by_name("frame_2")
+        self.select_frame_by_name("playlist_page")
 
     def frame_3_button_event(self):
         self.select_frame_by_name("frame_3")
 
     def change_appearance_mode_event(self, new_appearance_mode):
         customtkinter.set_appearance_mode(new_appearance_mode)
+        self.playlist_page.update_image_mode()
 
     def go_back(self):
         self.home_page.lift()
