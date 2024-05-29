@@ -15,16 +15,12 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.setup_ui()
 
     def setup_ui(self):
-        self.grid_columnconfigure(0, weight=1)
-
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent")
-        self.title_label.grid(row=0, column=0, pady=20, sticky="ew")
+        self.title_label.pack(pady=20, padx=20, fill="x")
 
-        self.tiles_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        self.tiles_frame.grid(row=1, column=0, pady=10, sticky="ew")
-        self.tiles_frame.grid_columnconfigure((0, 1, 2), weight=1)
-
-        self.tiles_frame.bind("<Configure>", self.onFrameConfigure)
+        self.scrollable_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
+        #Padding x ajouté car impossible de mettre les tiles au milieu
+        self.scrollable_frame.pack(fill="both", expand=True, pady=20, padx=(30, 0))
 
         self.load_playlists()
 
@@ -38,19 +34,13 @@ class PlaylistsPage(customtkinter.CTkFrame):
             ("ACID", "default_preview.png"),
             ("2STEP", "default_preview.png"),
             ("HARD", "default_preview.png"),
-            ("HARD", "default_preview.png"),
-            ("HARD", "default_preview.png"),
-            ("HARD", "default_preview.png"),
-            ("HARD", "default_preview.png"),
         ]
-
+        rowlen = 4
         for index, (title, image_file) in enumerate(playlists):
-            row = 1 + index // 3
-            column = index % 3
-            self.add_playlist_tile(row, column, title, image_file)
+            self.add_playlist_tile(1 + index // rowlen, index % rowlen, title, image_file)
 
     def add_playlist_tile(self, row, column, title, image_file):
-        frame = customtkinter.CTkFrame(self.tiles_frame, corner_radius=5, fg_color="transparent")
+        frame = customtkinter.CTkFrame(self.scrollable_frame, corner_radius=5, fg_color="transparent")
         frame.grid(row=row, column=column, padx=10, pady=10, sticky="nsew")
         canvas = Canvas(frame, width=180, height=140, bd=0, highlightthickness=0, bg=self['bg'])
         canvas.pack()
@@ -116,6 +106,3 @@ class PlaylistsPage(customtkinter.CTkFrame):
         im.putalpha(alpha)
         return im
     
-    def onFrameConfigure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))

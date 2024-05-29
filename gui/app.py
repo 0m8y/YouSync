@@ -19,6 +19,7 @@ class App(customtkinter.CTk):
         window_height = 650
         center_x = int(screen_width/2 - window_width/2)
         center_y = int(screen_height/2 - window_height/2)
+        self.resizable(width=False, height=False)
 
         self.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
 
@@ -62,35 +63,35 @@ class App(customtkinter.CTk):
         # self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         self.home_page = HomePage(self, image_path, corner_radius=0, fg_color="transparent")
-        self.playlist_page = PlaylistsPage(self, image_path, corner_radius=0, fg_color="transparent")
+        self.playlists_page = PlaylistsPage(self, image_path, corner_radius=0, fg_color="transparent")
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, image_path, fg_color="transparent")
 
         self.home_page.grid(row=0, column=1, sticky="nsew")
-        self.playlist_page.grid(row=0, column=1, sticky="nsew")
+        self.playlists_page.grid(row=0, column=1, sticky="nsew")
         self.third_frame.grid(row=0, column=1, sticky="nsew")
         self.new_youtube_playlist_page.grid(row=0, column=1, sticky="nsew")
 
-        self.playlist_page.lower()
+        self.playlists_page.lower()
         self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
 
-        self.select_frame_by_name("playlist_page")
+        self.select_frame_by_name("playlists_page")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")
 
     def select_frame_by_name(self, name):
         self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" else "transparent")
-        self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlist_page" else "transparent")
+        self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlists_page" else "transparent")
         self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
 
-        for frame in [self.home_page, self.playlist_page, self.third_frame, self.new_youtube_playlist_page]:
+        for frame in [self.home_page, self.playlists_page, self.third_frame, self.new_youtube_playlist_page]:
             frame.lower()
         if name == "home":
             self.home_page.lift()
-        elif name == "playlist_page":
-            self.playlist_page.lift()
+        elif name == "playlists_page":
+            self.playlists_page.lift()
         elif name == "frame_3":
             self.third_frame.lift()
         elif name == "new_youtube_playlist":
@@ -101,14 +102,14 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("home")
 
     def frame_2_button_event(self):
-        self.select_frame_by_name("playlist_page")
+        self.select_frame_by_name("playlists_page")
 
     def frame_3_button_event(self):
         self.select_frame_by_name("frame_3")
 
     def change_appearance_mode_event(self, new_appearance_mode):
         customtkinter.set_appearance_mode(new_appearance_mode)
-        self.playlist_page.update_image_mode()
+        self.playlists_page.update_image_mode()
 
     def go_back(self):
         self.home_page.lift()
