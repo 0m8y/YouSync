@@ -29,13 +29,17 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure(1, weight=1)
 
         self.image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
-        self.logo_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "YouSyncLogo_light.png")), 
-                                                 dark_image=Image.open(os.path.join(self.image_path, "YouSyncLogo_dark.png")), size=(180, 65))
-        self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "home_dark.png")), dark_image=Image.open(os.path.join(self.image_path, "home_light.png")), size=(20, 20))
-        self.playlist_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "chat_dark.png")),
-                                                 dark_image=Image.open(os.path.join(self.image_path, "chat_light.png")), size=(20, 20))
-        self.settings_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "chat_dark.png")),
-                                                     dark_image=Image.open(os.path.join(self.image_path, "chat_light.png")), size=(20, 20))
+        yousync_logo = Image.open(os.path.join(self.image_path, "YouSyncLogo.png"))
+        self.logo_image = customtkinter.CTkImage(light_image=yousync_logo, 
+                                                 dark_image=yousync_logo, size=(180, 65))
+        home_icon = Image.open(os.path.join(self.image_path, "home.png"))
+        self.home_image = customtkinter.CTkImage(light_image=home_icon, dark_image=home_icon, size=(20, 20))
+        playlist_icon = Image.open(os.path.join(self.image_path, "playlist.png"))
+        self.playlist_image = customtkinter.CTkImage(light_image=playlist_icon,
+                                                 dark_image=playlist_icon, size=(20, 20))
+        setting_icon = Image.open(os.path.join(self.image_path, "settings.png"))
+        self.settings_image = customtkinter.CTkImage(light_image=setting_icon,
+                                                     dark_image=setting_icon, size=(20, 20))
 
         self.navigation_frame = customtkinter.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")

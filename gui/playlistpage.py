@@ -53,8 +53,7 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         # Back Button
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
-        dark_back_image = Image.open(os.path.join(self.image_path, "back_dark.png"))
-        self.back_ctk_image = customtkinter.CTkImage(light_image=dark_back_image, dark_image=light_back_image)
+        self.back_ctk_image = customtkinter.CTkImage(light_image=light_back_image, dark_image=light_back_image)
         self.back_button = customtkinter.CTkButton(self, text="", command=self.parent.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
         self.back_button.place(x=15, y=30)
 

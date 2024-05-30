@@ -15,7 +15,6 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.image_path = image_path
         self.tiles = []
         self.light_sync_image = Image.open(os.path.join(self.image_path, "sync_light.png"))
-        self.dark_sync_image = Image.open(os.path.join(self.image_path, "sync_dark.png"))
         self.setup_ui()
 
     def setup_ui(self):

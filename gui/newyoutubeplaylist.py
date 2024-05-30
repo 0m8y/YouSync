@@ -26,8 +26,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
         # Back Button
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
-        dark_back_image = Image.open(os.path.join(self.image_path, "back_dark.png"))
-        self.back_ctk_image = customtkinter.CTkImage(light_image=dark_back_image, dark_image=light_back_image)
+        self.back_ctk_image = customtkinter.CTkImage(light_image=light_back_image, dark_image=light_back_image)
         self.back_button = customtkinter.CTkButton(self, text="", command=self.go_back, height=45, width=45, image=self.back_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
         self.back_button.place(x=30, y=30)
 
@@ -52,9 +51,8 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.path_entry.grid(row=4, column=1, padx=(0, 0), pady=10, sticky="ew")
 
         # Folder Button
-        light_photo_image = Image.open(os.path.join(self.image_path, "folder_light.png"))
-        dark_photo_image = Image.open(os.path.join(self.image_path, "folder_dark.png"))
-        self.folder_ctk_image = customtkinter.CTkImage(light_image=dark_photo_image, dark_image=light_photo_image)
+        light_photo_image = Image.open(os.path.join(self.image_path, "folder.png"))
+        self.folder_ctk_image = customtkinter.CTkImage(light_image=light_photo_image, dark_image=light_photo_image)
         self.browse_button = customtkinter.CTkButton(self, text="", command=self.browse_file, width=45, height=45, image=self.folder_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"), corner_radius=0)
         self.browse_button.grid(row=4, column=1, sticky="e")
 
