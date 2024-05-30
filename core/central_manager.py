@@ -1,9 +1,6 @@
-import os
-import json
 from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.utils import get_selenium_driver
-import requests
-import os
+import os, sys, json, requests
 
 class PlaylistData:
     def __init__(self, id, url, path, title):
@@ -36,7 +33,10 @@ class CentralManager:
         self.data = self.load_data()
 
     def get_project_path(self):
-        return os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, 'frozen', False):
+            return sys._MEIPASS
+        else:
+            return os.path.dirname(os.path.abspath(__file__))
 
     def load_data(self):
         if not os.path.exists(self.json_filepath):
@@ -148,20 +148,16 @@ class CentralManager:
         self.save_data()
 
     def update_playlist(self, playlist_id):
-        # Récupérer la playlist avec l'ID donné
         playlist = self.get_playlist(playlist_id)
         
         if not playlist:
             return f"Playlist with ID {playlist_id} not found."
 
-        # Récupérer le chemin et l'URL
         path_to_save_audio = os.path.dirname(os.path.dirname(playlist.path))
         playlist_url = playlist.url
 
-        # Instancier un YoutubePlaylistManager
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
         playlist_manager.update()
-        # Appeler la méthode update de YoutubePlaylistManager
 
 
     def list_playlists(self):
