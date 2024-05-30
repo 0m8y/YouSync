@@ -1,7 +1,7 @@
 import customtkinter
 from PIL import Image, ImageTk
 import os
-from utils import create_image
+from gui.utils import create_image
 
 class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, title, image_path, image_file, **kwargs):

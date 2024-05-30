@@ -1,5 +1,6 @@
-from core.youtube_playlist_manager import *
-
+from core.youtube_playlist_manager import YoutubePlaylistManager
+from core.central_manager import CentralManager
+from gui.app import App
 playlist_url = 'https://www.youtube.com/playlist?list=PLsOoDQgfBdd3rEtl2weVQ6XnQN421ODzq'
 path_to_save_audio = "D:\\OneDrive\\Mix\\All"
 
@@ -22,12 +23,22 @@ path_to_save_audio_cremaillere = "D:\\OneDrive\\Mix\\CremRap"
 playlist_url_test = 'https://www.youtube.com/playlist?list=PLsOoDQgfBdd0wOkApkqy5VutMnoK2RKeK'
 path_to_save_audio_test = "D:\\OneDrive\\Epsi\\dev_perso\\YouSync\\MyPlaylistTest"
 
-def main():
-   playlist_manager = YoutubePlaylistManager(playlist_url_cremaillere, path_to_save_audio_cremaillere)
+# def main():
+#    playlist_manager = YoutubePlaylistManager(playlist_url_cremaillere, path_to_save_audio_cremaillere)
 
 
-   playlist_manager.update()
-   playlist_manager.download()
+#    playlist_manager.update()
+#    playlist_manager.download()
 
 
-if __name__ == "__main__": main()
+# if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    manager = CentralManager("playlists.json")
+    print(manager.add_existing_playlists("D:\\OneDrive\\Mix\\Mateo"))
+    # manager.add_playlist("https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID", "/path/to/save/audio")
+    # print(manager.list_playlists())
+
+# if __name__ == "__main__":
+#     app = App()
+#     app.mainloop()

@@ -3,9 +3,9 @@ from PIL import Image, ImageTk
 import os
 from PIL import Image, ImageOps, ImageDraw
 from tkinter import Canvas
-from playlistpage import PlaylistPage
+from gui.playlistpage import PlaylistPage
 from tkinter import filedialog
-from utils import *
+from gui.utils import *
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):

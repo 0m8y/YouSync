@@ -2,9 +2,9 @@
 import customtkinter
 import os
 from PIL import Image, ImageOps
-from homepage import HomePage
-from newyoutubeplaylist import NewYoutubePlaylist
-from playlistspage import PlaylistsPage
+from gui.homepage import HomePage
+from gui.newyoutubeplaylist import NewYoutubePlaylist
+from gui.playlistspage import PlaylistsPage
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -119,8 +119,3 @@ class App(customtkinter.CTk):
 
     def go_back_playlists(self):
         self.playlists_page.lift()
-
-
-if __name__ == "__main__":
-    app = App()
-    app.mainloop()
