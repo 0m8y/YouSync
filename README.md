@@ -15,6 +15,11 @@ YouSync is an application that allows you to synchronize your playlists with you
 - **SoundCloud Support**: Sync SoundCloud playlists.
 - **Spotify Support**: Sync Spotify playlists.
 
+## Compatibility
+
+- **Windows**: YouSync has been tested and is confirmed to work on Windows.
+- **Linux and macOS**: Testing on Linux and macOS has not been completed yet but will be done soon.
+
 ## Installation
 
 Make sure you have Python and Chrome installed on your system. You can install the necessary dependencies with:
