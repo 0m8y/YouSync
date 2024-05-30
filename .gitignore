@@ -3,3 +3,4 @@ data
 __pycache__
 *.mp3
 *.txt
+*.json

@@ -82,16 +82,16 @@ class CentralManager:
         if os.path.basename(folder_path) == yousync_folder_name:
             print(f"Vous êtes déjà dans le dossier {yousync_folder_name}.")
         else:
-            yousync_folder_path = os.path.join(folder_path, yousync_folder_name)
-            if os.path.exists(yousync_folder_path) and os.path.isdir(yousync_folder_path):
-                os.chdir(yousync_folder_path)
+            folder_path = os.path.join(folder_path, yousync_folder_name)
+            if os.path.exists(folder_path) and os.path.isdir(folder_path):
+                os.chdir(folder_path)
                 print(f"Vous avez accédé au dossier {yousync_folder_name}.")
             else:
                 return f"Le dossier {yousync_folder_name} n'existe pas dans le répertoire courant."
 
-        for filename in os.listdir(yousync_folder_path):
+        for filename in os.listdir(folder_path):
             if filename.endswith(".json"):
-                filepath = os.path.join(yousync_folder_path, filename)
+                filepath = os.path.join(folder_path, filename)
                 try:
                     with open(filepath, 'r') as file:
                         playlist_data = json.load(file)
@@ -146,6 +146,23 @@ class CentralManager:
     def remove_playlist(self, playlist_id):
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
         self.save_data()
+
+    def update_playlist(self, playlist_id):
+        # Récupérer la playlist avec l'ID donné
+        playlist = self.get_playlist(playlist_id)
+        
+        if not playlist:
+            return f"Playlist with ID {playlist_id} not found."
+
+        # Récupérer le chemin et l'URL
+        path_to_save_audio = os.path.dirname(os.path.dirname(playlist.path))
+        playlist_url = playlist.url
+
+        # Instancier un YoutubePlaylistManager
+        playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+        playlist_manager.update()
+        # Appeler la méthode update de YoutubePlaylistManager
+
 
     def list_playlists(self):
         return [PlaylistData.from_dict(pl) if isinstance(pl, dict) else pl for pl in self.data["playlists"]]
