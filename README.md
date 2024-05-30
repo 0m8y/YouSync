@@ -51,6 +51,9 @@ Contributions are welcome! To submit changes, follow these steps:
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+> **Note**
+> Users are responsible for their actions and any potential legal consequences. We do not support the unauthorized downloading of copyrighted material and assume no responsibility for users' actions.
+
 ---
 
 Thank you for using YouSync! If you have any questions or suggestions, feel free to open an issue on GitHub.
