@@ -84,15 +84,17 @@ class YoutubePlaylistManager:
 
 #----------------------------------------GETTER----------------------------------------#
 
-    def __get_playlist_name(self, driver):
+    def get_playlist_name(self, driver):
         try:
             playlist_name_selector = "yt-formatted-string#text"
-            playlist_name = WebDriverWait(driver, 10).until(
+            playlist_name_element = WebDriverWait(driver, 10).until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, playlist_name_selector))
             )
+            playlist_name = playlist_name_element.get_attribute("textContent")
             return playlist_name
         except Exception as e:
             print(f"Une erreur est survenue lors de la récupération du nom de la playlist : {e}")
+            return None
 
     def __get_author_name(self, driver):
         try:
