@@ -93,25 +93,21 @@ class PlaylistsPage(customtkinter.CTkFrame):
         playlist_page.grid(row=0, column=1, sticky="nsew")
         playlist_page.lift()
 
-    def draw_round_button_with_image(self, canvas, x, y, image):
-        img_id = canvas.create_image(x, y, image=image)
-        canvas.tag_bind(img_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, image))
-
-    def start_rotation(self, canvas, image, angle=0, thread=None):
+    def start_rotation(self, canvas, image, playlist, angle=0, thread=None):
         if thread is None or not thread.is_alive():
             print("Rotation completed!")
             sync_icon_photo = ImageTk.PhotoImage(self.light_sync_image)
             canvas.itemconfig(canvas.sync_icon_id, image=sync_icon_photo)
             canvas.sync_icon_photo = sync_icon_photo
-            canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.start_rotation(c, self.light_sync_image))
+            canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.light_sync_image, playlist))
         else:
             rotated_image = image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
             canvas.itemconfig(canvas.sync_icon_id, image=rotated_photo)
             canvas.sync_icon_photo = rotated_photo  # Update reference!
-            canvas.after(50, lambda: self.start_rotation(canvas, image, angle + 10, thread))
+            canvas.after(50, lambda: self.start_rotation(canvas, image, playlist, angle + 10, thread))
 
     def update_playlist(self, canvas, image, playlist):
         update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
         update_thread.start()
-        self.start_rotation(canvas, image, thread=update_thread)
+        self.start_rotation(canvas, image, playlist, thread=update_thread)

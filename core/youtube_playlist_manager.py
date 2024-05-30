@@ -64,10 +64,6 @@ class YoutubePlaylistManager:
         print("Updating playlist " + self.id)
         #TODO: Not working, to update with new logic
         new_video_urls = self.__get_video_urls()
-        for video_url in self.video_urls:
-            print("video url: " + video_url)
-        for new_video_url in new_video_urls:
-            print("new video url: " + new_video_url)
 
         for new_video_url in new_video_urls:
             new_video_id = extract_video_id(new_video_url)
