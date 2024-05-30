@@ -11,7 +11,8 @@ YouSync is an application that allows you to synchronize your playlists with you
 - **Easy Sync**: Update your playlist with a single click.
 
 ### Upcoming Features
-
+- **Graphic Interface**: The graphical interface is currently under development. Coming soon !
+  
 - **SoundCloud Support**: Sync SoundCloud playlists.
 - **Spotify Support**: Sync Spotify playlists.
 
