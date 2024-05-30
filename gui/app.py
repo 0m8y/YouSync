@@ -26,14 +26,14 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
-        self.logo_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "YouSyncLogo_light.png")), 
-                                                 dark_image=Image.open(os.path.join(image_path, "YouSyncLogo_dark.png")), size=(180, 65))
-        self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "home_dark.png")), dark_image=Image.open(os.path.join(image_path, "home_light.png")), size=(20, 20))
-        self.playlist_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "chat_dark.png")),
-                                                 dark_image=Image.open(os.path.join(image_path, "chat_light.png")), size=(20, 20))
-        self.settings_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(image_path, "chat_dark.png")),
-                                                     dark_image=Image.open(os.path.join(image_path, "chat_light.png")), size=(20, 20))
+        self.image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
+        self.logo_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "YouSyncLogo_light.png")), 
+                                                 dark_image=Image.open(os.path.join(self.image_path, "YouSyncLogo_dark.png")), size=(180, 65))
+        self.home_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "home_dark.png")), dark_image=Image.open(os.path.join(self.image_path, "home_light.png")), size=(20, 20))
+        self.playlist_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "chat_dark.png")),
+                                                 dark_image=Image.open(os.path.join(self.image_path, "chat_light.png")), size=(20, 20))
+        self.settings_image = customtkinter.CTkImage(light_image=Image.open(os.path.join(self.image_path, "chat_dark.png")),
+                                                     dark_image=Image.open(os.path.join(self.image_path, "chat_light.png")), size=(20, 20))
 
         self.navigation_frame = customtkinter.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
@@ -62,10 +62,11 @@ class App(customtkinter.CTk):
                                                                 # command=self.change_appearance_mode_event, fg_color=("gray70", "gray30"), button_color=("gray80", "gray40"), button_hover_color=("gray90", "gray50"), text_color=("#282828", "#E5E4DE"))
         # self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
-        self.home_page = HomePage(self, image_path, corner_radius=0, fg_color="transparent")
-        self.playlists_page = PlaylistsPage(self, image_path, corner_radius=0, fg_color="transparent")
+        self.home_page = HomePage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        self.playlist_page = None
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.new_youtube_playlist_page = NewYoutubePlaylist(self, image_path, fg_color="transparent")
+        self.new_youtube_playlist_page = NewYoutubePlaylist(self, self.image_path, fg_color="transparent")
 
         self.home_page.grid(row=0, column=1, sticky="nsew")
         self.playlists_page.grid(row=0, column=1, sticky="nsew")
@@ -98,10 +99,12 @@ class App(customtkinter.CTk):
             self.new_youtube_playlist_page.lift()
 
     def home_button_event(self):
-        print("Home button clicked")
         self.select_frame_by_name("home")
 
     def frame_2_button_event(self):
+        if not self.playlist_page:
+            self.playlist_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+            self.playlist_page.grid(row=0, column=1, sticky="nsew")
         self.select_frame_by_name("playlists_page")
 
     def frame_3_button_event(self):
@@ -111,8 +114,12 @@ class App(customtkinter.CTk):
         customtkinter.set_appearance_mode(new_appearance_mode)
         self.playlists_page.update_image_mode()
 
-    def go_back(self):
+    def go_back_home(self):
         self.home_page.lift()
+
+    def go_back_playlists(self):
+        self.playlists_page.lift()
+
 
 if __name__ == "__main__":
     app = App()

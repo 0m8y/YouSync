@@ -16,7 +16,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         label.grid(row=row, column=1, columnspan=2, pady=(30, 0), sticky="w")
 
     def go_back(self):
-        self.parent_app.go_back()
+        self.parent_app.go_back_home()
 
 
     def setup_ui(self):
