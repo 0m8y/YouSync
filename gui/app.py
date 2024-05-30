@@ -5,10 +5,13 @@ from PIL import Image, ImageOps
 from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
 from gui.playlistspage import PlaylistsPage
+from core.central_manager import CentralManager
 
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
+
+        self.central_manager = CentralManager("playlists.json")
 
         self.title("YouSync")
         self.geometry("1100x650")
@@ -20,7 +23,6 @@ class App(customtkinter.CTk):
         center_x = int(screen_width/2 - window_width/2)
         center_y = int(screen_height/2 - window_height/2)
         self.resizable(width=False, height=False)
-
         self.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
 
         self.grid_rowconfigure(0, weight=1)

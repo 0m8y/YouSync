@@ -33,12 +33,12 @@ path_to_save_audio_test = "D:\\OneDrive\\Epsi\\dev_perso\\YouSync\\MyPlaylistTes
 
 # if __name__ == "__main__": main()
 
-if __name__ == "__main__":
-    manager = CentralManager("playlists.json")
-    print(manager.add_existing_playlists("D:\\OneDrive\\Mix\\Mateo"))
-    # manager.add_playlist("https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID", "/path/to/save/audio")
-    # print(manager.list_playlists())
-
 # if __name__ == "__main__":
-#     app = App()
-#     app.mainloop()
+#     manager = CentralManager("playlists.json")
+#     print(manager.add_existing_playlists("D:\\OneDrive\\Mix\\Mateo"))
+#     # manager.add_playlist("https://www.youtube.com/playlist?list=YOUR_PLAYLIST_ID", "/path/to/save/audio")
+#     # print(manager.list_playlists())
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()

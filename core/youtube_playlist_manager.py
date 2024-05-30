@@ -95,6 +95,18 @@ class YoutubePlaylistManager:
         except Exception as e:
             print(f"Une erreur est survenue lors de la récupération du nom de la playlist : {e}")
             return None
+        
+    def get_playlist_image_url(self, driver):
+        try:
+            image_selector = "img#img"
+            image_element = WebDriverWait(driver, 10).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, image_selector))
+            )
+            image_url = image_element.get_attribute("src")
+            return image_url
+        except Exception as e:
+            print(f"Une erreur est survenue lors de la récupération de l'URL de l'image : {e}")
+            return None
 
     def __get_author_name(self, driver):
         try:

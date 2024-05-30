@@ -12,7 +12,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         super().__init__(parent, **kwargs)
         self.parent = parent
         self.image_path = image_path
-        self.sync_images = []
+        self.tiles = []
         self.light_sync_image = Image.open(os.path.join(self.image_path, "sync_light.png"))
         self.dark_sync_image = Image.open(os.path.join(self.image_path, "sync_dark.png"))
         self.setup_ui()
@@ -34,31 +34,26 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
     # Mettez à jour la méthode add
     def add(self):
-        print("add")
-        # folder_selected = filedialog.askdirectory()
-        # if folder_selected:
-            # Suppose that the folder name is the playlist name and contains an image file named "cover.png"
-            # playlist_name = os.path.basename(folder_selected)
-            # cover_image_path = os.path.join(folder_selected, "cover.png")
-
-            # Add the new playlist to the list
-            # self.playlists.append((playlist_name, cover_image_path))
-            # self.load_playlists()
+        folder_selected = filedialog.askdirectory()
+        print(f"add on {folder_selected}")
+        if folder_selected:
+            response = self.parent.central_manager.add_existing_playlists(folder_selected)
+            print(f"{response}")
+            self.load_playlists()
 
     def load_playlists(self):
-        playlists = [
-            ("BigParty", "BigParty.png"),
-            ("CremRap", "default_preview.png"),
-            ("Rap US", "default_preview.png"),
-            ("Rap FR", "default_preview.png"),
-            ("Techno", "default_preview.png"),
-            ("ACID", "default_preview.png"),
-            ("2STEP", "default_preview.png"),
-            ("HARD", "default_preview.png"),
-        ]
+        for tile in self.tiles:
+            tile[1].destroy()
+        self.tiles.clear()
+
+        playlists = self.parent.central_manager.list_playlists()
         rowlen = 4
-        for index, (title, image_file) in enumerate(playlists):
-            self.add_playlist_tile(1 + index // rowlen, index % rowlen, title, image_file)
+        index = 0
+        for playlist in playlists:
+            print(f"playlist: {playlist.id}")
+            tile = self.add_playlist_tile(1 + index // rowlen, index % rowlen, playlist.title, "default_preview.png")
+            self.tiles.append((playlist.id, tile))
+            index += 1
 
     def add_playlist_tile(self, row, column, title, image_file):
         frame = customtkinter.CTkFrame(self.scrollable_frame, corner_radius=5, fg_color="transparent")
@@ -83,16 +78,17 @@ class PlaylistsPage(customtkinter.CTkFrame):
         title_label = customtkinter.CTkLabel(frame, text=title)
         title_label.pack(pady=(0, 10))
 
+        return frame
+
     def open_playlist_page(self, title, image_path):
-        # This method switches to the PlaylistPage, passing the title and image path
         playlist_page = PlaylistPage(self.parent, title, self.image_path, image_path, fg_color="transparent")
         playlist_page.grid(row=0, column=1, sticky="nsew")
         playlist_page.lift()
 
     def draw_round_button_with_image(self, canvas, x, y, image):
         img_id = canvas.create_image(x, y, image=image)
-        canvas.tag_bind(img_id, "<Button-1>", lambda event, c=canvas: self.start_rotation(c, image))
-        # canvas.tag_bind(img_id, "<Button-1>", self.button_click_action)
+        canvas.tag_bind(img_id, "<Button-1>", lambda event, c=canvas: self.button_click_action(c, image))
+        canvas.tag_bind(img_id, "<Button-1>", self.button_click_action)
 
     def start_rotation(self, canvas, image, angle=0):
         if angle < 360:
@@ -108,8 +104,9 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.sync_icon_photo = sync_icon_photo
             canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.start_rotation(c, self.light_sync_image))
 
-    def button_click_action(self, event):
+    def button_click_action(self, canvas, image):
         print("Button clicked!")
+        self.start_rotation(canvas, image)
 
     def update_image_mode(self, mode):
         if mode == "light":
