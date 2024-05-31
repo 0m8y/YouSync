@@ -143,6 +143,7 @@ class CentralManager:
                             )
                             self.data["playlists"].append(playlist_info.to_dict())
                             self.playlist_managers.append(playlist_manager)
+                            self.save_data()
                             playlist_count += 1
                         else:
                             print(f"Les données dans le fichier {filename} sont incomplètes.")

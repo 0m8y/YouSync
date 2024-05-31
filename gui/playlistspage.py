@@ -22,6 +22,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.notification_manager = NotificationManager(self, self.image_path)
+        self.adding_folder = False
         self.syncing_playlists = []
         self.parent.central_manager = CentralManager("playlists.json", self.update_progress)
         self.join_thread = threading.Thread(target=self.join_load_managers_thread)
@@ -56,8 +57,16 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.notification_manager.show_notification("Playlists loaded successfully!")
 
     def add(self):
+        if self.adding_folder:
+            self.notification_manager.show_notification(
+                "One file is already being recovered. Please try again later.",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            return
         folder_selected = filedialog.askdirectory()
         if folder_selected:
+            self.adding_folder = True
             add_thread = threading.Thread(target=self.parent.central_manager.add_existing_playlists, args=(folder_selected,))
             add_thread.start()
             self.sync_add_button_rotation(add_thread)
@@ -73,7 +82,9 @@ class PlaylistsPage(customtkinter.CTkFrame):
             print("Addition completed!")
             self.add_button.configure(image=self.add_ctk_image)
             self.add_button.image = self.add_ctk_image
+            self.adding_folder = False
             self.load_playlists()
+
 
     def load_playlists(self):
         for tile in self.tiles:
