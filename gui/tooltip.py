@@ -1,4 +1,5 @@
 from tkinter import Toplevel, Label
+from gui.style import *
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -27,7 +28,7 @@ class ToolTip:
         self.tipwindow = Toplevel(self.widget)
         self.tipwindow.wm_overrideredirect(True)
         self.tipwindow.wm_geometry(f"+{x}+{y}")
-        label = Label(self.tipwindow, text=self.text, background="#404040", relief="solid", borderwidth=1, fg="#E5E4DE")
+        label = Label(self.tipwindow, text=self.text, background=BUTTON_COLOR, relief="solid", borderwidth=1, fg=WHITE_TEXT_COLOR)
         label.pack()
 
     def hide_tip(self, event=None):

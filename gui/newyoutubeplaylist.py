@@ -3,6 +3,8 @@ from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
 import os
 import re
+from gui.style import *
+
 
 class NewYoutubePlaylist(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -12,7 +14,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.setup_ui()
 
     def create_label(self, text, row):
-        label = customtkinter.CTkLabel(self, text=text, text_color=("#282828", "#E5E4DE"), font=('Roboto Medium', 25))
+        label = customtkinter.CTkLabel(self, text=text, text_color=WHITE_TEXT_COLOR, font=('Roboto Medium', 25))
         label.grid(row=row, column=1, columnspan=2, pady=(30, 0), sticky="w")
 
     def go_back(self):
@@ -27,7 +29,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         # Back Button
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
         self.back_ctk_image = customtkinter.CTkImage(light_image=light_back_image, dark_image=light_back_image)
-        self.back_button = customtkinter.CTkButton(self, text="", command=self.go_back, height=45, width=45, image=self.back_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
+        self.back_button = customtkinter.CTkButton(self, text="", command=self.go_back, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=30, y=30)
 
         # Logo YouTube
@@ -41,28 +43,28 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
         # Youtube URL Section
         self.create_label("Enter Playlist URL", 1)
-        self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=("#bdbdbd", "#333333"))
+        self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
         self.url_entry.grid(row=2, column=1, padx=(0, 0), pady=10, sticky="ew")
 
         # Path Section
         self.create_label("Search path to save playlist", 3)
-        self.path_entry = customtkinter.CTkEntry(self, placeholder_text="Path to save", width=600, height=45, border_width=0, fg_color=("#bdbdbd", "#333333"))
+        self.path_entry = customtkinter.CTkEntry(self, placeholder_text="Path to save", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
         self.path_entry.configure(state="disabled")
         self.path_entry.grid(row=4, column=1, padx=(0, 0), pady=10, sticky="ew")
 
         # Folder Button
         light_photo_image = Image.open(os.path.join(self.image_path, "folder.png"))
         self.folder_ctk_image = customtkinter.CTkImage(light_image=light_photo_image, dark_image=light_photo_image)
-        self.browse_button = customtkinter.CTkButton(self, text="", command=self.browse_file, width=45, height=45, image=self.folder_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"), corner_radius=0)
+        self.browse_button = customtkinter.CTkButton(self, text="", command=self.browse_file, width=45, height=45, image=self.folder_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, corner_radius=0)
         self.browse_button.grid(row=4, column=1, sticky="e")
 
         # Save Button
         self.save_button = customtkinter.CTkButton(self, text="Save", command=self.save, width=120, height=45,
-                                                    fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"), text_color=("#282828", "#E5E4DE"))
+                                                    fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
         self.save_button.grid(row=5, column=1, padx=(0, 0), pady=40)
 
         # Notification Section
-        self.notification_label = customtkinter.CTkLabel(self, text="", text_color=("#FF0000", "#FFFFFF"))
+        self.notification_label = customtkinter.CTkLabel(self, text="", text_color=WHITE_TEXT_COLOR)
         self.notification_label.grid(row=6, column=1, sticky="ew")
 
     def browse_file(self):

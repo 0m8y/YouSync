@@ -2,6 +2,7 @@ import customtkinter
 from PIL import Image, ImageTk
 import os
 from gui.utils import create_image
+from gui.style import *
 
 class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
@@ -55,7 +56,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         # Back Button
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
         self.back_ctk_image = customtkinter.CTkImage(light_image=light_back_image, dark_image=light_back_image)
-        self.back_button = customtkinter.CTkButton(self, text="", command=self.parent.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
+        self.back_button = customtkinter.CTkButton(self, text="", command=self.parent.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=15, y=30)
 
     def add_song_list(self):
@@ -63,7 +64,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         for i in range(1, 27):
-            bg_color = "#2E2E2E" if i % 2 == 0 else "transparent"
+            bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
             song_frame = customtkinter.CTkFrame(song_list_frame, fg_color=bg_color, height=40)
             song_frame.grid_columnconfigure(0, weight=0)
             song_frame.grid_columnconfigure(1, weight=5)

@@ -6,6 +6,7 @@ from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
 from gui.playlistspage import PlaylistsPage
 from core.central_manager import CentralManager
+from gui.style import *
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -15,6 +16,7 @@ class App(customtkinter.CTk):
 
         self.title("YouSync")
         self.geometry("1100x650")
+        self._fg_color = FIRST_COLOR
 
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -50,23 +52,19 @@ class App(customtkinter.CTk):
         self.navigation_frame_label.grid(row=0, column=0, padx=20, pady=20)
 
         self.home_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Home",
-                                                   fg_color="transparent", text_color=("#282828", "#E5E4DE"), hover_color=("gray70", "gray30"),
+                                                   fg_color="transparent", text_color=WHITE_TEXT_COLOR, hover_color=HOVER_COLOR,
                                                    image=self.home_image, anchor="w", command=self.home_button_event)
         self.home_button.grid(row=1, column=0, sticky="ew")
 
         self.frame_2_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Playlists",
-                                                      fg_color="transparent", text_color=("#282828", "#E5E4DE"), hover_color=("gray70", "gray30"),
+                                                      fg_color="transparent", text_color=WHITE_TEXT_COLOR, hover_color=HOVER_COLOR,
                                                       image=self.playlist_image, anchor="w", command=self.frame_2_button_event)
         self.frame_2_button.grid(row=2, column=0, sticky="ew")
 
         self.frame_3_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Settings",
-                                                      fg_color="transparent", text_color=("#282828", "#E5E4DE"), hover_color=("gray70", "gray30"),
+                                                      fg_color="transparent", text_color=WHITE_TEXT_COLOR, hover_color=HOVER_COLOR,
                                                       image=self.settings_image, anchor="w", command=self.frame_3_button_event)
         self.frame_3_button.grid(row=3, column=0, sticky="ew")
-
-        # self.appearance_mode_menu = customtkinter.CTkOptionMenu(self.navigation_frame, values=["Dark", "Light", "System"],
-                                                                # command=self.change_appearance_mode_event, fg_color=("gray70", "gray30"), button_color=("gray80", "gray40"), button_hover_color=("gray90", "gray50"), text_color=("#282828", "#E5E4DE"))
-        # self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         self.home_page = HomePage(self, self.image_path, corner_radius=0, fg_color="transparent")
         self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
@@ -89,7 +87,7 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("new_youtube_playlist")
 
     def select_frame_by_name(self, name):
-        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" else "transparent")
+        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" or name == "new_youtube_playlist" else "transparent")
         self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlists_page" else "transparent")
         self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
 

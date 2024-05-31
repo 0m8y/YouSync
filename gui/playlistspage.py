@@ -8,7 +8,8 @@ from tkinter import filedialog
 from gui.utils import *
 import threading
 from gui.tooltip import ToolTip
-from gui.notificationmanager import Notification, NotificationManager
+from gui.notificationmanager import NotificationManager
+from gui.style import *
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -21,9 +22,10 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.notification_manager = NotificationManager(self)
         self.setup_ui()
         self.on_update = False
+        self.syncing_playlists = []
 
     def setup_ui(self):
-        self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent")
+        self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         self.title_label.pack(pady=20, padx=20, fill="x")
 
         self.scrollable_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
@@ -32,7 +34,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         # Add Button
         add_image = Image.open(os.path.join(self.image_path, "add.png"))
         self.add_ctk_image = customtkinter.CTkImage(light_image=add_image, dark_image=add_image)
-        self.add_button = customtkinter.CTkButton(self, text="", command=self.add, height=45, width=45, image=self.add_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
+        self.add_button = customtkinter.CTkButton(self, text="", command=self.add, height=45, width=45, image=self.add_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         #!!! x postition hardcoded, need to replace logic
         self.add_button.place(x=800, y=30)
         ToolTip(self.add_button, "Retreive existing playlist")
@@ -103,7 +105,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
         canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas, p=playlist: self.update_playlist(c, self.sync_image, p))
 
-        title_label = customtkinter.CTkLabel(frame, text=self.truncate_string(playlist.title, 18))
+        title_label = customtkinter.CTkLabel(frame, text=self.truncate_string(playlist.title, 18), text_color=WHITE_TEXT_COLOR)
         title_label.pack(pady=(0, 10))
 
         return frame
@@ -120,7 +122,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.itemconfig(canvas.sync_icon_id, image=sync_icon_photo)
             canvas.sync_icon_photo = sync_icon_photo
             canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.sync_image, playlist))
-            self.on_update = False
+            self.syncing_playlists.remove(playlist.id)
         else:
             rotated_image = image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
@@ -129,14 +131,14 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.after(50, lambda: self.sync_playlist_rotation(canvas, image, playlist, angle + 10, thread))
 
     def update_playlist(self, canvas, image, playlist):
-        if self.on_update:
+        if playlist.id in self.syncing_playlists:
             self.notification_manager.show_notification(
                 "This playlist is being synchronized. Please try again later.",
                 duration=5000,
-                text_color="#E5E4DE"
+                text_color=WHITE_TEXT_COLOR
             )
         elif self.parent.central_manager.playlist_loaded:
-            self.on_update = True
+            self.syncing_playlists.append(playlist.id)
             update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
             update_thread.start()
             self.sync_playlist_rotation(canvas, image, playlist, thread=update_thread)
@@ -144,8 +146,9 @@ class PlaylistsPage(customtkinter.CTkFrame):
             self.notification_manager.show_notification(
                 "Playlist is not yet loaded. Please try again later.",
                 duration=5000,
-                text_color="#E5E4DE"
+                text_color=WHITE_TEXT_COLOR
             )
 
 #TODO: Notification lorsque on clique sur sync et qu'il est déjà en train de se sync
 #TODO: Notification lorsque on clique sur add et qu'il est déjà en chargement d'une playlist
+#TODO: Notification de début et de fin de chargement des playlists

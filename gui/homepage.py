@@ -1,6 +1,7 @@
 from PIL import Image, ImageOps, ImageTk
 import customtkinter
 import os
+from gui.style import *
 
 class HomePage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -14,7 +15,7 @@ class HomePage(customtkinter.CTkFrame):
         self.__create_youtube_button__()
 
     def create_label(self, text):
-        label = customtkinter.CTkLabel(self, text=text, text_color=("#282828", "#E5E4DE"), font=('Roboto Medium', 32))
+        label = customtkinter.CTkLabel(self, text=text, text_color=WHITE_TEXT_COLOR, font=('Roboto Medium', 32))
         label.grid(row=0, column=0, columnspan=2, pady=(30, 0), sticky="ew")
 
     def __create_youtube_button__(self):
@@ -25,7 +26,7 @@ class HomePage(customtkinter.CTkFrame):
 
         self.youtube_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
                                                          command=self.youtube_button_event, text="",
-                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
+                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.youtube_button.image = tk_image
         self.youtube_button.grid(row=1, column=0, padx=(50, 0), pady=(30, 0))
 
@@ -38,7 +39,7 @@ class HomePage(customtkinter.CTkFrame):
 
         self.soundcloud_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
                                                          command=self.soundcloud_button_event, text="",
-                                                         fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
+                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.soundcloud_button.image = tk_image
         self.soundcloud_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
 
