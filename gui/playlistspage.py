@@ -67,6 +67,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
             return
         folder_selected = filedialog.askdirectory()
         if folder_selected:
+            self.notification_manager.show_notification(
+                "Start of playlist recovery.",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
             self.adding_folder = True
             add_thread = threading.Thread(target=self.parent.central_manager.add_existing_playlists, args=(folder_selected,))
             add_thread.start()
@@ -85,6 +90,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
             self.add_button.image = self.add_ctk_image
             self.adding_folder = False
             self.load_playlists()
+            self.notification_manager.show_notification(
+                "New playlist loaded!",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
 
 
     def load_playlists(self):
@@ -155,6 +165,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.sync_icon_photo = sync_icon_photo
             canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.sync_image, playlist))
             self.syncing_playlists.remove(playlist.id)
+            self.notification_manager.show_notification(
+                f"{playlist.title} is synchronized.",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
         else:
             rotated_image = image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
@@ -170,6 +185,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 text_color=WHITE_TEXT_COLOR
             )
         elif self.parent.central_manager.playlist_loaded:
+            self.notification_manager.show_notification(
+                f"{playlist.title} synchronization in progress...",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
             self.syncing_playlists.append(playlist.id)
             update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
             update_thread.start()
