@@ -8,8 +8,10 @@ from tkinter import filedialog
 from gui.utils import *
 import threading
 from gui.tooltip import ToolTip
-from gui.notificationmanager import NotificationManager
+from gui.notifications.notificationmanager import NotificationManager
 from gui.style import *
+from core.central_manager import CentralManager
+
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -19,13 +21,18 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.tiles = []
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
-        self.notification_manager = NotificationManager(self)
-        self.on_update = False
+        self.notification_manager = NotificationManager(self, self.image_path)
         self.syncing_playlists = []
+        self.parent.central_manager = CentralManager("playlists.json", self.update_progress)
         self.join_thread = threading.Thread(target=self.join_load_managers_thread)
         self.join_thread.start()
+        len(self.parent.central_manager.list_playlists())
         self.setup_ui()
 
+    def update_progress(self, current, total ):
+        if self.notification_manager.progress_notification is None:
+            self.notification_manager.show_progress_bar_notification(total)
+        self.notification_manager.update_progress_bar_notification(current)
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)

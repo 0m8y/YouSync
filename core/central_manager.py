@@ -31,11 +31,13 @@ class PlaylistData:
         )
 
 class CentralManager:
-    def __init__(self, json_filename):
+    def __init__(self, json_filename, progress_callback=None):
+        print("CentralManager Open")
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
         self.data = self.load_data()
         self.playlist_managers = []
+        self.progress_callback = progress_callback
         self.load_managers_thread = threading.Thread(target=self.instantiate_playlist_managers)
         self.load_managers_thread.start()
         self.playlist_loaded = False
@@ -67,10 +69,15 @@ class CentralManager:
     def instantiate_playlist_managers(self):
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(self.create_playlist_manager, pl) for pl in self.data["playlists"]]
-            for future in futures:
+            total_playlists = len(futures)
+            self.progress_callback(0, total_playlists)
+            for i, future in enumerate(futures):
                 result = future.result()
                 if result:
                     self.playlist_managers.append(result)
+                if self.progress_callback:
+                    print("Progress callback")
+                    self.progress_callback(i + 1, total_playlists)
         self.playlist_loaded = True
 
     def create_playlist_manager(self, pl):

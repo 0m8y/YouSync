@@ -1,19 +1,15 @@
 #app.py
 import customtkinter
 import os
-from PIL import Image, ImageOps
+from PIL import Image
 from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
 from gui.playlistspage import PlaylistsPage
-from core.central_manager import CentralManager
 from gui.style import *
-import threading
 
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-
-        self.central_manager = CentralManager("playlists.json")
 
         self.title("YouSync")
         self.geometry("1100x650")
@@ -69,6 +65,7 @@ class App(customtkinter.CTk):
 
         self.home_page = HomePage(self, self.image_path, corner_radius=0, fg_color="transparent")
         
+        self.central_manager = None
         self.playlist_page = None
         self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
 
