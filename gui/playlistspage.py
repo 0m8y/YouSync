@@ -1,12 +1,13 @@
 import customtkinter
 from PIL import Image, ImageTk
 import os
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image
 from tkinter import Canvas
 from gui.playlistpage import PlaylistPage
 from tkinter import filedialog
 from gui.utils import *
 import threading
+from gui.tooltip import ToolTip
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -14,7 +15,8 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.parent = parent
         self.image_path = image_path
         self.tiles = []
-        self.light_sync_image = Image.open(os.path.join(self.image_path, "sync_light.png"))
+        self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
+        self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.setup_ui()
 
     def setup_ui(self):
@@ -28,17 +30,31 @@ class PlaylistsPage(customtkinter.CTkFrame):
         add_image = Image.open(os.path.join(self.image_path, "add.png"))
         self.add_ctk_image = customtkinter.CTkImage(light_image=add_image, dark_image=add_image)
         self.add_button = customtkinter.CTkButton(self, text="", command=self.add, height=45, width=45, image=self.add_ctk_image, fg_color=("#bdbdbd", "#333333"), hover_color=("gray70", "gray30"))
-        self.add_button.place(x=30, y=30)
+        #!!! x postition hardcoded, need to replace logic
+        self.add_button.place(x=800, y=30)
+        ToolTip(self.add_button, "Retreive existing playlist")
 
         self.load_playlists()
 
     # Mettez à jour la méthode add
     def add(self):
         folder_selected = filedialog.askdirectory()
-        print(f"add on {folder_selected}")
         if folder_selected:
-            response = self.parent.central_manager.add_existing_playlists(folder_selected)
-            print(f"{response}")
+            add_thread = threading.Thread(target=self.parent.central_manager.add_existing_playlists, args=(folder_selected,))
+            add_thread.start()
+            self.sync_add_button_rotation(add_thread)
+
+    def sync_add_button_rotation(self, thread, angle=0):
+        if thread.is_alive():
+            rotated_image = self.load_image.rotate(angle)
+            rotated_photo = ImageTk.PhotoImage(rotated_image)
+            self.add_button.configure(image=rotated_photo)
+            self.add_button.image = rotated_photo  # Update reference
+            self.add_button.after(50, lambda: self.sync_add_button_rotation(thread, angle + 10))
+        else:
+            print("Addition completed!")
+            self.add_button.configure(image=self.add_ctk_image)
+            self.add_button.image = self.add_ctk_image
             self.load_playlists()
 
     def load_playlists(self):
@@ -77,12 +93,12 @@ class PlaylistsPage(customtkinter.CTkFrame):
         image_id = canvas.create_image(90, 70, image=photo_img)
         canvas.image = photo_img
 
-        sync_icon_photo = ImageTk.PhotoImage(self.light_sync_image)
+        sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         canvas.sync_icon_id = canvas.create_image(160, 120, image=sync_icon_photo)
         canvas.sync_icon_photo = sync_icon_photo
         canvas.tag_bind(image_id, "<Button-1>", lambda event, title=playlist.title, image_path=image_path: self.open_playlist_page(title, image_path))
 
-        canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas, p=playlist: self.update_playlist(c, self.light_sync_image, p))
+        canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas, p=playlist: self.update_playlist(c, self.sync_image, p))
 
         title_label = customtkinter.CTkLabel(frame, text=self.truncate_string(playlist.title, 18))
         title_label.pack(pady=(0, 10))
@@ -94,21 +110,21 @@ class PlaylistsPage(customtkinter.CTkFrame):
         playlist_page.grid(row=0, column=1, sticky="nsew")
         playlist_page.lift()
 
-    def start_rotation(self, canvas, image, playlist, angle=0, thread=None):
+    def sync_playlist_rotation(self, canvas, image, playlist, angle=0, thread=None):
         if thread is None or not thread.is_alive():
             print("Rotation completed!")
-            sync_icon_photo = ImageTk.PhotoImage(self.light_sync_image)
+            sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
             canvas.itemconfig(canvas.sync_icon_id, image=sync_icon_photo)
             canvas.sync_icon_photo = sync_icon_photo
-            canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.light_sync_image, playlist))
+            canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.sync_image, playlist))
         else:
             rotated_image = image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
             canvas.itemconfig(canvas.sync_icon_id, image=rotated_photo)
             canvas.sync_icon_photo = rotated_photo  # Update reference!
-            canvas.after(50, lambda: self.start_rotation(canvas, image, playlist, angle + 10, thread))
+            canvas.after(50, lambda: self.sync_playlist_rotation(canvas, image, playlist, angle + 10, thread))
 
     def update_playlist(self, canvas, image, playlist):
         update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
         update_thread.start()
-        self.start_rotation(canvas, image, playlist, thread=update_thread)
+        self.sync_playlist_rotation(canvas, image, playlist, thread=update_thread)
