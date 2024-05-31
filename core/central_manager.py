@@ -1,7 +1,6 @@
 from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.utils import get_selenium_driver
-import os, sys, json, requests
-import datetime
+import os, sys, json, requests, datetime, threading
 
 class PlaylistData:
     def __init__(self, id, url, path, title, last_update=None):
@@ -35,6 +34,10 @@ class CentralManager:
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
         self.data = self.load_data()
+        self.playlist_managers = []
+        self.load_managers_thread = threading.Thread(target=self.instantiate_playlist_managers)
+        self.load_managers_thread.start()
+        self.playlist_loaded = False
 
     def get_project_path(self):
         if getattr(sys, 'frozen', False):
@@ -60,6 +63,13 @@ class CentralManager:
                 "playlists": [pl.to_dict() if isinstance(pl, PlaylistData) else PlaylistData.from_dict(pl).to_dict() for pl in self.data["playlists"]]
             }, file, indent=4)
 
+    def instantiate_playlist_managers(self):
+        for pl in self.data["playlists"]:
+            path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
+            manager = YoutubePlaylistManager(pl.url, path_to_save_audio)
+            self.playlist_managers.append(manager)
+        self.playlist_loaded = True
+
     def add_playlist(self, playlist_url, path_to_save_audio):
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
 
@@ -74,6 +84,7 @@ class CentralManager:
             title=playlist_name,
         )
         self.data["playlists"].append(playlist_info.to_dict())
+        self.playlist_managers.append(playlist_manager)
         self.save_data()
 
     def add_existing_playlists(self, folder_path):
@@ -117,6 +128,7 @@ class CentralManager:
                                 title=playlist_name,
                             )
                             self.data["playlists"].append(playlist_info.to_dict())
+                            self.playlist_managers.append(playlist_manager)
                             playlist_count += 1
                         else:
                             print(f"Les données dans le fichier {filename} sont incomplètes.")
@@ -154,6 +166,7 @@ class CentralManager:
 
     def remove_playlist(self, playlist_id):
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
+        self.playlist_managers = [pm for pm in self.playlist_managers if pm.id != playlist_id]
         self.save_data()
 
     def update_playlist(self, playlist_id):
@@ -162,13 +175,11 @@ class CentralManager:
         if not playlist:
             return f"Playlist with ID {playlist_id} not found."
 
-        path_to_save_audio = os.path.dirname(os.path.dirname(playlist.path))
-        playlist_url = playlist.url
-
-        playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
-        playlist_manager.update()
-        playlist.last_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.save_data()
+        playlist_manager = next((pm for pm in self.playlist_managers if pm.id == playlist_id), None)
+        if playlist_manager:
+            playlist_manager.update()
+            playlist.last_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save_data()
 
 
     def list_playlists(self):
