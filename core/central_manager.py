@@ -97,7 +97,7 @@ class CentralManager:
             path= playlist_manager.playlist_data_filepath,
             title=playlist_name,
         )
-        self.data["playlists"].append(playlist_info.to_dict())
+        self.data["playlists"].append(playlist_info)
         self.playlist_managers.append(playlist_manager)
         self.save_data()
 
@@ -141,7 +141,7 @@ class CentralManager:
                                 path=filepath,
                                 title=playlist_name,
                             )
-                            self.data["playlists"].append(playlist_info.to_dict())
+                            self.data["playlists"].append(playlist_info)
                             self.playlist_managers.append(playlist_manager)
                             self.save_data()
                             playlist_count += 1
