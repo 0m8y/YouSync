@@ -24,9 +24,10 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.notification_manager = NotificationManager(self, self.image_path)
         self.adding_folder = False
         self.syncing_playlists = []
-        self.parent.central_manager = CentralManager("playlists.json", self.update_progress)
-        self.join_thread = threading.Thread(target=self.join_load_managers_thread)
-        self.join_thread.start()
+        if self.parent.central_manager is None:
+            self.parent.central_manager = CentralManager("playlists.json", self.update_progress)
+            self.join_thread = threading.Thread(target=self.join_load_managers_thread)
+            self.join_thread.start()
         len(self.parent.central_manager.list_playlists())
         self.setup_ui()
 
