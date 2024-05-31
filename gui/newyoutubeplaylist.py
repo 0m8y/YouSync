@@ -76,11 +76,13 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
     def save(self):
         url = self.url_entry.get()
         path = self.path_entry.get()
-        if not self.validate_youtube_url(url):
-            self.notification_label.configure(text="Please enter a valid YouTube URL.", text_color=("red"))
-        elif not self.validate_path(path):
+        # if not self.validate_youtube_url(url):
+        #     self.notification_label.configure(text="Please enter a valid YouTube URL.", text_color=("red"))
+        if not self.validate_path(path):
             self.notification_label.configure(text="Please enter a valid path.", text_color=("red"))
         else:
+            self.parent_app.central_manager.add_playlist(url, path)
+            self.parent_app.playlists_page.load_playlists()
             self.notification_label.configure(text="The YouTube URL is valid.", text_color=("green"))
 
     def validate_youtube_url(self, url):

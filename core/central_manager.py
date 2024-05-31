@@ -58,15 +58,16 @@ class CentralManager:
 
     def add_playlist(self, playlist_url, path_to_save_audio):
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
-        playlist_name = playlist_manager.get_playlist_name(get_selenium_driver(playlist_url))
 
         if any(pl.id == playlist_manager.id for pl in self.data["playlists"]):
             return "The playlist is already registered."
+        
+        playlist_name = self.save_picture_and_get_title(playlist_url, playlist_manager, path_to_save_audio)
             
         playlist_info = PlaylistData(
             id=playlist_manager.id,
             url=playlist_url,
-            path= playlist_manager.path_to_save_audio,
+            path= playlist_manager.playlist_data_filepath,
             title=playlist_name
         )
         self.data["playlists"].append(playlist_info.to_dict())
@@ -100,27 +101,12 @@ class CentralManager:
                         
                         if playlist_url and path_to_save_audio:
                             playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
-                            driver = get_selenium_driver(playlist_url)
-                            playlist_name = playlist_manager.get_playlist_name(driver)
-                            playlist_picture = playlist_manager.get_playlist_image_url(driver)
-                            print(f"Playlist Picture: {playlist_picture}")
-
-                            yousync_path = os.path.join(path_to_save_audio, '.yousync')
-                            if not os.path.exists(yousync_path):
-                                os.makedirs(yousync_path)
-
-                            image_path = os.path.join(yousync_path, f"cover.jpg")
-                            response = requests.get(playlist_picture)
-                            if response.status_code == 200:
-                                with open(image_path, 'wb') as img_file:
-                                    img_file.write(response.content)
-                                print(f"Image enregistrée à: {image_path}")
-                            else:
-                                print(f"Erreur lors du téléchargement de l'image: {response.status_code}")
 
                             if any(PlaylistData.from_dict(pl).id == playlist_manager.id if isinstance(pl, dict) else pl.id == playlist_manager.id for pl in self.data["playlists"]):
                                 print(f"La playlist avec l'ID {playlist_manager.id} existe déjà.")
                                 continue
+
+                            playlist_name = self.save_picture_and_get_title(playlist_url, playlist_manager, path_to_save_audio)
 
                             playlist_info = PlaylistData (
                                 id=playlist_manager.id,
@@ -142,6 +128,27 @@ class CentralManager:
             return "1 playlist has been found !"
         else:
             return f"{playlist_count} playlists were found !"
+
+    def save_picture_and_get_title(self, playlist_url, playlist_manager, path_to_save_audio):
+        driver = get_selenium_driver(playlist_url)
+        playlist_name = playlist_manager.get_playlist_name(driver)
+        playlist_picture = playlist_manager.get_playlist_image_url(driver)
+        print(f"Playlist Picture: {playlist_picture}")
+
+        yousync_path = os.path.join(path_to_save_audio, '.yousync')
+        if not os.path.exists(yousync_path):
+            os.makedirs(yousync_path)
+
+        image_path = os.path.join(yousync_path, f"cover.jpg")
+        response = requests.get(playlist_picture)
+        if response.status_code == 200:
+            with open(image_path, 'wb') as img_file:
+                img_file.write(response.content)
+            print(f"Image enregistrée à: {image_path}")
+        else:
+            print(f"Erreur lors du téléchargement de l'image: {response.status_code}")
+        return playlist_name
+
 
     def remove_playlist(self, playlist_id):
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
