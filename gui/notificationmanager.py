@@ -5,7 +5,7 @@ from tkinter import Toplevel
 from gui.style import *
 
 class Notification(Toplevel):
-    def __init__(self, parent, message, duration=5000, text_color=WHITE_TEXT_COLOR, **kwargs):
+    def __init__(self, parent, message, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR, **kwargs):
         super().__init__(parent.parent)
         self.parent = parent
         self.message = message
@@ -34,7 +34,7 @@ class NotificationManager:
         self.parent = parent
         self.notifications = []
 
-    def show_notification(self, message, duration=5000, text_color=WHITE_TEXT_COLOR):
+    def show_notification(self, message, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR):
         notification = Notification(self, message, duration, text_color=text_color)
         self.notifications.append(notification)
         self.place_notification()

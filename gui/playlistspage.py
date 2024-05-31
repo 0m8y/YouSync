@@ -134,7 +134,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         if playlist.id in self.syncing_playlists:
             self.notification_manager.show_notification(
                 "This playlist is being synchronized. Please try again later.",
-                duration=5000,
+                duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
         elif self.parent.central_manager.playlist_loaded:
@@ -145,7 +145,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         else:
             self.notification_manager.show_notification(
                 "Playlist is not yet loaded. Please try again later.",
-                duration=5000,
+                duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
 
