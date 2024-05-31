@@ -57,6 +57,8 @@ class PlaylistsPage(customtkinter.CTkFrame):
             index += 1
 
     def truncate_string(self, s, max_length):
+        if s is None:
+            return None
         if len(s) > max_length:
             return s[:max_length-3] + "..."
         return s
