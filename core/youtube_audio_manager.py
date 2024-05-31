@@ -19,7 +19,6 @@ class YoutubeAudioManager:
         self.path_to_save_audio = path_to_save_audio
         self.yt = YouTube(self.url)
         self.video_title = find_title_yt(self.yt)
-        print(f"TITLE: {self.video_title}")
         self.path_to_save_audio_with_title = f"{self.path_to_save_audio}\\{self.video_title}.mp3"
         self.data_filepath = data_filepath
 
@@ -130,7 +129,6 @@ class YoutubeAudioManager:
             return []
         
     def save_data_to_file(self, audios_data):
-        print(f"METADA: {self.video_title}")
         with self.lock:
             try:
                 with open(self.data_filepath, 'r') as file:

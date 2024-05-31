@@ -3,6 +3,7 @@ from PIL import Image, ImageTk
 import os
 from gui.utils import create_image
 from gui.style import *
+from gui.tooltip import ToolTip
 
 class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
@@ -62,6 +63,9 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.back_button.place(x=15, y=30)
 
     def add_song_list(self):
+        self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
+        self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
+        self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
         song_list_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
@@ -72,9 +76,25 @@ class PlaylistPage(customtkinter.CTkFrame):
             song_frame.grid_columnconfigure(1, weight=5)
             song_frame.pack(fill="x", pady=2, padx=10)
             
-            track_number_label = customtkinter.CTkLabel(song_frame, text=f"{i}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
+            track_number_label = customtkinter.CTkLabel(song_frame, text=f"{i + 1}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
             track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
 
             song_title_label = customtkinter.CTkLabel(song_frame, text=f"{manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
             song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
+
+            if manager.is_downloaded:
+                icon_ctk_image = customtkinter.CTkImage(self.download_green, size=(15, 15))
+                tip = "The music is fully downloaded."
+            elif manager.metadata_updated:
+                icon_ctk_image = customtkinter.CTkImage(self.download_orange, size=(15, 15))
+                tip = "Metadata not downloaded."
+            else:
+                icon_ctk_image = customtkinter.CTkImage(self.download_red, size=(15, 15))
+                tip = "Music not downloaded."
+
+
+            icon_label = customtkinter.CTkLabel(song_frame, text="", image=icon_ctk_image, fg_color="transparent")
+            icon_label.image = icon_ctk_image
+            icon_label.grid(row=0, column=2, sticky="e", padx=(10, 10))
+            ToolTip(icon_label, tip)
 
