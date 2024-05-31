@@ -7,6 +7,7 @@ from gui.newyoutubeplaylist import NewYoutubePlaylist
 from gui.playlistspage import PlaylistsPage
 from core.central_manager import CentralManager
 from gui.style import *
+import threading
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -67,9 +68,12 @@ class App(customtkinter.CTk):
         self.frame_3_button.grid(row=3, column=0, sticky="ew")
 
         self.home_page = HomePage(self, self.image_path, corner_radius=0, fg_color="transparent")
-        self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        
         self.playlist_page = None
+        self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, self.image_path, fg_color="transparent")
 
         self.home_page.grid(row=0, column=1, sticky="nsew")

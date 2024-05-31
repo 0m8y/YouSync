@@ -20,9 +20,12 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.notification_manager = NotificationManager(self)
-        self.setup_ui()
         self.on_update = False
         self.syncing_playlists = []
+        self.join_thread = threading.Thread(target=self.join_load_managers_thread)
+        self.join_thread.start()
+        self.setup_ui()
+
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)
@@ -41,7 +44,10 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
         self.load_playlists()
 
-    # Mettez à jour la méthode add
+    def join_load_managers_thread(self):
+        self.parent.central_manager.load_managers_thread.join()
+        self.notification_manager.show_notification("Playlists loaded successfully!")
+
     def add(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
@@ -149,6 +155,5 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 text_color=WHITE_TEXT_COLOR
             )
 
-#TODO: Notification lorsque on clique sur sync et qu'il est déjà en train de se sync
-#TODO: Notification lorsque on clique sur add et qu'il est déjà en chargement d'une playlist
 #TODO: Notification de début et de fin de chargement des playlists
+#TODO: Notification lorsque on clique sur add et qu'il est déjà en chargement d'une playlist

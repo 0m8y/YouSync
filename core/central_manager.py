@@ -1,6 +1,7 @@
 from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.utils import get_selenium_driver
 import os, sys, json, requests, datetime, threading
+from concurrent.futures import ThreadPoolExecutor
 
 class PlaylistData:
     def __init__(self, id, url, path, title, last_update=None):
@@ -64,11 +65,17 @@ class CentralManager:
             }, file, indent=4)
 
     def instantiate_playlist_managers(self):
-        for pl in self.data["playlists"]:
-            path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
-            manager = YoutubePlaylistManager(pl.url, path_to_save_audio)
-            self.playlist_managers.append(manager)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(self.create_playlist_manager, pl) for pl in self.data["playlists"]]
+            for future in futures:
+                result = future.result()
+                if result:
+                    self.playlist_managers.append(result)
         self.playlist_loaded = True
+
+    def create_playlist_manager(self, pl):
+        path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
+        return YoutubePlaylistManager(pl.url, path_to_save_audio)
 
     def add_playlist(self, playlist_url, path_to_save_audio):
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
