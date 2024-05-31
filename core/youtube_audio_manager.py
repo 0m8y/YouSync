@@ -19,12 +19,12 @@ class YoutubeAudioManager:
         self.path_to_save_audio = path_to_save_audio
         self.yt = YouTube(self.url)
         self.video_title = find_title_yt(self.yt)
+        print(f"TITLE: {self.video_title}")
         self.path_to_save_audio_with_title = f"{self.path_to_save_audio}\\{self.video_title}.mp3"
         self.data_filepath = data_filepath
 
         self.is_downloaded = False
         self.metadata_updated = False
-        self.video_title = None
         self.title = None
         self.artist = None
         self.album = None
@@ -117,7 +117,7 @@ class YoutubeAudioManager:
         audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
         print("Metadata is added in " + self.url)
         self.metadata_updated = True
-        self.__update_data()
+        self.update_data()
 
 #-------------------------------------Load & Save--------------------------------------#
     
@@ -130,6 +130,7 @@ class YoutubeAudioManager:
             return []
         
     def save_data_to_file(self, audios_data):
+        print(f"METADA: {self.video_title}")
         with self.lock:
             try:
                 with open(self.data_filepath, 'r') as file:
@@ -169,7 +170,7 @@ class YoutubeAudioManager:
     
 #----------------------------------------UPDATE-----------------------------------------#
     
-    def __update_data(self):
+    def update_data(self):
         data = self.load_data()
         for item in data:
             if item['url'] == self.url:

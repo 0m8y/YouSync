@@ -136,6 +136,13 @@ class PlaylistsPage(customtkinter.CTkFrame):
         return frame
 
     def open_playlist_page(self, title, image_path, playlist):
+        if not self.parent.central_manager.playlist_loaded:
+            self.notification_manager.show_notification(
+                "This playlist is being synchronized. Please try again later.",
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            return
         playlist_page = PlaylistPage(self.parent, title, self.image_path, image_path, playlist, fg_color="transparent")
         playlist_page.grid(row=0, column=1, sticky="nsew")
         playlist_page.lift()

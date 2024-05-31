@@ -16,7 +16,7 @@ class YoutubePlaylistManager:
         self.id = get_playlist_id(playlist_url)
         
         self.video_urls = []
-        self.audios_manager = []
+        self.audio_managers = []
         self.__init()
 
     def __init(self):
@@ -35,23 +35,24 @@ class YoutubePlaylistManager:
 
         for video_url in self.video_urls:
             youtube_audio = YoutubeAudioManager(video_url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
-            self.audios_manager.append(youtube_audio)
+            self.audio_managers.append(youtube_audio)
         print(f"playlist {self.id} is loaded successfully")
         #TODO: check if data have deleted video from playlist
     
     def __add_audio(self, url):
             print("Adding audio: " + url)
             youtube_audio = YoutubeAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
-            self.audios_manager.append(youtube_audio)
+            youtube_audio.update_data()
+            self.audio_managers.append(youtube_audio)
             self.video_urls.append(url)
 
     def __remove_audio(self, url):
-        audio_manager_index = next((i for i, am in enumerate(self.audios_manager) if am.get_url() == url), None)
+        audio_manager_index = next((i for i, am in enumerate(self.audio_managers) if am.get_url() == url), None)
 
         if audio_manager_index is not None:
-            self.audios_manager[audio_manager_index].delete()
+            self.audio_managers[audio_manager_index].delete()
 
-            del self.audios_manager[audio_manager_index]
+            del self.audio_managers[audio_manager_index]
 
             self.video_urls = [video_url for video_url in self.video_urls if video_url != url]
 
@@ -79,6 +80,9 @@ class YoutubePlaylistManager:
 
 
 #----------------------------------------GETTER----------------------------------------#
+
+    def get_audio_managers(self):
+        return self.audio_managers
 
     def get_playlist_name(self, driver):
         try:
@@ -146,7 +150,7 @@ class YoutubePlaylistManager:
 
     def download(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in self.audios_manager]
+            futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in self.audio_managers]
             for future in futures:
                 future.result()
         print("downloading video...")

@@ -8,12 +8,14 @@ class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
         super().__init__(parent, **kwargs)
         self.parent = parent
+        self.central_manager = self.parent.central_manager
         self.playlist_data = playlist
         self.title = title
         self.image_path = image_path
         self.cover_pic = os.path.join(self.image_path, image_file)
-        self.song_count = 26
         self.last_update = self.playlist_data.last_update
+        self.audio_managers = self.central_manager.get_audio_managers(playlist.id)
+        self.song_count = len(self.audio_managers)
         self.setup_ui()
 
     def setup_ui(self):
@@ -44,11 +46,11 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         # Détails supplémentaires
         details_label = f"{self.song_count} songs"
-        self.details_label = customtkinter.CTkLabel(text_frame, text=details_label, justify=customtkinter.LEFT)
+        self.details_label = customtkinter.CTkLabel(text_frame, text=details_label, justify=customtkinter.LEFT, text_color=WHITE_TEXT_COLOR)
         self.details_label.grid(row=1, column=0, sticky="w")
 
         details_label2 = f"Last Update: {self.last_update}"
-        self.details_label2 = customtkinter.CTkLabel(text_frame, text=details_label2, justify=customtkinter.LEFT)
+        self.details_label2 = customtkinter.CTkLabel(text_frame, text=details_label2, justify=customtkinter.LEFT, text_color=WHITE_TEXT_COLOR)
         self.details_label2.grid(row=2, column=0, sticky="w")
 
         self.add_song_list()
@@ -63,16 +65,16 @@ class PlaylistPage(customtkinter.CTkFrame):
         song_list_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
-        for i in range(1, 27):
-            bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
+        for i, manager in enumerate(self.audio_managers):
+            bg_color = FIRST_COLOR if i % 2 == 0 else SECOND_COLOR
             song_frame = customtkinter.CTkFrame(song_list_frame, fg_color=bg_color, height=40)
             song_frame.grid_columnconfigure(0, weight=0)
             song_frame.grid_columnconfigure(1, weight=5)
             song_frame.pack(fill="x", pady=2, padx=10)
             
-            track_number_label = customtkinter.CTkLabel(song_frame, text=f"{i}.", anchor="w", fg_color="transparent")
+            track_number_label = customtkinter.CTkLabel(song_frame, text=f"{i}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
             track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
 
-            song_title_label = customtkinter.CTkLabel(song_frame, text=f"Song Title {i}", anchor="w", fg_color="transparent")
+            song_title_label = customtkinter.CTkLabel(song_frame, text=f"{manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
             song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
 

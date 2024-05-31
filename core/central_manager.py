@@ -205,3 +205,9 @@ class CentralManager:
             if pl.id == playlist_id:
                 return pl
         return None
+    
+    def get_audio_managers(self, playlist_id):
+        for pl in self.playlist_managers:
+            if pl.id == playlist_id:
+                return pl.get_audio_managers()
+        return None
