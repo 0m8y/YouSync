@@ -1,9 +1,10 @@
 import customtkinter
-from PIL import Image, ImageTk
+from PIL import Image
 import os
 from gui.utils import create_image
 from gui.style import *
 from gui.tooltip import ToolTip
+import threading
 
 class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
@@ -87,14 +88,34 @@ class PlaylistPage(customtkinter.CTkFrame):
                 tip = "The music is fully downloaded."
             elif manager.metadata_updated:
                 icon_ctk_image = customtkinter.CTkImage(self.download_orange, size=(15, 15))
-                tip = "Metadata not downloaded."
+                tip = "Metadata not downloaded, click to download."
             else:
                 icon_ctk_image = customtkinter.CTkImage(self.download_red, size=(15, 15))
-                tip = "Music not downloaded."
-
+                tip = "Music not downloaded, click to download."
 
             icon_label = customtkinter.CTkLabel(song_frame, text="", image=icon_ctk_image, fg_color="transparent")
             icon_label.image = icon_ctk_image
             icon_label.grid(row=0, column=2, sticky="e", padx=(10, 10))
             ToolTip(icon_label, tip)
+
+            if not manager.is_downloaded:
+                icon_label.bind("<Button-1>", lambda event, m=manager, l=icon_label, i=customtkinter.CTkImage(self.download_green, size=(15, 15)): self.download_music(m, l, i))
+
+    def download_music(self, manager, icon_label, icon_ctk_image):
+        def download():
+            self.parent.playlists_page.notification_manager.show_notification(
+                f"Downloading {manager.video_title}...", 
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            manager.download()
+            self.parent.playlists_page.notification_manager.show_notification(
+                f"{manager.video_title} is downloaded!", 
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            icon_label.configure(image=icon_ctk_image)
+            icon_label.image = icon_ctk_image
+        download_thread = threading.Thread(target=download)
+        download_thread.start()
 
