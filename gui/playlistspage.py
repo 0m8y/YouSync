@@ -8,6 +8,7 @@ from tkinter import filedialog
 from gui.utils import *
 import threading
 from gui.tooltip import ToolTip
+from gui.notificationmanager import Notification, NotificationManager
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -17,7 +18,9 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.tiles = []
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
+        self.notification_manager = NotificationManager(self)
         self.setup_ui()
+        self.on_update = False
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent")
@@ -117,6 +120,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.itemconfig(canvas.sync_icon_id, image=sync_icon_photo)
             canvas.sync_icon_photo = sync_icon_photo
             canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas: self.update_playlist(c, self.sync_image, playlist))
+            self.on_update = False
         else:
             rotated_image = image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
@@ -125,6 +129,23 @@ class PlaylistsPage(customtkinter.CTkFrame):
             canvas.after(50, lambda: self.sync_playlist_rotation(canvas, image, playlist, angle + 10, thread))
 
     def update_playlist(self, canvas, image, playlist):
-        update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
-        update_thread.start()
-        self.sync_playlist_rotation(canvas, image, playlist, thread=update_thread)
+        if self.on_update:
+            self.notification_manager.show_notification(
+                "This playlist is being synchronized. Please try again later.",
+                duration=5000,
+                text_color="#E5E4DE"
+            )
+        elif self.parent.central_manager.playlist_loaded:
+            self.on_update = True
+            update_thread = threading.Thread(target=self.parent.central_manager.update_playlist, args=(playlist.id,))
+            update_thread.start()
+            self.sync_playlist_rotation(canvas, image, playlist, thread=update_thread)
+        else:
+            self.notification_manager.show_notification(
+                "Playlist is not yet loaded. Please try again later.",
+                duration=5000,
+                text_color="#E5E4DE"
+            )
+
+#TODO: Notification lorsque on clique sur sync et qu'il est déjà en train de se sync
+#TODO: Notification lorsque on clique sur add et qu'il est déjà en chargement d'une playlist

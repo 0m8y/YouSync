@@ -36,7 +36,7 @@ class YoutubePlaylistManager:
         for video_url in self.video_urls:
             youtube_audio = YoutubeAudioManager(video_url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             self.audios_manager.append(youtube_audio)
-
+        print(f"playlist {self.id} is loaded successfully")
         #TODO: check if data have deleted video from playlist
     
     def __add_audio(self, url):

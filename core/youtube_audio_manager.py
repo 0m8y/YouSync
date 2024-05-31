@@ -37,7 +37,6 @@ class YoutubeAudioManager:
             for item in data:
                 if item['url'] == self.url:
                     self.__from_dict(item)
-                    print(self.url + " is already loaded !")
 
 #----------------------------------Download Process-------------------------------------#
 
