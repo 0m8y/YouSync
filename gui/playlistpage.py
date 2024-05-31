@@ -4,14 +4,15 @@ import os
 from gui.utils import create_image
 
 class PlaylistPage(customtkinter.CTkFrame):
-    def __init__(self, parent, title, image_path, image_file, **kwargs):
+    def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
         super().__init__(parent, **kwargs)
         self.parent = parent
+        self.playlist_data = playlist
         self.title = title
         self.image_path = image_path
         self.cover_pic = os.path.join(self.image_path, image_file)
         self.song_count = 26
-        self.last_updated = "26 Avril 2024"
+        self.last_update = self.playlist_data.last_update
         self.setup_ui()
 
     def setup_ui(self):
@@ -45,7 +46,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.details_label = customtkinter.CTkLabel(text_frame, text=details_label, justify=customtkinter.LEFT)
         self.details_label.grid(row=1, column=0, sticky="w")
 
-        details_label2 = f"Last Update: {self.last_updated}"
+        details_label2 = f"Last Update: {self.last_update}"
         self.details_label2 = customtkinter.CTkLabel(text_frame, text=details_label2, justify=customtkinter.LEFT)
         self.details_label2.grid(row=2, column=0, sticky="w")
 

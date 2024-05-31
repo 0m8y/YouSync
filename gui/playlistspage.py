@@ -96,7 +96,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         canvas.sync_icon_id = canvas.create_image(160, 120, image=sync_icon_photo)
         canvas.sync_icon_photo = sync_icon_photo
-        canvas.tag_bind(image_id, "<Button-1>", lambda event, title=playlist.title, image_path=image_path: self.open_playlist_page(title, image_path))
+        canvas.tag_bind(image_id, "<Button-1>", lambda event, title=playlist.title, image_path=image_path: self.open_playlist_page(title, image_path, playlist))
 
         canvas.tag_bind(canvas.sync_icon_id, "<Button-1>", lambda event, c=canvas, p=playlist: self.update_playlist(c, self.sync_image, p))
 
@@ -105,8 +105,8 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
         return frame
 
-    def open_playlist_page(self, title, image_path):
-        playlist_page = PlaylistPage(self.parent, title, self.image_path, image_path, fg_color="transparent")
+    def open_playlist_page(self, title, image_path, playlist):
+        playlist_page = PlaylistPage(self.parent, title, self.image_path, image_path, playlist, fg_color="transparent")
         playlist_page.grid(row=0, column=1, sticky="nsew")
         playlist_page.lift()
 

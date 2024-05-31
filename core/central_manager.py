@@ -1,20 +1,23 @@
 from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.utils import get_selenium_driver
 import os, sys, json, requests
+import datetime
 
 class PlaylistData:
-    def __init__(self, id, url, path, title):
+    def __init__(self, id, url, path, title, last_update=None):
         self.id = id
         self.url = url
         self.path = path
         self.title = title
+        self.last_update = last_update or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def to_dict(self):
         return {
             "id": self.id,
             "url": self.url,
             "path": self.path,
-            "title": self.title
+            "title": self.title,
+            "last_update": self.last_update
         }
 
     @classmethod
@@ -23,7 +26,8 @@ class PlaylistData:
             id=data["id"],
             url=data["url"],
             path=data["path"],
-            title=data["title"]
+            title=data["title"],
+            last_update=data.get("last_update")
         )
 
 class CentralManager:
@@ -63,12 +67,11 @@ class CentralManager:
             return "The playlist is already registered."
         
         playlist_name = self.save_picture_and_get_title(playlist_url, playlist_manager, path_to_save_audio)
-            
         playlist_info = PlaylistData(
             id=playlist_manager.id,
             url=playlist_url,
             path= playlist_manager.playlist_data_filepath,
-            title=playlist_name
+            title=playlist_name,
         )
         self.data["playlists"].append(playlist_info.to_dict())
         self.save_data()
@@ -107,12 +110,11 @@ class CentralManager:
                                 continue
 
                             playlist_name = self.save_picture_and_get_title(playlist_url, playlist_manager, path_to_save_audio)
-
                             playlist_info = PlaylistData (
                                 id=playlist_manager.id,
                                 url=playlist_url,
                                 path=filepath,
-                                title=playlist_name
+                                title=playlist_name,
                             )
                             self.data["playlists"].append(playlist_info.to_dict())
                             playlist_count += 1
@@ -165,6 +167,8 @@ class CentralManager:
 
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
         playlist_manager.update()
+        playlist.last_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save_data()
 
 
     def list_playlists(self):
