@@ -10,7 +10,6 @@ import time
 class YoutubePlaylistManager:
 
     def __init__(self, playlist_url, path_to_save_audio):
-        print(f"START init {path_to_save_audio}: {datetime.datetime.now().strftime("%H:%M:%S")}...")
 
         self.lock = Lock()
         self.playlist_url = playlist_url
@@ -20,7 +19,6 @@ class YoutubePlaylistManager:
         self.video_urls = []
         self.audio_managers = []
         self.__init()
-        print(f"END init {path_to_save_audio}: {datetime.datetime.now().strftime("%H:%M:%S")}...")
 
     def __init(self):
         check_yousync_folder(os.path.join(self.path_to_save_audio, ".yousync"))

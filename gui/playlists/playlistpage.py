@@ -1,5 +1,5 @@
 import os, threading, customtkinter
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps
 
 from gui.utils import create_image
 from gui.tooltip import ToolTip
@@ -19,7 +19,9 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.audio_managers = self.central_manager.get_audio_managers(playlist.id)
         self.song_count = len(self.audio_managers)
         self.on_update = False
-        self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
+        sync_image = Image.open(os.path.join(self.image_path, "sync2.png"))
+        sync_padded_image = ImageOps.expand(sync_image, border=0, fill='black')
+        self.sync_image = sync_padded_image.resize((25, 25))
         self.playlist_tile = playlist_tile
 
         self.setup_ui()
@@ -67,9 +69,20 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         # Synchronization Button
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
-        self.sync_button = customtkinter.CTkButton(self, width=35, height=35, text="", fg_color=FIRST_COLOR, hover_color=HOVER_COLOR, image=sync_icon_photo, command=lambda: self.playlist_tile.update_playlist())
+        self.sync_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=sync_icon_photo, command=lambda: self.playlist_tile.update_playlist())
         self.sync_button.image = sync_icon_photo
-        self.sync_button.place(x=280, y=150)
+        self.sync_button.place(x=274, y=135)
+        ToolTip(self.sync_button, "Synchronize playlist.")
+
+        # Download Button
+        self.download_default_image = Image.open(os.path.join(self.image_path, "download.png"))
+        padded_image = ImageOps.expand(self.download_default_image, border=0, fill='black')
+        resized_image = padded_image.resize((25, 25))
+        dl_icon_photo = ImageTk.PhotoImage(resized_image)
+        self.download_all_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=dl_icon_photo, command=lambda: self.playlist_tile.update_playlist())
+        self.download_all_button.image = dl_icon_photo
+        self.download_all_button.place(x=330, y=135)
+        ToolTip(self.download_all_button, "Download all missing sounds.")
 
         self.add_song_list()
 
@@ -81,7 +94,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         for i, manager in enumerate(self.audio_managers):
-            bg_color = FIRST_COLOR if i % 2 == 0 else SECOND_COLOR
+            bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
             song_frame = customtkinter.CTkFrame(song_list_frame, fg_color=bg_color, height=40)
             song_frame.grid_columnconfigure(0, weight=0)
             song_frame.grid_columnconfigure(1, weight=5)

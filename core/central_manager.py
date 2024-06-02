@@ -76,7 +76,6 @@ class CentralManager:
                 if result:
                     self.playlist_managers.append(result)
                 if self.progress_callback:
-                    print("Progress callback")
                     self.progress_callback(i + 1, total_playlists)
         self.playlist_loaded = True
 
