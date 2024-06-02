@@ -10,6 +10,8 @@ import time
 class YoutubePlaylistManager:
 
     def __init__(self, playlist_url, path_to_save_audio):
+        print(f"START init {path_to_save_audio}: {datetime.datetime.now().strftime("%H:%M:%S")}...")
+
         self.lock = Lock()
         self.playlist_url = playlist_url
         self.path_to_save_audio = path_to_save_audio
@@ -18,6 +20,7 @@ class YoutubePlaylistManager:
         self.video_urls = []
         self.audio_managers = []
         self.__init()
+        print(f"END init {path_to_save_audio}: {datetime.datetime.now().strftime("%H:%M:%S")}...")
 
     def __init(self):
         check_yousync_folder(os.path.join(self.path_to_save_audio, ".yousync"))
@@ -30,14 +33,14 @@ class YoutubePlaylistManager:
                 fichier.write("[]")
             self.__initialize_playlist_data()
         else:
-            print("FROM DICT")
             self.__from_dict(self.load_playlist_data())
 
-        for video_url in self.video_urls:
-            youtube_audio = YoutubeAudioManager(video_url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
-            self.audio_managers.append(youtube_audio)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(YoutubeAudioManager, video_url, self.path_to_save_audio, self.playlist_data_filepath, self.lock) for video_url in self.video_urls]
+            for future in futures:
+                youtube_audio = future.result()
+                self.audio_managers.append(youtube_audio)
         print(f"playlist {self.id} is loaded successfully")
-        #TODO: check if data have deleted video from playlist
     
     def __add_audio(self, url):
             print("Adding audio: " + url)

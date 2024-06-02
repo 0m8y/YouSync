@@ -35,7 +35,7 @@ class CentralManager:
         print("CentralManager Open")
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
-        self.data = self.load_data()
+        self.data = self.load_data_from_json()
         self.playlist_managers = []
         self.progress_callback = progress_callback
         self.load_managers_thread = threading.Thread(target=self.instantiate_playlist_managers)
@@ -48,7 +48,7 @@ class CentralManager:
         else:
             return os.path.dirname(os.path.abspath(__file__))
 
-    def load_data(self):
+    def load_data_from_json(self):
         if not os.path.exists(self.json_filepath):
             with open(self.json_filepath, 'w') as file:
                 json.dump({"playlists": []}, file)
@@ -60,7 +60,7 @@ class CentralManager:
                     "playlists": [PlaylistData.from_dict(pl) for pl in data["playlists"]]
                 }
 
-    def save_data(self):
+    def save_data_to_json(self):
         with open(self.json_filepath, 'w') as file:
             json.dump({
                 "playlists": [pl.to_dict() if isinstance(pl, PlaylistData) else PlaylistData.from_dict(pl).to_dict() for pl in self.data["playlists"]]
@@ -99,7 +99,7 @@ class CentralManager:
         )
         self.data["playlists"].append(playlist_info)
         self.playlist_managers.append(playlist_manager)
-        self.save_data()
+        self.save_data_to_json()
 
     def add_existing_playlists(self, folder_path):
         playlist_count = 0
@@ -143,14 +143,14 @@ class CentralManager:
                             )
                             self.data["playlists"].append(playlist_info)
                             self.playlist_managers.append(playlist_manager)
-                            self.save_data()
+                            self.save_data_to_json()
                             playlist_count += 1
                         else:
                             print(f"Les données dans le fichier {filename} sont incomplètes.")
                 except Exception as e:
                     return f"Erreur lors du chargement du fichier {filename}: {e}"
 
-        self.save_data()
+        self.save_data_to_json()
         if playlist_count == 0:
             return "No playlists found !"
         elif playlist_count == 1:
@@ -182,7 +182,7 @@ class CentralManager:
     def remove_playlist(self, playlist_id):
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
         self.playlist_managers = [pm for pm in self.playlist_managers if pm.id != playlist_id]
-        self.save_data()
+        self.save_data_to_json()
 
     def update_playlist(self, playlist_id):
         playlist = self.get_playlist(playlist_id)
@@ -194,7 +194,7 @@ class CentralManager:
         if playlist_manager:
             playlist_manager.update()
             playlist.last_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save_data()
+            self.save_data_to_json()
 
 
     def list_playlists(self):
