@@ -29,3 +29,10 @@ def create_image(image_path, target_width, target_height):
     img = crop_center(img, target_width, target_height)
     img = add_round_corners(img, rad=7)
     return ImageTk.PhotoImage(img)
+
+def truncate_string(s, max_length):
+    if s is None:
+        return None
+    if len(s) > max_length:
+        return s[:max_length-3] + "..."
+    return s

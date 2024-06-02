@@ -4,7 +4,7 @@ import os
 from PIL import Image
 from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
-from gui.playlistspage import PlaylistsPage
+from gui.playlists.playlistspage import PlaylistsPage
 from gui.style import *
 
 class App(customtkinter.CTk):

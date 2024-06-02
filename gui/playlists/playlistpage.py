@@ -1,23 +1,27 @@
-import customtkinter
-from PIL import Image
-import os
+import os, threading, customtkinter
+from PIL import Image, ImageTk
+
 from gui.utils import create_image
-from gui.style import *
 from gui.tooltip import ToolTip
-import threading
+from gui.style import *
 
 class PlaylistPage(customtkinter.CTkFrame):
-    def __init__(self, parent, title, image_path, image_file, playlist, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.parent = parent
-        self.central_manager = self.parent.central_manager
+    def __init__(self, parent, image_path, image_file, playlist, playlist_tile, **kwargs):
+        super().__init__(parent.parent, **kwargs)
+        self.main_app = parent.parent
+        self.playlists_page = parent
+        self.central_manager = self.main_app.central_manager
         self.playlist_data = playlist
-        self.title = title
+        self.title = self.playlist_data.title
         self.image_path = image_path
         self.cover_pic = os.path.join(self.image_path, image_file)
         self.last_update = self.playlist_data.last_update
         self.audio_managers = self.central_manager.get_audio_managers(playlist.id)
         self.song_count = len(self.audio_managers)
+        self.on_update = False
+        self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
+        self.playlist_tile = playlist_tile
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -55,13 +59,19 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.details_label2 = customtkinter.CTkLabel(text_frame, text=details_label2, justify=customtkinter.LEFT, text_color=WHITE_TEXT_COLOR)
         self.details_label2.grid(row=2, column=0, sticky="w")
 
-        self.add_song_list()
-
         # Back Button
         light_back_image = Image.open(os.path.join(self.image_path, "back_light.png"))
         self.back_ctk_image = customtkinter.CTkImage(light_image=light_back_image, dark_image=light_back_image)
-        self.back_button = customtkinter.CTkButton(self, text="", command=self.parent.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
+        self.back_button = customtkinter.CTkButton(self, text="", command=self.main_app.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=15, y=30)
+
+        # Synchronization Button
+        sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
+        self.sync_button = customtkinter.CTkButton(self, width=35, height=35, text="", fg_color=FIRST_COLOR, hover_color=HOVER_COLOR, image=sync_icon_photo, command=lambda: self.playlist_tile.update_playlist())
+        self.sync_button.image = sync_icon_photo
+        self.sync_button.place(x=280, y=150)
+
+        self.add_song_list()
 
     def add_song_list(self):
         self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
@@ -103,13 +113,13 @@ class PlaylistPage(customtkinter.CTkFrame):
 
     def download_music(self, manager, icon_label, icon_ctk_image):
         def download():
-            self.parent.playlists_page.notification_manager.show_notification(
+            self.playlists_page.notification_manager.show_notification(
                 f"Downloading {manager.video_title}...", 
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
             manager.download()
-            self.parent.playlists_page.notification_manager.show_notification(
+            self.playlists_page.notification_manager.show_notification(
                 f"{manager.video_title} is downloaded!", 
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
@@ -119,3 +129,20 @@ class PlaylistPage(customtkinter.CTkFrame):
         download_thread = threading.Thread(target=download)
         download_thread.start()
 
+    def update_sync_icon(self, angle):
+        rotated_image = self.sync_image.rotate(angle)
+        rotated_photo = ImageTk.PhotoImage(rotated_image)
+        self.sync_button.configure(image=rotated_photo)
+        self.sync_button.image = rotated_photo  # Update reference
+        self.sync_button.update_idletasks()
+
+    def sync_completed(self):
+        sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
+        self.sync_button.configure(image=sync_icon_photo)
+        self.sync_button.image = sync_icon_photo
+        self.on_update = False
+        self.playlists_page.notification_manager.show_notification(
+            f"{self.playlist_data.title} is synchronized.",
+            duration=NOTIFICATION_DURATION,
+            text_color=WHITE_TEXT_COLOR
+        )
