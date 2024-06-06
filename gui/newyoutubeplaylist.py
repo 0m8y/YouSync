@@ -66,6 +66,12 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.notification_label = customtkinter.CTkLabel(self, text="", text_color=WHITE_TEXT_COLOR)
         self.notification_label.grid(row=6, column=1, sticky="ew")
 
+    def clear_entries(self):
+        self.url_entry.delete(0, customtkinter.END)
+        self.path_entry.configure(state="normal")
+        self.path_entry.delete(0, customtkinter.END)
+        self.path_entry.configure(state="disabled")
+
     def browse_file(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
@@ -88,6 +94,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
                 self.notification_manager.show_notification("The playlist has been added!")
                 self.parent_app.playlists_page.reload()
                 self.parent_app.playlists_page.load_playlists()
+                self.clear_entries()
 
             add_thread = threading.Thread(target=add_and_load)
             add_thread.start()

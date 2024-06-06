@@ -42,7 +42,7 @@ class PlaylistTile:
     def update_playlist(self):
         if self.on_update:
             self.playlists_page.notification_manager.show_notification(
-                "This playlist is being synchronized. Please try again later.",
+                "This playlist is on update. Please try again later.",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
