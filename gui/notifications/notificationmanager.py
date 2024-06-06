@@ -11,7 +11,6 @@ class NotificationManager:
         self.parent = parent
         self.notifications = []
         self.image_path = image_path
-        self.progress_notification = None
 
     def show_notification(self, message, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR):
         notification = Notification(self, message, self.image_path, duration, text_color=text_color)
@@ -43,12 +42,15 @@ class NotificationManager:
             n.geometry("+{}+{}".format(x, y))
             n.deiconify()
 
-    def show_progress_bar_notification(self, total):
-        self.progress_notification = ProgressBarNotification(self, total, fg_color="#333", corner_radius=10)
-        self.notifications.append(self.progress_notification)
+    def show_progress_bar_notification(self, total, text):
+        progress_notification = ProgressBarNotification(self, total, text, fg_color="#333", corner_radius=10)
+        self.notifications.append(progress_notification)
         self.place_notification()
+        self.reorder_notifications()
+        return progress_notification
 
-    def update_progress_bar_notification(self, current):
-        if hasattr(self, 'progress_notification'):
-            self.progress_notification.update_progress(current)
+    def update_progress_bar_notification(self, notification, current):
+        if notification in self.notifications:
+            notification.update_progress(current)
+        self.place_notification()
 

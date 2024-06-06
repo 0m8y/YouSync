@@ -82,7 +82,7 @@ class App(customtkinter.CTk):
         self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
 
-        self.select_frame_by_name("playlists_page")
+        self.select_frame_by_name("home")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")

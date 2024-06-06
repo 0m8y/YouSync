@@ -105,3 +105,6 @@ class PlaylistTile:
         self.cover_canvas.itemconfig(self.cover_canvas.sync_icon_id, image=rotated_photo)
         self.cover_canvas.sync_icon_photo = rotated_photo  # Update reference!
         self.cover_canvas.update_idletasks()
+
+    def destroy(self):
+        self.cover_frame.destroy()

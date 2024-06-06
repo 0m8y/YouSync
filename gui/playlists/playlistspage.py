@@ -25,7 +25,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.adding_folder = False
         
         self.notification_manager = NotificationManager(self, self.image_path)
-        
+        self.progress_notification = None
         self.init_central_manager()
         
         self.setup_ui()
@@ -37,10 +37,10 @@ class PlaylistsPage(customtkinter.CTkFrame):
             self.join_thread.start()
 
 
-    def update_progress(self, current, total ):
-        if self.notification_manager.progress_notification is None:
-            self.notification_manager.show_progress_bar_notification(total)
-        self.notification_manager.update_progress_bar_notification(current)
+    def update_progress(self, current, total):
+        if self.progress_notification is None:
+            self.progress_notification = self.notification_manager.show_progress_bar_notification(total, "Loading playlists...")
+        self.notification_manager.update_progress_bar_notification(self.progress_notification, current)
 
     def join_load_managers_thread(self):
         self.parent.central_manager.load_managers_thread.join()

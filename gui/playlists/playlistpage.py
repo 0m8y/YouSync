@@ -1,5 +1,6 @@
 import os, threading, customtkinter
 from PIL import Image, ImageTk, ImageOps
+from concurrent.futures import ThreadPoolExecutor
 
 from gui.utils import create_image
 from gui.tooltip import ToolTip
@@ -23,6 +24,11 @@ class PlaylistPage(customtkinter.CTkFrame):
         sync_padded_image = ImageOps.expand(sync_image, border=0, fill='black')
         self.sync_image = sync_padded_image.resize((25, 25))
         self.playlist_tile = playlist_tile
+        self.progress_notification = None
+        self.song_list_frame = None
+        self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
+        self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
+        self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
 
         self.setup_ui()
 
@@ -79,23 +85,55 @@ class PlaylistPage(customtkinter.CTkFrame):
         padded_image = ImageOps.expand(self.download_default_image, border=0, fill='black')
         resized_image = padded_image.resize((25, 25))
         dl_icon_photo = ImageTk.PhotoImage(resized_image)
-        self.download_all_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=dl_icon_photo, command=lambda: self.playlist_tile.update_playlist())
+        self.download_all_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=dl_icon_photo, command=lambda: self.download_playlist())
         self.download_all_button.image = dl_icon_photo
         self.download_all_button.place(x=330, y=135)
         ToolTip(self.download_all_button, "Download all missing sounds.")
 
-        self.add_song_list()
+        self.reload_song_list()
 
-    def add_song_list(self):
-        self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
-        self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
-        self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
-        song_list_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
-        song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+    def download_playlist(self):
+        audio_managers_not_downloaded = [am for am in self.audio_managers if not am.is_downloaded or not am.metadata_updated]
+
+        if not audio_managers_not_downloaded:
+            self.playlists_page.notification_manager.show_notification(
+                "Everything is downloaded!", 
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            return
+
+        self.progress_notification = self.playlists_page.notification_manager.show_progress_bar_notification(
+            len(audio_managers_not_downloaded), 
+            f"Downloading {len(audio_managers_not_downloaded)} songs."
+        )
+
+        # Démarrer le téléchargement dans un thread séparé
+        download_thread = threading.Thread(target=self._download_playlist, args=(audio_managers_not_downloaded,))
+        download_thread.start()
+
+    def _download_playlist(self, audio_managers_not_downloaded):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in audio_managers_not_downloaded]
+            for i, future in enumerate(futures):
+                future.result()
+                self.reload_song_list()
+                self.playlists_page.notification_manager.update_progress_bar_notification(self.progress_notification, i + 1)
+
+
+    def download_audio(self, audio_manager):
+        audio_manager.download()
+
+    def reload_song_list(self):
+        if hasattr(self, 'song_list_frame') and self.song_list_frame is not None:
+            self.song_list_frame.destroy()
+
+        self.song_list_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
+        self.song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         for i, manager in enumerate(self.audio_managers):
             bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
-            song_frame = customtkinter.CTkFrame(song_list_frame, fg_color=bg_color, height=40)
+            song_frame = customtkinter.CTkFrame(self.song_list_frame, fg_color=bg_color, height=40)
             song_frame.grid_columnconfigure(0, weight=0)
             song_frame.grid_columnconfigure(1, weight=5)
             song_frame.pack(fill="x", pady=2, padx=10)
@@ -154,8 +192,3 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.sync_button.configure(image=sync_icon_photo)
         self.sync_button.image = sync_icon_photo
         self.on_update = False
-        self.playlists_page.notification_manager.show_notification(
-            f"{self.playlist_data.title} is synchronized.",
-            duration=NOTIFICATION_DURATION,
-            text_color=WHITE_TEXT_COLOR
-        )
