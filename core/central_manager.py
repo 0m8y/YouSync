@@ -71,6 +71,7 @@ class CentralManager:
             futures = [executor.submit(self.create_playlist_manager, pl) for pl in self.data["playlists"]]
             total_playlists = len(futures)
             if (total_playlists == 0):
+                self.playlist_loaded = True
                 return
             self.progress_callback(0, total_playlists)
             for i, future in enumerate(futures):
