@@ -1,8 +1,6 @@
-import customtkinter
+import customtkinter, os, re, threading
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
-import os
-import re
 from gui.style import *
 
 
@@ -10,6 +8,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
         self.image_path = image_path
         self.parent_app = parent
+        self.notification_manager = self.parent_app.playlists_page.notification_manager
         super().__init__(parent, **kwargs)
         self.setup_ui()
 
@@ -81,11 +80,18 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         # if not self.validate_youtube_url(url):
         #     self.notification_label.configure(text="Please enter a valid YouTube URL.", text_color=("red"))
         if not self.validate_path(path):
-            self.notification_label.configure(text="Please enter a valid path.", text_color=("red"))
+            self.notification_manager.show_notification("Please enter a valid path.", text_color=("red"))
         else:
-            self.parent_app.central_manager.add_playlist(url, path)
-            self.parent_app.playlists_page.load_playlists()
-            self.notification_label.configure(text="The YouTube URL is valid.", text_color=("green"))
+            def add_and_load():
+                self.notification_manager.show_notification("Adding playlist...")
+                self.parent_app.central_manager.add_playlist(url, path)
+                self.notification_manager.show_notification("The playlist has been added!")
+                self.parent_app.playlists_page.reload()
+                self.parent_app.playlists_page.load_playlists()
+
+            add_thread = threading.Thread(target=add_and_load)
+            add_thread.start()
+
 
     def validate_youtube_url(self, url):
         youtube_regex = (

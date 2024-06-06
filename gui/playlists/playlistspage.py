@@ -36,6 +36,9 @@ class PlaylistsPage(customtkinter.CTkFrame):
             self.join_thread = threading.Thread(target=self.join_load_managers_thread)
             self.join_thread.start()
 
+    def reload(self):
+        self.join_thread = threading.Thread(target=self.join_load_managers_thread)
+        self.join_thread.start()
 
     def update_progress(self, current, total):
         if self.progress_notification is None:

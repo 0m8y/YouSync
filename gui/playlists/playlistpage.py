@@ -25,6 +25,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.sync_image = sync_padded_image.resize((25, 25))
         self.playlist_tile = playlist_tile
         self.progress_notification = None
+        self.on_download = False
         self.song_list_frame = None
         self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
         self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
@@ -93,6 +94,14 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.reload_song_list()
 
     def download_playlist(self):
+        if not self.on_download:
+            self.playlists_page.notification_manager.show_notification(
+                "download is already in progress!", 
+                duration=NOTIFICATION_DURATION,
+                text_color=WHITE_TEXT_COLOR
+            )
+            return
+
         audio_managers_not_downloaded = [am for am in self.audio_managers if not am.is_downloaded or not am.metadata_updated]
 
         if not audio_managers_not_downloaded:
@@ -113,12 +122,15 @@ class PlaylistPage(customtkinter.CTkFrame):
         download_thread.start()
 
     def _download_playlist(self, audio_managers_not_downloaded):
+        self.on_download = True
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in audio_managers_not_downloaded]
             for i, future in enumerate(futures):
                 future.result()
                 self.reload_song_list()
                 self.playlists_page.notification_manager.update_progress_bar_notification(self.progress_notification, i + 1)
+                self.on_download = False
+
 
 
     def download_audio(self, audio_manager):
