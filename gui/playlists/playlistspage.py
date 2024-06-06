@@ -48,6 +48,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
     def join_load_managers_thread(self):
         self.parent.central_manager.load_managers_thread.join()
         self.notification_manager.show_notification("Playlists loaded successfully!")
+        self.parent.central_manager.playlist_loaded = True
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)
