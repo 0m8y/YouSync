@@ -9,6 +9,12 @@ import platform, re, os, time
 import datetime
 
 def check_yousync_folder(yousync_folder_path):
+    parent_folder = os.path.dirname(yousync_folder_path)
+    
+    # Check if parent folder exists
+    if not os.path.exists(parent_folder):
+        raise FileNotFoundError(f"The parent folder {parent_folder} does not exist.")
+
     if not os.path.exists(yousync_folder_path):
         os.makedirs(yousync_folder_path)
 

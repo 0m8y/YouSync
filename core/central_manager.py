@@ -38,8 +38,6 @@ class CentralManager:
         self.data = self.load_data_from_json()
         self.playlist_managers = []
         self.progress_callback = progress_callback
-        self.load_managers_thread = threading.Thread(target=self.instantiate_playlist_managers)
-        self.load_managers_thread.start()
         self.playlist_loaded = False
 
     def get_project_path(self):
@@ -162,7 +160,7 @@ class CentralManager:
 
     def save_picture_and_get_title(self, playlist_url, playlist_manager, path_to_save_audio):
         driver = get_selenium_driver(playlist_url)
-        playlist_name = playlist_manager.get_playlist_name(driver)
+        playlist_name = playlist_manager.get_playlist_name(driver)#TODO: l'enregistrer en donnée dans youtube_playlist_manager
         playlist_picture = playlist_manager.get_playlist_image_url(driver)
         print(f"Playlist Picture: {playlist_picture}")
 
@@ -213,4 +211,33 @@ class CentralManager:
             if pl.id == playlist_id:
                 return pl.get_audio_managers()
         return None
-    
+
+
+    def delete_playlist(self, playlist_id):
+        # Supprimer la playlist des données
+        self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
+        
+        # Sauvegarder les données mises à jour dans le fichier JSON
+        self.save_data_to_json()
+
+    def update_path(self, new_path, playlist_id):
+        yousync_folder_name = ".yousync"
+        if os.path.basename(new_path) != yousync_folder_name:
+            new_path = os.path.join(new_path, yousync_folder_name)
+            if not os.path.exists(new_path):
+                return False
+
+        updated = False
+
+        # Vérifier si le fichier {playlist_data.id}.json se trouve dans le dossier
+        playlist_file = f"{playlist_id}.json"
+        playlist_file_path = os.path.join(new_path, playlist_file)
+        if os.path.exists(playlist_file_path):
+            for playlist in self.data["playlists"]:
+                if playlist.id == playlist_id:
+                    playlist.path = playlist_file_path
+                    self.save_data_to_json()
+                    return True
+            return False
+        else:
+            return False
