@@ -12,9 +12,9 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         super().__init__(parent, **kwargs)
         self.setup_ui()
 
-    def create_label(self, text, row):
-        label = customtkinter.CTkLabel(self, text=text, text_color=WHITE_TEXT_COLOR, font=('Roboto Medium', 25))
-        label.grid(row=row, column=1, columnspan=2, pady=(30, 0), sticky="w")
+    def create_label(self, text, row, font_size=25, pady=(30, 0)):
+        label = customtkinter.CTkLabel(self, text=text, text_color=WHITE_TEXT_COLOR, font=('Roboto Medium', font_size))
+        label.grid(row=row, column=1, columnspan=2, pady=pady, sticky="w")
 
     def go_back(self):
         self.parent_app.go_back_home()
@@ -42,29 +42,31 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
         # Youtube URL Section
         self.create_label("Enter Playlist URL", 1)
+        self.create_label("Make sure the playlist is not private.", 2, font_size=11, pady=(0, 0))
         self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
-        self.url_entry.grid(row=2, column=1, padx=(0, 0), pady=10, sticky="ew")
+        self.url_entry.grid(row=3, column=1, padx=(0, 0), pady=10, sticky="ew")
+
 
         # Path Section
-        self.create_label("Search path to save playlist", 3)
+        self.create_label("Search path to save playlist", 4)
         self.path_entry = customtkinter.CTkEntry(self, placeholder_text="Path to save", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
         self.path_entry.configure(state="disabled")
-        self.path_entry.grid(row=4, column=1, padx=(0, 0), pady=10, sticky="ew")
+        self.path_entry.grid(row=5, column=1, padx=(0, 0), pady=10, sticky="ew")
 
         # Folder Button
         light_photo_image = Image.open(os.path.join(self.image_path, "folder.png"))
         self.folder_ctk_image = customtkinter.CTkImage(light_image=light_photo_image, dark_image=light_photo_image)
         self.browse_button = customtkinter.CTkButton(self, text="", command=self.browse_file, width=45, height=45, image=self.folder_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, corner_radius=0)
-        self.browse_button.grid(row=4, column=1, sticky="e")
+        self.browse_button.grid(row=5, column=1, sticky="e")
 
         # Save Button
         self.save_button = customtkinter.CTkButton(self, text="Save", command=self.save, width=120, height=45,
                                                     fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
-        self.save_button.grid(row=5, column=1, padx=(0, 0), pady=40)
+        self.save_button.grid(row=6, column=1, padx=(0, 0), pady=40)
 
         # Notification Section
         self.notification_label = customtkinter.CTkLabel(self, text="", text_color=WHITE_TEXT_COLOR)
-        self.notification_label.grid(row=6, column=1, sticky="ew")
+        self.notification_label.grid(row=7, column=1, sticky="ew")
 
     def clear_entries(self):
         self.url_entry.delete(0, customtkinter.END)
