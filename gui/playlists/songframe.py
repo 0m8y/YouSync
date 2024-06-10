@@ -49,7 +49,6 @@ class SongFrame:
         ToolTip(self.icon_label, tip)
         if not self.audio_manager.is_downloaded or not self.audio_manager.metadata_updated:
             self.icon_label.bind("<Button-1>", lambda event: self.download_music())
-        #TODO: Rajouter l'ajout de métadonnée
 
     def download_music(self):
         if self.on_progress:
@@ -59,20 +58,24 @@ class SongFrame:
                 text_color=WHITE_TEXT_COLOR
             )
             return
-        def download():
-            self.on_progress = True
-            self.playlist_page.playlists_page.notification_manager.show_notification(
-                f"Downloading {self.audio_manager.video_title}...", 
-                duration=NOTIFICATION_DURATION,
-                text_color=WHITE_TEXT_COLOR
-            )
-            self.audio_manager.download()
-            self.playlist_page.playlists_page.notification_manager.show_notification(
-                f"{self.audio_manager.video_title} is downloaded!", 
-                duration=NOTIFICATION_DURATION,
-                text_color=WHITE_TEXT_COLOR
-            )
-            self.update_icon_status()
-            self.on_progress = False
-        download_thread = threading.Thread(target=download)
+        download_thread = threading.Thread(target=self._download)
         download_thread.start()
+
+    def download(self):
+        self.audio_manager.download()
+        self.update_icon_status()
+
+    def _download(self):
+        self.on_progress = True
+        self.playlist_page.playlists_page.notification_manager.show_notification(
+            f"Downloading {self.audio_manager.video_title}...", 
+            duration=NOTIFICATION_DURATION,
+            text_color=WHITE_TEXT_COLOR
+        )
+        self.download()
+        self.playlist_page.playlists_page.notification_manager.show_notification(
+            f"{self.audio_manager.video_title} is downloaded!", 
+            duration=NOTIFICATION_DURATION,
+            text_color=WHITE_TEXT_COLOR
+        )
+        self.on_progress = False

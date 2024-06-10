@@ -107,7 +107,7 @@ class PlaylistPage(customtkinter.CTkFrame):
             )
             return
 
-        audio_managers_not_downloaded = [am for am in self.audio_managers if not am.is_downloaded or not am.metadata_updated]
+        audio_managers_not_downloaded = [am for am in self.audio_managers if (not am.is_downloaded or not am.metadata_updated) and not self.songframe_by_id[am.id].on_progress]
 
         if not audio_managers_not_downloaded:
             self.playlists_page.notification_manager.show_notification(
@@ -132,19 +132,17 @@ class PlaylistPage(customtkinter.CTkFrame):
             futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in audio_managers_not_downloaded]
             for i, future in enumerate(futures):
                 future.result()
-                self.init_song_list()
                 self.playlists_page.notification_manager.update_progress_bar_notification(self.progress_notification, i + 1)
                 self.on_download = False
 
-
-
     def download_audio(self, audio_manager):
-        audio_manager.download()
+        self.songframe_by_id[audio_manager.id].download()
 
     def init_song_list(self):
         if hasattr(self, 'track_frame') and self.track_frame is not None:
-            print("DESTROY OBJECT")
             self.track_frame.destroy()
+            self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
+            self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         for i, manager in enumerate(self.audio_managers):
             bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
@@ -155,7 +153,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         rotated_image = self.sync_image.rotate(angle)
         rotated_photo = ImageTk.PhotoImage(rotated_image)
         self.sync_button.configure(image=rotated_photo)
-        self.sync_button.image = rotated_photo  # Update reference
+        self.sync_button.image = rotated_photo
         self.sync_button.update_idletasks()
 
     def sync_completed(self):
