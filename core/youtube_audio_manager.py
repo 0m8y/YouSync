@@ -18,6 +18,7 @@ class YoutubeAudioManager:
         self.url = url
         self.path_to_save_audio = path_to_save_audio
         self.yt = YouTube(self.url)
+        self.id = self.yt.video_id
         self.video_title = find_title_yt(self.yt)
         self.path_to_save_audio_with_title = f"{self.path_to_save_audio}\\{self.video_title}.mp3"
         self.data_filepath = data_filepath

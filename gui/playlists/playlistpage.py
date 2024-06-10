@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from gui.utils import create_image
 from gui.tooltip import ToolTip
+from gui.playlists.songframe import SongFrame
 from gui.style import *
 
 class PlaylistPage(customtkinter.CTkFrame):
@@ -26,7 +27,8 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.playlist_tile = playlist_tile
         self.progress_notification = None
         self.on_download = False
-        self.song_list_frame = None
+        self.songframe_by_id = {}
+        self.track_frame = None
         self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
         self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
         self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
@@ -91,7 +93,10 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.download_all_button.place(x=330, y=135)
         ToolTip(self.download_all_button, "Download all missing sounds.")
 
-        self.reload_song_list()
+        self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
+        self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+
+        self.init_song_list()
 
     def download_playlist(self):
         if self.on_download:
@@ -127,7 +132,7 @@ class PlaylistPage(customtkinter.CTkFrame):
             futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in audio_managers_not_downloaded]
             for i, future in enumerate(futures):
                 future.result()
-                self.reload_song_list()
+                self.init_song_list()
                 self.playlists_page.notification_manager.update_progress_bar_notification(self.progress_notification, i + 1)
                 self.on_download = False
 
@@ -136,61 +141,15 @@ class PlaylistPage(customtkinter.CTkFrame):
     def download_audio(self, audio_manager):
         audio_manager.download()
 
-    def reload_song_list(self):
-        if hasattr(self, 'song_list_frame') and self.song_list_frame is not None:
-            self.song_list_frame.destroy()
-
-        self.song_list_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
-        self.song_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+    def init_song_list(self):
+        if hasattr(self, 'track_frame') and self.track_frame is not None:
+            print("DESTROY OBJECT")
+            self.track_frame.destroy()
 
         for i, manager in enumerate(self.audio_managers):
             bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
-            song_frame = customtkinter.CTkFrame(self.song_list_frame, fg_color=bg_color, height=40)
-            song_frame.grid_columnconfigure(0, weight=0)
-            song_frame.grid_columnconfigure(1, weight=5)
-            song_frame.pack(fill="x", pady=2, padx=10)
-            
-            track_number_label = customtkinter.CTkLabel(song_frame, text=f"{i + 1}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
-            track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
-
-            song_title_label = customtkinter.CTkLabel(song_frame, text=f"{manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
-            song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
-
-            if manager.is_downloaded:
-                icon_ctk_image = customtkinter.CTkImage(self.download_green, size=(15, 15))
-                tip = "The music is fully downloaded."
-            elif manager.metadata_updated:
-                icon_ctk_image = customtkinter.CTkImage(self.download_orange, size=(15, 15))
-                tip = "Metadata not downloaded, click to download."
-            else:
-                icon_ctk_image = customtkinter.CTkImage(self.download_red, size=(15, 15))
-                tip = "Music not downloaded, click to download."
-
-            icon_label = customtkinter.CTkLabel(song_frame, text="", image=icon_ctk_image, fg_color="transparent")
-            icon_label.image = icon_ctk_image
-            icon_label.grid(row=0, column=2, sticky="e", padx=(10, 10))
-            ToolTip(icon_label, tip)
-
-            if not manager.is_downloaded:
-                icon_label.bind("<Button-1>", lambda event, m=manager, l=icon_label, i=customtkinter.CTkImage(self.download_green, size=(15, 15)): self.download_music(m, l, i))
-
-    def download_music(self, manager, icon_label, icon_ctk_image):
-        def download():
-            self.playlists_page.notification_manager.show_notification(
-                f"Downloading {manager.video_title}...", 
-                duration=NOTIFICATION_DURATION,
-                text_color=WHITE_TEXT_COLOR
-            )
-            manager.download()
-            self.playlists_page.notification_manager.show_notification(
-                f"{manager.video_title} is downloaded!", 
-                duration=NOTIFICATION_DURATION,
-                text_color=WHITE_TEXT_COLOR
-            )
-            icon_label.configure(image=icon_ctk_image)
-            icon_label.image = icon_ctk_image
-        download_thread = threading.Thread(target=download)
-        download_thread.start()
+            songframe = SongFrame(self, self.track_frame, i+1, bg_color, manager, self.download_green, self.download_orange, self.download_red)
+            self.songframe_by_id[songframe.id] = songframe
 
     def update_sync_icon(self, angle):
         rotated_image = self.sync_image.rotate(angle)
