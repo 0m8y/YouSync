@@ -94,7 +94,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.reload_song_list()
 
     def download_playlist(self):
-        if not self.on_download:
+        if self.on_download:
             self.playlists_page.notification_manager.show_notification(
                 "download is already in progress!", 
                 duration=NOTIFICATION_DURATION,

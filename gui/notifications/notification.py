@@ -19,7 +19,6 @@ class Notification(Toplevel):
         self.message_label = customtkinter.CTkLabel(self, text=self.message, anchor="w", text_color=text_color, fg_color=BUTTON_COLOR)
         self.message_label.pack(side="left", padx=10, pady=5, fill="x", expand=True)
 
-        print(f"FilePath image: {self.image_path}")
         close_image = Image.open(os.path.join(self.image_path, "close.png"))
         self.close_icon = customtkinter.CTkImage(close_image, size=(15, 15))
         self.close_button = customtkinter.CTkButton(self, text="", image=self.close_icon, command=self.close_notification, width=15, height=15, fg_color="transparent", hover_color=HOVER_COLOR)
