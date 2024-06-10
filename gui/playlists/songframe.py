@@ -79,3 +79,6 @@ class SongFrame:
             text_color=WHITE_TEXT_COLOR
         )
         self.on_progress = False
+
+    def destroy(self):
+        self.song_frame.destroy()

@@ -9,7 +9,7 @@ class PlaylistData:
         self.url = url
         self.path = path
         self.title = title
-        self.last_update = last_update or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.last_update = last_update or datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
 
     def to_dict(self):
         return {
@@ -195,7 +195,7 @@ class CentralManager:
         playlist_manager = next((pm for pm in self.playlist_managers if pm.id == playlist_id), None)
         if playlist_manager:
             playlist_manager.update()
-            playlist.last_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            playlist.last_update = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
             self.save_data_to_json()
 
 

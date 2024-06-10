@@ -15,6 +15,8 @@ class PlaylistTile:
         self.image_path = image_path
         self.scrollable_frame = scrollable_frame
         self.on_update = False
+        self.playlist_page = None
+
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
 
         self.cover_frame = customtkinter.CTkFrame(self.scrollable_frame, corner_radius=5, fg_color="transparent")
@@ -86,6 +88,7 @@ class PlaylistTile:
             )
             if self.playlist_page is not None:
                 self.playlist_page.sync_completed()
+                self.playlist_page.update_tracklist()
 
     def open_playlist_page(self, playlist, canvas):
         if not self.playlists_page.parent.central_manager.playlist_loaded:

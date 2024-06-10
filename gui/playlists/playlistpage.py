@@ -149,6 +149,33 @@ class PlaylistPage(customtkinter.CTkFrame):
             songframe = SongFrame(self, self.track_frame, i+1, bg_color, manager, self.download_green, self.download_orange, self.download_red)
             self.songframe_by_id[songframe.id] = songframe
 
+    def update_tracklist(self):
+        for audio_manager in self.audio_managers:
+            if audio_manager.id not in self.songframe_by_id:
+                songframe = SongFrame(self, self.track_frame, 0, FIRST_COLOR, audio_manager, self.download_green, self.download_orange, self.download_red)#TODO: Enlever first_color et le déduire directement dans la classe
+                self.songframe_by_id[songframe.id] = songframe
+
+        id_to_delete = [id for id, songframe in self.songframe_by_id.items() if not any(audio_manager.id == id for audio_manager in self.audio_managers)]
+
+        for id in id_to_delete:
+            songframe = self.songframe_by_id.pop(id)
+            songframe.song_frame.destroy()
+
+        self.update_details_label()
+
+    def update_tracknumber(self):
+        print("update")
+
+    def update_details_label(self):
+        self.song_count = len(self.audio_managers)
+        new_details_label = f"{self.song_count} songs"
+        self.details_label.configure(text=new_details_label)
+        self.details_label.update_idletasks()
+
+        new_details_label2 = f"Last update: {self.playlist_data.last_update}"
+        self.details_label2.configure(text=new_details_label2)
+        self.details_label2.update_idletasks()
+
     def update_sync_icon(self, angle):
         rotated_image = self.sync_image.rotate(angle)
         rotated_photo = ImageTk.PhotoImage(rotated_image)
