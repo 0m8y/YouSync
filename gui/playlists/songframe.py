@@ -7,7 +7,7 @@ from gui.tooltip import ToolTip
 from gui.style import *
 
 class SongFrame:
-    def __init__(self, parent, track_frame, song_number, bg_color, audio_manager, green_image, orange_image, red_image):
+    def __init__(self, parent, track_frame, track_number, audio_manager, green_image, orange_image, red_image):
         self.playlist_page = parent
         self.track_frame = track_frame
         self.id = audio_manager.id
@@ -16,13 +16,15 @@ class SongFrame:
         self.orange_image = orange_image
         self.red_image = red_image
         self.on_progress = False
+
+        bg_color = FIRST_COLOR if track_number % 2 == 0 else SECOND_COLOR
         self.song_frame = customtkinter.CTkFrame(self.track_frame, fg_color=bg_color, height=40)
         self.song_frame.grid_columnconfigure(0, weight=0)
         self.song_frame.grid_columnconfigure(1, weight=5)
         self.song_frame.pack(fill="x", pady=2, padx=10)
     
-        track_number_label = customtkinter.CTkLabel(self.song_frame, text=f"{song_number}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
-        track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
+        self.track_number_label = customtkinter.CTkLabel(self.song_frame, text=f"{track_number}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
+        self.track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
 
         song_title_label = customtkinter.CTkLabel(self.song_frame, text=f"{self.audio_manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
@@ -79,6 +81,13 @@ class SongFrame:
             text_color=WHITE_TEXT_COLOR
         )
         self.on_progress = False
+
+    def update_display(self, track_number):
+        self.track_number_label.configure(text=f"{track_number}.")
+        self.track_number_label.update_idletasks()
+
+        bg_color = FIRST_COLOR if track_number % 2 == 0 else SECOND_COLOR
+        self.song_frame.configure(fg_color=bg_color)
 
     def destroy(self):
         self.song_frame.destroy()

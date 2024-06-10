@@ -96,7 +96,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
-        self.init_song_list()
+        self.init_tracklist()
 
     def download_playlist(self):
         if self.on_download:
@@ -138,21 +138,15 @@ class PlaylistPage(customtkinter.CTkFrame):
     def download_audio(self, audio_manager):
         self.songframe_by_id[audio_manager.id].download()
 
-    def init_song_list(self):
-        if hasattr(self, 'track_frame') and self.track_frame is not None:
-            self.track_frame.destroy()
-            self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
-            self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
-
+    def init_tracklist(self):
         for i, manager in enumerate(self.audio_managers):
-            bg_color = SECOND_COLOR if i % 2 == 0 else FIRST_COLOR
-            songframe = SongFrame(self, self.track_frame, i+1, bg_color, manager, self.download_green, self.download_orange, self.download_red)
+            songframe = SongFrame(self, self.track_frame, i+1, manager, self.download_green, self.download_orange, self.download_red)
             self.songframe_by_id[songframe.id] = songframe
 
     def update_tracklist(self):
         for audio_manager in self.audio_managers:
             if audio_manager.id not in self.songframe_by_id:
-                songframe = SongFrame(self, self.track_frame, 0, FIRST_COLOR, audio_manager, self.download_green, self.download_orange, self.download_red)#TODO: Enlever first_color et le déduire directement dans la classe
+                songframe = SongFrame(self, self.track_frame, 0, audio_manager, self.download_green, self.download_orange, self.download_red)#TODO: Enlever first_color et le déduire directement dans la classe
                 self.songframe_by_id[songframe.id] = songframe
 
         id_to_delete = [id for id, songframe in self.songframe_by_id.items() if not any(audio_manager.id == id for audio_manager in self.audio_managers)]
@@ -162,9 +156,11 @@ class PlaylistPage(customtkinter.CTkFrame):
             songframe.song_frame.destroy()
 
         self.update_details_label()
+        self.update_tracknumber()
 
     def update_tracknumber(self):
-        print("update")
+        for i, (id, songframe) in enumerate(self.songframe_by_id.items()):
+            songframe.update_display(i + 1)
 
     def update_details_label(self):
         self.song_count = len(self.audio_managers)
