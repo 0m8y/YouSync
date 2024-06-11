@@ -185,3 +185,18 @@ class YoutubePlaylistManager:
         with self.lock:
             with open(self.playlist_data_filepath, 'w') as file:
                 json.dump(data, file, indent=4)
+
+#----------------------------------------UDPATE----------------------------------------#
+
+    def update_path(self, new_path):
+        old_path = self.path_to_save_audio
+        self.path_to_save_audio = new_path
+
+        for audio_manager in self.audio_managers:
+            audio_manager.update_path(new_path, old_path)
+
+        self.playlist_data_filepath = os.path.join(new_path, '.yousync', f"{self.id}.json")
+
+        data = self.load_playlist_data()
+        data['path_to_save_audio'] = new_path
+        self.save_playlist_data(data)

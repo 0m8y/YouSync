@@ -248,6 +248,19 @@ class YoutubeAudioManager:
         except Exception as e:
             print(f"Erreur lors de la suppression de l'audio : {e}")
 
+    def update_path(self, new_path, old_path):
+        current_path = os.path.dirname(self.path_to_save_audio_with_title)
+        if current_path == old_path:
+            new_path_to_save_audio_with_title = os.path.join(new_path, f"{self.video_title}.mp3")
+            self.path_to_save_audio = new_path
+            self.path_to_save_audio_with_title = new_path_to_save_audio_with_title
+
+            data = self.load_data()
+            for item in data:
+                if item['url'] == self.url:
+                    item['path_to_save_audio_with_title'] = self.path_to_save_audio_with_title
+                    break 
+            self.save_data_to_file(data)
 
 #----------------------------------------GETTER----------------------------------------#
 

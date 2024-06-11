@@ -82,7 +82,10 @@ class CentralManager:
 
     def create_playlist_manager(self, pl):
         path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
-        return YoutubePlaylistManager(pl.url, path_to_save_audio)
+        playlist_manager = next((pm for pm in self.playlist_managers if pm.id == pl.id), None)
+        if not playlist_manager:
+            return YoutubePlaylistManager(pl.url, path_to_save_audio)
+        return None
 
     def add_playlist(self, playlist_url, path_to_save_audio):
         playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
@@ -236,6 +239,11 @@ class CentralManager:
             for playlist in self.data["playlists"]:
                 if playlist.id == playlist_id:
                     playlist.path = playlist_file_path
+                    playlist_manager = next((pm for pm in self.playlist_managers if pm.id == playlist_id), None)
+                    if not playlist_manager:
+                        playlist_manager = self.create_playlist_manager(playlist)
+                        self.playlist_managers.append(playlist_manager)
+                    playlist_manager.update_path(os.path.dirname(new_path))
                     self.save_data_to_json()
                     return True
             return False
