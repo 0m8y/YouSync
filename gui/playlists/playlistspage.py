@@ -57,13 +57,13 @@ class PlaylistsPage(customtkinter.CTkFrame):
         message2 = customtkinter.CTkLabel(popup, text="What would you like to do?", text_color=WHITE_TEXT_COLOR)
         message2.pack(pady=(0, 20), padx=20)
 
-        button_frame = customtkinter.CTkFrame(popup)
+        button_frame = customtkinter.CTkFrame(popup, fg_color="transparent")
         button_frame.pack(pady=20)
 
-        delete_button = customtkinter.CTkButton(button_frame, text="Delete Playlist", command=lambda: self.delete_playlist(popup, playlist_data))
+        delete_button = customtkinter.CTkButton(button_frame, text="Delete Playlist", command=lambda: self.delete_playlist(popup, playlist_data), fg_color=RED_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
         delete_button.pack(side="left", padx=20)
 
-        resync_button = customtkinter.CTkButton(button_frame, text="Re-sync Playlist", command=lambda: self.resync_playlist(popup, playlist_data))
+        resync_button = customtkinter.CTkButton(button_frame, text="Re-sync Playlist", command=lambda: self.resync_playlist(popup, playlist_data), fg_color=GREEN_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
         resync_button.pack(side="right", padx=20)
 
         popup.update_idletasks()
