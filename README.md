@@ -23,18 +23,12 @@ YouSync is an application that allows you to synchronize your playlists with you
 
 ## Installation
 
-Make sure you have Python and Chrome installed on your system. You can install the necessary dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
+To install YouSync, simply run `YouSyncInstaller.exe` and follow the installation wizard instructions.
 
 ## Usage
 
-1. **Launch the Application**:
-   ```bash
-   python yousync.py
-   ```
+1. **Launch App**:
+   Once the installation is complete, you can launch the YouSync application from the Start menu or by running `YouSync.exe` in the installation folder.
 
 ## Technical Details
 
