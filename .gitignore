@@ -1,7 +1,11 @@
 MyPlaylistTest
-data
 __pycache__
-*.mp3
-*.json
-build/
+data
 dist/
+build/
+
+*.mp3
+*.mp4
+
+*.json
+*.log

@@ -5,8 +5,7 @@ a = Analysis(
     ['yousync.py'],
     pathex=[],
     binaries=[],
-    datas=[('gui/assets/images', 'gui/assets/images'),
-           ('core/playlists.json', 'core')],
+    datas=[('gui/assets/images/', 'gui/assets/images')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -30,10 +29,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    console=False
 )
