@@ -1,4 +1,4 @@
-![YouSync Logo](gui/assets/images/YouSyncLogo.png)
+![YouSync Logo](YouSyncDev/gui/assets/images/YouSyncLogo.png)
 
 YouSync is an application that allows you to synchronize your playlists with your PC. By saving the desired playlist and assigning it to a folder on your computer, YouSync takes care of downloading all the songs in MP3 format and retrieving the associated metadata. Once the playlist is on your computer, you just need to press a button to synchronize it again.
 
