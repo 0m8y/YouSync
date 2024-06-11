@@ -1,4 +1,4 @@
-![YouSync Logo](gui/assets/images/YouSyncLogo.png)
+![YouSync Logo](YouSyncDev/gui/assets/images/YouSyncLogo.png)
 
 YouSync is an application that allows you to synchronize your playlists with your PC. By saving the desired playlist and assigning it to a folder on your computer, YouSync takes care of downloading all the songs in MP3 format and retrieving the associated metadata. Once the playlist is on your computer, you just need to press a button to synchronize it again.
 
@@ -23,18 +23,12 @@ YouSync is an application that allows you to synchronize your playlists with you
 
 ## Installation
 
-Make sure you have Python and Chrome installed on your system. You can install the necessary dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
+To install YouSync, simply run `YouSyncInstaller.exe` and follow the installation wizard instructions.
 
 ## Usage
 
-1. **Launch the Application**:
-   ```bash
-   python yousync.py
-   ```
+1. **Launch App**:
+   Once the installation is complete, you can launch the YouSync application from the Start menu or by running `YouSync.exe` in the installation folder.
 
 ## Technical Details
 
