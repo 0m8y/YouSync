@@ -130,11 +130,9 @@ class CentralManager:
                         playlist_data = json.load(file)
                         playlist_url = playlist_data.get("playlist_url")
                         path_to_save_audio = playlist_data.get("path_to_save_audio")
-                        print("playlists.json loaded")
                         if playlist_url and path_to_save_audio:
                             try:
                                 playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
-                                print("Here2")
                             except Exception as e:
                                 logging.error(f"Error initializing YoutubePlaylistManager: {e}")
                                 print(f"Error initializing YoutubePlaylistManager: {e}")

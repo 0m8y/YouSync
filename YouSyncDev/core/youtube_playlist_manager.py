@@ -18,7 +18,12 @@ class YoutubePlaylistManager(IPlaylistManager):
 
     #Override Method
     def new_audio_manager(self, url):
-        return YoutubeAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
+        try:
+            audio_manager = YoutubeAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
+        except Exception as e:
+            logging.error(f"Error initializing YoutubeAudioManager: {e}")
+            print(f"Error initializing YoutubeAudioManager: {e}")
+        return audio_manager
 
     #Override Method
     def get_playlist_name(self, driver):

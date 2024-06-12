@@ -121,7 +121,7 @@ class IPlaylistManager(ABC):
     def __add_audio(self, audio_manager):
             audio_manager.update_data()
             self.audio_managers.append(audio_manager)
-            self.video_urls.append(audio_manager.url)
+            self.video_urls.append(audio_manager.get_url())
 
     @abstractmethod
     def new_audio_manager(self, url):
