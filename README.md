@@ -4,15 +4,11 @@ YouSync is an application that allows you to synchronize your playlists with you
 
 ## Features
 
-- **Playlist Synchronization**: Sync your YouTube playlists with your PC.
-- **Music Downloading**: Saves songs in MP3 format.
-- **Metadata Retrieval**: Retrieves metadata for optimal organization.
-- **Synchronization Folder**: Assign each playlist to a specific folder on your computer.
-- **Easy Sync**: Update your playlist with a single click.
+- **Playlist Synchronization**: Sync your YouTube playlists on your PC with a single click.
+- **Music Downloading and Metadata Retrieval**: Saves songs in MP3 format. Retrieves metadata for optimal organization.
+- **Graphic Interface**: The graphical interface is now available!
 
 ### Upcoming Features
-- **Graphic Interface**: The graphical interface is currently under development. Coming soon !
-  
 - **SoundCloud Support**: Sync SoundCloud playlists.
 - **Spotify Support**: Sync Spotify playlists.
 
