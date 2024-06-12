@@ -2,6 +2,7 @@ from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.utils import get_selenium_driver
 import os, sys, json, requests, datetime, threading
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 class PlaylistData:
     def __init__(self, id, url, path, title, last_update=None):
@@ -129,9 +130,14 @@ class CentralManager:
                         playlist_data = json.load(file)
                         playlist_url = playlist_data.get("playlist_url")
                         path_to_save_audio = playlist_data.get("path_to_save_audio")
-                        
+                        print("playlists.json loaded")
                         if playlist_url and path_to_save_audio:
-                            playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+                            try:
+                                playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+                                print("Here2")
+                            except Exception as e:
+                                logging.error(f"Error initializing YoutubePlaylistManager: {e}")
+                                print(f"Error initializing YoutubePlaylistManager: {e}")
 
                             if any(PlaylistData.from_dict(pl).id == playlist_manager.id if isinstance(pl, dict) else pl.id == playlist_manager.id for pl in self.data["playlists"]):
                                 print(f"La playlist avec l'ID {playlist_manager.id} existe déjà.")
