@@ -12,6 +12,7 @@ YouSync is an application that allows you to synchronize your playlists with you
 - **Spotify Support**: Sync Spotify playlists.
 - **SoundCloud Support**: Sync SoundCloud playlists.
 - **Several playlists in the same folder**: Currently, it's possible to have several playlists in the same folder, but there's a thumbnail display bug.
+- **Playlists Folder Recover**: Find several playlists folder at the same time.
 
 
 ## Compatibility
