@@ -46,7 +46,7 @@ class CentralManager:
         self.progress_callback = progress_callback
         self.playlist_loaded = False
 
-    def get_project_path():
+    def get_project_path(self):
         if getattr(sys, 'frozen', False):
             user_dir = os.path.expanduser("~")
             project_dir = os.path.join(user_dir, '.yousync_project')
