@@ -14,7 +14,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
 :: Compile yousync.py to an executable
-pyinstaller --onefile --add-data "gui/assets/images/;gui/assets/images" --noconsole yousync.py
+pyinstaller --onefile --add-data "gui/assets/images/;gui/assets/images" yousync.py
 
 :: Move the compiled executable to ProgramData
 move dist\yousync.exe .
