@@ -1,8 +1,14 @@
 from core.youtube_playlist_manager import YoutubePlaylistManager
-from core.utils import get_selenium_driver
+from core.spotify_playlist_manager import SpotifyPlaylistManager
+from core.utils import get_selenium_driver, get_selenium_driver_for_spotify
 import os, sys, json, requests, datetime, threading
 from concurrent.futures import ThreadPoolExecutor
-import logging
+import logging, re
+from enum import Enum
+
+class Platform(Enum):
+    YOUTUBE = 1
+    SPOTIFY = 2
 
 class PlaylistData:
     def __init__(self, id, url, path, title, last_update=None):
@@ -85,11 +91,26 @@ class CentralManager:
         path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
         playlist_manager = next((pm for pm in self.playlist_managers if pm.id == pl.id), None)
         if not playlist_manager:
-            return YoutubePlaylistManager(pl.url, path_to_save_audio)
+            spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+            youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+
+            if youtube_pattern.match(pl.url):
+                return YoutubePlaylistManager(pl.url, path_to_save_audio)
+            elif spotify_pattern.match(pl.url):
+                return SpotifyPlaylistManager(pl.url, path_to_save_audio)
         return None
 
-    def add_playlist(self, playlist_url, path_to_save_audio):
-        playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+    def add_playlist(self, playlist_url, path_to_save_audio, plateform: Platform):
+        match plateform:
+            case Platform.YOUTUBE:
+                print("Adding new youtube playlist...")
+                playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+            case Platform.SPOTIFY:
+                print("Adding new spotify playlist...")
+                playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
+            case _:
+                print("Adding new youtube playlist...")
+                playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
 
         if any(pl.id == playlist_manager.id for pl in self.data["playlists"]):
             return "The playlist is already registered."
@@ -132,10 +153,18 @@ class CentralManager:
                         path_to_save_audio = playlist_data.get("path_to_save_audio")
                         if playlist_url and path_to_save_audio:
                             try:
-                                playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+                                spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+                                youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+
+                                if youtube_pattern.match(playlist_url):
+                                    playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
+                                elif spotify_pattern.match(playlist_url):
+                                    playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
+                                else:
+                                    raise Exception(f"Unknown playlist url: {playlist_url}")
                             except Exception as e:
-                                logging.error(f"Error initializing YoutubePlaylistManager: {e}")
-                                print(f"Error initializing YoutubePlaylistManager: {e}")
+                                logging.error(f"Error initializing PlaylistManager: {e}")
+                                print(f"Error initializing PlaylistManager: {e}")
 
                             if any(PlaylistData.from_dict(pl).id == playlist_manager.id if isinstance(pl, dict) else pl.id == playlist_manager.id for pl in self.data["playlists"]):
                                 print(f"La playlist avec l'ID {playlist_manager.id} existe déjà.")
@@ -166,7 +195,16 @@ class CentralManager:
             return f"{playlist_count} playlists were found !"
 
     def save_picture_and_get_title(self, playlist_url, playlist_manager, path_to_save_audio):
-        driver = get_selenium_driver(playlist_url)
+        spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+        youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+
+        if youtube_pattern.match(playlist_url):
+            driver = get_selenium_driver(playlist_url)
+        elif spotify_pattern.match(playlist_url):
+            driver = get_selenium_driver_for_spotify(playlist_url)
+        else:
+            raise Exception(f"Unknown playlist url: {playlist_url}")
+
         playlist_name = playlist_manager.get_playlist_name(driver)#TODO: l'enregistrer en donnée dans youtube_playlist_manager
         playlist_picture = playlist_manager.get_playlist_image_url(driver)
         print(f"Playlist Picture: {playlist_picture}")
@@ -192,17 +230,21 @@ class CentralManager:
         self.save_data_to_json()
 
     def update_playlist(self, playlist_id):
-        playlist = self.get_playlist(playlist_id)
-        
-        if not playlist:
-            return f"Playlist with ID {playlist_id} not found."
+        try:
+            playlist = self.get_playlist(playlist_id)
+            
+            if not playlist:
+                return f"Playlist with ID {playlist_id} not found."
 
-        playlist_manager = next((pm for pm in self.playlist_managers if pm.id == playlist_id), None)
-        if playlist_manager:
-            playlist_manager.update()
-            playlist.last_update = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
-            self.save_data_to_json()
-
+            playlist_manager = next((pm for pm in self.playlist_managers if pm.id == playlist_id), None)
+            if playlist_manager:
+                playlist_manager.update()
+                playlist.last_update = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
+                self.save_data_to_json()
+        except Exception as e:
+            print(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
+            logging.error(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
+            return f"An error occurred while updating the playlist with ID {playlist_id}. Please check the logs for more details."
 
     def list_playlists(self):
         return [PlaylistData.from_dict(pl) if isinstance(pl, dict) else pl for pl in self.data["playlists"]]

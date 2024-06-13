@@ -1,11 +1,10 @@
-from core.central_manager import Platform
 import customtkinter, os, re, threading
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
 from gui.style import *
+from core.central_manager import Platform
 
-
-class NewYoutubePlaylist(customtkinter.CTkFrame):
+class NewSpotifyPlaylist(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
         self.image_path = image_path
         self.parent_app = parent
@@ -32,16 +31,16 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.back_button = customtkinter.CTkButton(self, text="", command=self.go_back, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=30, y=30)
 
-        # Logo YouTube
-        youtube_logo = Image.open(os.path.join(self.image_path, "Youtube_logo.png"))
-        padded_image = ImageOps.expand(youtube_logo, border=0, fill='black')
-        resized_image = padded_image.resize((179, 75))
+        # Logo Spotify
+        spotify_logo = Image.open(os.path.join(self.image_path, "Spotify_logo.png"))
+        padded_image = ImageOps.expand(spotify_logo, border=0, fill='black')
+        resized_image = padded_image.resize((216, 65))
         tk_logo = ImageTk.PhotoImage(resized_image)
         self.logo_label = customtkinter.CTkLabel(self, image=tk_logo, text="")
         self.logo_label.image = tk_logo
         self.logo_label.grid(row=0, column=1, pady=(30, 40))
 
-        # Youtube URL Section
+        # Spotify URL Section
         self.create_label("Enter Playlist URL", 1)
         self.create_label("Make sure the playlist is not private.", 2, font_size=11, pady=(0, 0))
         self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
@@ -93,7 +92,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         else:
             def add_and_load():
                 self.notification_manager.show_notification("Adding playlist...")
-                self.parent_app.central_manager.add_playlist(url, path, Platform.YOUTUBE)
+                self.parent_app.central_manager.add_playlist(url, path, Platform.SPOTIFY)
                 self.notification_manager.show_notification("The playlist has been added!")
                 self.parent_app.playlists_page.reload()
                 self.parent_app.playlists_page.load_playlists()

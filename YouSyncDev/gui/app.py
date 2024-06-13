@@ -4,6 +4,7 @@ import os
 from PIL import Image
 from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
+from gui.newspotifyplaylist import NewSpotifyPlaylist
 from gui.playlists.playlistspage import PlaylistsPage
 from gui.style import *
 
@@ -72,23 +73,29 @@ class App(customtkinter.CTk):
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, self.image_path, fg_color="transparent")
+        self.new_spotify_playlist_page = NewSpotifyPlaylist(self, self.image_path, fg_color="transparent")
 
         self.home_page.grid(row=0, column=1, sticky="nsew")
         self.playlists_page.grid(row=0, column=1, sticky="nsew")
         self.third_frame.grid(row=0, column=1, sticky="nsew")
         self.new_youtube_playlist_page.grid(row=0, column=1, sticky="nsew")
+        self.new_spotify_playlist_page.grid(row=0, column=1, sticky="nsew")
 
         self.playlists_page.lower()
         self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
+        self.new_spotify_playlist_page.lower()
 
         self.select_frame_by_name("home")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")
 
+    def show_new_spotify_playlist(self):
+        self.select_frame_by_name("new_spotify_playlist")
+
     def select_frame_by_name(self, name):
-        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" or name == "new_youtube_playlist" else "transparent")
+        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" or name == "new_youtube_playlist" or name == "new_spotify_playlist" else "transparent")
         self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlists_page" else "transparent")
         self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
 
@@ -102,6 +109,8 @@ class App(customtkinter.CTk):
             self.third_frame.lift()
         elif name == "new_youtube_playlist":
             self.new_youtube_playlist_page.lift()
+        elif name == "new_spotify_playlist":
+            self.new_spotify_playlist_page.lift()
 
     def home_button_event(self):
         self.select_frame_by_name("home")

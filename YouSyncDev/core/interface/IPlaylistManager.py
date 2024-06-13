@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from abc import ABC, abstractmethod
 from threading import Lock
 from core.utils import *
@@ -31,12 +31,20 @@ class IPlaylistManager(ABC):
         else:
             self.__get_video_urls_from_json()
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(self.new_audio_manager, video_url) for video_url in self.video_urls]
-            for future in futures:
-                youtube_audio = future.result()
-                self.audio_managers.append(youtube_audio)
-        logging.debug(f"playlist {self.id} is loaded successfully")
+        try:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [executor.submit(self.new_audio_manager, video_url) for video_url in self.video_urls]
+                
+                for future in as_completed(futures):
+                    try:
+                        youtube_audio = future.result()
+                        self.audio_managers.append(youtube_audio)
+                    except Exception as e:
+                        logging.error(f"Error processing future: {e}", exc_info=True)
+            
+            logging.debug(f"playlist {self.id} is loaded successfully")
+        except Exception as e:
+            logging.error(f"Error in load_audio_managers: {e}", exc_info=True)
 
     def __initialize_playlist_data(self):
         data = {
@@ -49,10 +57,11 @@ class IPlaylistManager(ABC):
 
     def __get_video_urls_from_json(self):
         data = self.__load_playlist_data()
-        self.path_to_save_audio = data["path_to_save_audio"]
-        audios = data["audios"]
+        self.path_to_save_audio = data.get("path_to_save_audio", self.path_to_save_audio)  # Utiliser la valeur actuelle si la clé n'existe pas
+        audios = data.get("audios", [])
         for audio in audios:
             self.video_urls.append(audio["url"])
+
 
 #-------------------------------------Load & Save--------------------------------------#
 
@@ -69,19 +78,26 @@ class IPlaylistManager(ABC):
     def update(self):
         print("Updating playlist " + self.id)
         #TODO: Not working, to update with new logic
-        new_video_urls = self.get_video_urls()
+        try:
+            new_video_urls = self.get_video_urls()
 
-        for new_video_url in new_video_urls:
-            new_video_id = extract_video_id(new_video_url)
-            existing_video_ids = [extract_video_id(video_url) for video_url in self.video_urls]
-            if new_video_id not in existing_video_ids:
-                self.__add_audio(self.new_audio_manager(new_video_url))
+            for new_video_url in new_video_urls:
+                new_video_id = self.extract_video_id(new_video_url)
+                existing_video_ids = [self.extract_video_id(video_url) for video_url in self.video_urls]
+                for vid in existing_video_ids:
+                    print("Existing video: " + vid)
+                if new_video_id not in existing_video_ids:
+                    print("new video url: " + new_video_url)
+                    self.__add_audio(self.new_audio_manager(new_video_url))
 
-        for video_url in list(self.video_urls):
-            video_id = extract_video_id(video_url)
-            new_video_ids = [extract_video_id(new_video_url) for new_video_url in new_video_urls]
-            if video_id not in new_video_ids:
-                self.__remove_audio(video_url)
+            for video_url in list(self.video_urls):
+                video_id = self.extract_video_id(video_url)
+                new_video_ids = [self.extract_video_id(new_video_url) for new_video_url in new_video_urls]
+                if video_id not in new_video_ids:
+                    self.__remove_audio(video_url)
+        except Exception as e:
+            raise Exception(f"Update Error: {e}")
+
 
     def update_path(self, new_path):
         old_path = self.path_to_save_audio
@@ -141,3 +157,6 @@ class IPlaylistManager(ABC):
     def download(self):
         pass
 
+    @abstractmethod
+    def extract_video_id(self):
+        pass

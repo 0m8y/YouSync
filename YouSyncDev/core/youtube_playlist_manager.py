@@ -12,7 +12,7 @@ class YoutubePlaylistManager(IPlaylistManager):
     def __init__(self, playlist_url, path_to_save_audio):
         print("YoutubePlaylistManager Loaded")  
         logging.debug("Initializing YoutubePlaylistManager")  
-        super().__init__(playlist_url, path_to_save_audio, get_playlist_id(playlist_url))
+        super().__init__(playlist_url, path_to_save_audio, get_youtube_playlist_id(playlist_url))
     
 #----------------------------------------GETTER----------------------------------------#
 
@@ -97,3 +97,8 @@ class YoutubePlaylistManager(IPlaylistManager):
                 future.result()
         logging.debug("downloading videos ...")
 
+    #Override Function
+    def extract_video_id(self, url):
+        query = urlparse(url).query
+        params = parse_qs(query)
+        return params.get('v', [None])[0]

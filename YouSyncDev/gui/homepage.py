@@ -11,8 +11,9 @@ class HomePage(customtkinter.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         self.create_label("Add new playlist")
-        self.__create_soundcloud_button__()
         self.__create_youtube_button__()
+        self.__create_spotify_button__()
+        self.__create_soundcloud_button__()
 
     def create_label(self, text):
         label = customtkinter.CTkLabel(self, text=text, text_color=WHITE_TEXT_COLOR, font=('Roboto Medium', 32))
@@ -30,6 +31,19 @@ class HomePage(customtkinter.CTkFrame):
         self.youtube_button.image = tk_image
         self.youtube_button.grid(row=1, column=0, padx=(50, 0), pady=(30, 0))
 
+    def __create_spotify_button__(self):
+        spotify_image = Image.open(os.path.join(self.image_path, "Spotify_logo.png"))
+        padded_image = ImageOps.expand(spotify_image, border=0, fill='black')
+        resized_image = padded_image.resize((216, 65))
+
+        tk_image = ImageTk.PhotoImage(resized_image)
+
+        self.spotify_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
+                                                         command=self.spotify_button_event, text="",
+                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
+        self.spotify_button.image = tk_image
+        self.spotify_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
+
     def __create_soundcloud_button__(self):
         soundcloud_image = Image.open(os.path.join(self.image_path, "SoundCloud_logo.png"))
         padded_image = ImageOps.expand(soundcloud_image, border=0, fill='black')
@@ -41,10 +55,13 @@ class HomePage(customtkinter.CTkFrame):
                                                          command=self.soundcloud_button_event, text="",
                                                          fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.soundcloud_button.image = tk_image
-        self.soundcloud_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
+        self.soundcloud_button.grid(row=2, column=0, padx=(50, 0), pady=(40, 0))
 
     def soundcloud_button_event(self):
         print("SoundCloud cliqué!")
 
     def youtube_button_event(self):
         self.parent_app.show_new_youtube_playlist()
+
+    def spotify_button_event(self):
+        self.parent_app.show_new_spotify_playlist()
