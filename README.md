@@ -8,12 +8,14 @@ YouSync is an application that allows you to synchronize your playlists with you
 - **Music Downloading and Metadata Retrieval**: Saves songs in MP3 format. Retrieves metadata for optimal organization.
 - **Graphic Interface**: The graphical interface is now available!
 
-### YouSync 2.0 Upcoming Features
+### YouSync 1.1 Features
 - **Spotify Support**: Sync Spotify playlists.
+- 
+### Upcoming Features
+
 - **SoundCloud Support**: Sync SoundCloud playlists.
 - **Several playlists in the same folder**: Currently, it's possible to have several playlists in the same folder, but there's a thumbnail display bug.
-- **Playlists Folder Recover**: Find several playlists folder at the same time.
-
+- **Upgrade Playlists Folder Recover**: Find several playlists folder at the same time.
 
 ## Compatibility
 
