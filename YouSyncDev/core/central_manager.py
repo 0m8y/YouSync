@@ -1,9 +1,8 @@
 from core.youtube_playlist_manager import YoutubePlaylistManager
 from core.spotify_playlist_manager import SpotifyPlaylistManager
 from core.utils import get_selenium_driver, get_selenium_driver_for_spotify
-import os, sys, json, requests, datetime, threading
+import os, sys, json, requests, datetime, logging, re, shutil
 from concurrent.futures import ThreadPoolExecutor
-import logging, re
 from enum import Enum
 
 class Platform(Enum):
@@ -47,9 +46,15 @@ class CentralManager:
         self.progress_callback = progress_callback
         self.playlist_loaded = False
 
-    def get_project_path(self):
+    def get_project_path():
         if getattr(sys, 'frozen', False):
-            return sys._MEIPASS
+            user_dir = os.path.expanduser("~")
+            project_dir = os.path.join(user_dir, '.yousync_project')
+            
+            if not os.path.exists(project_dir):
+                os.makedirs(project_dir)
+            
+            return project_dir
         else:
             return os.path.dirname(os.path.abspath(__file__))
 
