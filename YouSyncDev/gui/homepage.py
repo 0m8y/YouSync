@@ -6,7 +6,7 @@ from gui.style import *
 class HomePage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
         self.image_path = image_path
-        self.parent_app = parent
+        self.parent = parent
         super().__init__(parent, **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -58,10 +58,15 @@ class HomePage(customtkinter.CTkFrame):
         self.soundcloud_button.grid(row=2, column=0, padx=(50, 0), pady=(40, 0))
 
     def soundcloud_button_event(self):
-        print("SoundCloud cliqué!")
+        self.parent.playlists_page.notification_manager.show_notification(
+            "Soundcloud Comming soon...", 
+            duration=NOTIFICATION_DURATION,
+            text_color=WHITE_TEXT_COLOR
+        )
+
 
     def youtube_button_event(self):
-        self.parent_app.show_new_youtube_playlist()
+        self.parent.show_new_youtube_playlist()
 
     def spotify_button_event(self):
-        self.parent_app.show_new_spotify_playlist()
+        self.parent.show_new_spotify_playlist()

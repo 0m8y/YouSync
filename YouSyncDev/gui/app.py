@@ -69,6 +69,11 @@ class App(customtkinter.CTk):
         self.central_manager = None
         self.playlist_page = None
         self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        self.playlists_page.notification_manager.show_notification(
+            "download is already in progress!", 
+            duration=NOTIFICATION_DURATION,
+            text_color=WHITE_TEXT_COLOR
+        )
 
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         
