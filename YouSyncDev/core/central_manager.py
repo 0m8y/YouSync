@@ -1,5 +1,5 @@
-from core.youtube_playlist_manager import YoutubePlaylistManager
-from core.spotify_playlist_manager import SpotifyPlaylistManager
+from core.playlist_managers.youtube_playlist_manager import YoutubePlaylistManager
+from core.playlist_managers.spotify_playlist_manager import SpotifyPlaylistManager
 from core.utils import get_selenium_driver, get_selenium_driver_for_spotify
 import os, sys, json, requests, datetime, logging, re, shutil
 from concurrent.futures import ThreadPoolExecutor

@@ -1,6 +1,6 @@
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.chrome.options import Options
-from core.interface.IAudioManager import IAudioManager
+from core.audio_managers.IAudioManager import IAudioManager
 
 from selenium import webdriver
 from pytube import YouTube

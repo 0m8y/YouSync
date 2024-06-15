@@ -1,9 +1,9 @@
 from selenium.webdriver.support import expected_conditions as EC
-from core.interface.IPlaylistManager import IPlaylistManager
+from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from selenium.webdriver.support.ui import WebDriverWait
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
-from core.youtube_audio_manager import *
+from core.audio_managers.youtube_audio_manager import *
 from core.utils import *
 import logging
 import requests

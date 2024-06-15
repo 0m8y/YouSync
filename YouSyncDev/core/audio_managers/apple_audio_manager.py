@@ -1,46 +1,41 @@
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.chrome.options import Options
-from core.interface.IAudioManager import IAudioManager
+from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
-from selenium import webdriver
 from pytube import YouTube
-import eyed3
 
 from moviepy.editor import *
-import json
 from core.metadata_finder import *
 from core.utils import *
 import requests
 from bs4 import BeautifulSoup
 
-class SpotifyAudioManager(IAudioManager):
+class AppleAudioManager(IAudioManager):
 
     def __init__(self, url, path_to_save_audio, data_filepath, lock):
         self.html_page = requests.get(url)
         self.soup = BeautifulSoup(self.html_page.text,'lxml')
-        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(), lock)
+        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_apple_id(url), self.__extract_title(), lock)
 
 #----------------------------------Download Process-------------------------------------#
 
-    def __extract_spotify_id(self, spotify_url):
+    def __extract_apple_id(self, apple_url):
         # Définir une expression régulière pour extraire l'ID de la piste
         pattern = r"track/([a-zA-Z0-9]+)"
-        match = re.search(pattern, spotify_url)
+        match = re.search(pattern, apple_url)
         if match:
             return match.group(1)
         return None
 
-    def __get_youtube_url_from_spotify(self):
-        title = self.soup.find('meta', property='og:title')['content']
-        artist = self.soup.find('meta', attrs={'name':'music:musician_description'})['content']
+    def __get_youtube_url_from_apple(self):
+        title = self.__extract_title()
+        artist = self.__extract_artist()
         video_search = str(title + " " + artist).replace(" ", "+")
         result = str(list(YoutubeSearch(str(video_search), max_results=1).to_dict())[-1]['url_suffix'])
         return result
 
     #Override Function
     def download_audio(self):
-        youtube_url = self.__get_youtube_url_from_spotify()
+        youtube_url = self.__get_youtube_url_from_apple()
         yt = YouTube(youtube_url)
         audio_stream = yt.streams.filter(only_audio=True).first()
         downloaded_file = audio_stream.download()
@@ -64,16 +59,18 @@ class SpotifyAudioManager(IAudioManager):
         self.register_metadata(video_title, video_title, artist, album, image_url)
 
     def __extract_title(self):
-        return self.soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+        return self.soup.find('meta', attrs={'name':'apple:title'})['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
     
     def __extract_artist(self):
-        return self.soup.find('meta', attrs={'name':'music:musician_description'})['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+        artist_elements = self.soup.select('span.song-subtitles-item span a[data-testid="click-action"]')
+        return ", ".join([artist.get_text(strip=True) for artist in artist_elements])
     
     def __extract_album(self):
-        album_link = self.soup.find('meta', attrs={'name':'music:album'})['content']
-        html_page = requests.get(album_link)
-        soup = BeautifulSoup(html_page.text,'lxml')
-        return soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+        album_element = self.soup.select_one('span[data-testid="song-subtitle-album"] span[data-testid="song-subtitle-album-link"] a[data-testid="click-action"]')
+        if album_element:
+            return album_element.get_text(strip=True)
+        else:
+            return None
     
     def extract_image(self):
         return self.soup.find('meta', attrs={'name':'twitter:image'})['content']

@@ -9,3 +9,5 @@ build/
 
 *.json
 *.log
+txt.Txt
+Test.py
