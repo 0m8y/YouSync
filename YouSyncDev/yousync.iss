@@ -15,6 +15,7 @@ SolidCompression=yes
 PrivilegesRequired=admin
 
 [Files]
+Source: "core\playlists.json"; DestDir: "{app}\core"; Flags: dontcopy
 Source: "installer.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "yousync.py"; DestDir: "{app}"; Flags: ignoreversion
