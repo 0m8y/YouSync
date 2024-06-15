@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from abc import ABC, abstractmethod
 from threading import Lock
 from core.utils import *
-import logging
+import logging, requests
 import json
 
 class IPlaylistManager(ABC):
@@ -41,6 +41,9 @@ class IPlaylistManager(ABC):
                         self.audio_managers.append(youtube_audio)
                     except Exception as e:
                         logging.error(f"Error processing future: {e}", exc_info=True)
+
+            self.title = self.get_playlist_title()
+            self.download_cover_image()
             
             logging.debug(f"playlist {self.id} is loaded successfully")
         except Exception as e:
@@ -62,6 +65,22 @@ class IPlaylistManager(ABC):
         for audio in audios:
             self.video_urls.append(audio["url"])
 
+    def download_cover_image(self):
+        logging.debug("Downloading cover image...")
+        yousync_path = os.path.join(self.path_to_save_audio, '.yousync')
+        image_path = os.path.join(yousync_path, self.id + ".jpg")
+        if os.path.exists(image_path):
+            logging.debug("Cover image is already downloaded")
+            return
+        cover_image_url = self.extract_image()
+        logging.debug(f"Cover image url: {cover_image_url}, playlist: {self.playlist_url}")
+        response = requests.get(cover_image_url)
+        if response.status_code == 200:
+            with open(image_path, 'wb') as img_file:
+                img_file.write(response.content)
+            print(f"Image enregistrée à: {image_path}")
+        else:
+            print(f"Erreur lors du téléchargement de l'image: {response.status_code}")
 
 #-------------------------------------Load & Save--------------------------------------#
 
@@ -84,8 +103,6 @@ class IPlaylistManager(ABC):
             for new_video_url in new_video_urls:
                 new_video_id = self.extract_video_id(new_video_url)
                 existing_video_ids = [self.extract_video_id(video_url) for video_url in self.video_urls]
-                for vid in existing_video_ids:
-                    print("Existing video: " + vid)
                 if new_video_id not in existing_video_ids:
                     print("new video url: " + new_video_url)
                     self.__add_audio(self.new_audio_manager(new_video_url))
@@ -148,7 +165,7 @@ class IPlaylistManager(ABC):
         pass
 
     @abstractmethod
-    def get_playlist_name(self, driver):
+    def get_playlist_title(self):
         pass
 
 #----------------------------------Download Process-------------------------------------#
@@ -158,5 +175,9 @@ class IPlaylistManager(ABC):
         pass
 
     @abstractmethod
-    def extract_video_id(self):
+    def extract_video_id(self, url):
+        pass
+
+    @abstractmethod
+    def extract_image(self):
         pass

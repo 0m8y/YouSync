@@ -60,11 +60,10 @@ class YoutubeAudioManager(IAudioManager):
 
         selenium_driver = self.__get_selenium_driver()
 
-        video_title = find_title_url(self.url)
         title = find_title(selenium_driver)
         artist = find_artist(selenium_driver)
         album = find_album(selenium_driver)
         image_url = find_image(selenium_driver)
         selenium_driver.quit()
 
-        self.register_metadata(video_title, title, artist, album, image_url)
+        self.register_metadata(self.video_title, title, artist, album, image_url)

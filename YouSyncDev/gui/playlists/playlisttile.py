@@ -25,21 +25,36 @@ class PlaylistTile:
         self.cover_canvas = Canvas(self.cover_frame, width=180, height=140, bd=0, highlightthickness=0, bg=self.playlists_page['bg'])
         self.cover_canvas.pack()
 
-        self.cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), "cover.jpg")
-        self.cover_img = create_image(os.path.join(self.image_path, self.cover_filename), 180, 140)
-
+        self.cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
+        if not os.path.exists(self.cover_filename):
+            self.cover_filename =os.path.join(self.image_path, "default_preview.png")
+        self.cover_img = create_image(self.cover_filename, 180, 140)
         self.cover_image_id = self.cover_canvas.create_image(90, 70, image=self.cover_img)
         self.cover_canvas.image = self.cover_img
+        self.cover_canvas.tag_bind(self.cover_image_id, "<Button-1>", lambda event: self.open_playlist_page(self.playlist_data, self.cover_canvas))
+
 
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         self.cover_canvas.sync_icon_id = self.cover_canvas.create_image(160, 120, image=sync_icon_photo)
         self.cover_canvas.sync_icon_photo = sync_icon_photo
-        self.cover_canvas.tag_bind(self.cover_image_id, "<Button-1>", lambda event: self.open_playlist_page(self.playlist_data, self.cover_canvas))
 
         self.cover_canvas.tag_bind(self.cover_canvas.sync_icon_id, "<Button-1>", lambda event, c=self.cover_canvas: self.update_playlist())
 
         title_label = customtkinter.CTkLabel(self.cover_frame, text=truncate_string(self.playlist_data.title, 18), text_color=WHITE_TEXT_COLOR)
         title_label.pack(pady=(0, 10))
+
+    def update_cover(self):
+        print("Updating cover...")
+        new_cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
+        if self.cover_filename == new_cover_filename: 
+            return
+        if not os.path.exists(new_cover_filename):
+            self.cover_filename = os.path.join(self.image_path, "default_preview.png")
+        else:
+            self.cover_filename = new_cover_filename
+        self.cover_img = create_image(self.cover_filename, 180, 140)
+        self.cover_canvas.itemconfig(self.cover_image_id, image=self.cover_img)
+        print(f"Cover updated: {self.cover_filename}")
 
     def update_playlist(self):
         if self.on_update:
@@ -86,7 +101,9 @@ class PlaylistTile:
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
+            self.update_cover()
             if self.playlist_page is not None:
+                self.playlist_page.update_cover(self.cover_filename)
                 self.playlist_page.sync_completed()
                 self.playlist_page.update_tracklist()
 

@@ -5,15 +5,18 @@ from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from core.spotify_audio_manager import SpotifyAudioManager
 from core.utils import *
-import logging
+import logging, requests
 
 class SpotifyPlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url, path_to_save_audio):
+        self.html_page = requests.get(playlist_url).text
+        self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing SpotifyPlaylistManager")  
         super().__init__(playlist_url, path_to_save_audio, get_spotify_playlist_id(playlist_url))
     
 #----------------------------------------GETTER----------------------------------------#
+
 
     #Override Method
     def new_audio_manager(self, url):
@@ -26,31 +29,11 @@ class SpotifyPlaylistManager(IPlaylistManager):
             print(f"Error initializing SpotifyAudioManager: {e}")
 
     #Override Method
-    def get_playlist_name(self, driver):
-        html_content = driver.page_source
-        soup = BeautifulSoup(html_content, 'html.parser')
-        title = soup.find('meta', property='og:title')['content']
-        return title
-        
-    #Override Method
-    def get_playlist_image_url(self, driver):
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "img.mMx2LUixlnN_Fu45JpFB")))
-        html_content = driver.page_source
-        soup = BeautifulSoup(html_content, 'html.parser')
-        img_tag = soup.find('img', {'class': 'mMx2LUixlnN_Fu45JpFB'})
-        srcset = img_tag.get('srcset')
-        srcset_list = srcset.split(', ')
-        desired_url = None
-        for item in srcset_list:
-            url, resolution = item.split(' ')
-            if resolution == '640w':
-                desired_url = url
-                break
-
-            print("Image URL with 640w resolution:", desired_url)
-        else:
-            raise Exception(f"Desired resolution not found for {driver.current_url}")
-        return desired_url
+    def get_playlist_title(self):
+        return self.soup.find('meta', property='og:title')['content']
+    
+    def extract_image(self):
+        return self.soup.find('meta', property='og:image')['content']
 
     #Override Method
     def get_video_urls(self):

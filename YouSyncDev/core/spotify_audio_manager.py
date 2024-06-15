@@ -59,7 +59,7 @@ class SpotifyAudioManager(IAudioManager):
         video_title = self.__extract_title()
         artist = self.__extract_artist()
         album = self.__extract_album()
-        image_url = self.__extract_image()
+        image_url = self.extract_image()
         print("Image URL: " + image_url)
         self.register_metadata(video_title, video_title, artist, album, image_url)
 
@@ -75,5 +75,5 @@ class SpotifyAudioManager(IAudioManager):
         soup = BeautifulSoup(html_page.text,'lxml')
         return soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
     
-    def __extract_image(self):
+    def extract_image(self):
         return self.soup.find('meta', attrs={'name':'twitter:image'})['content']

@@ -8,7 +8,7 @@ from gui.playlists.playlisttile import PlaylistTile
 from gui.tooltip import ToolTip
 from gui.utils import *
 from gui.style import *
-
+import logging
 from core.central_manager import CentralManager
 
 class PlaylistsPage(customtkinter.CTkFrame):
@@ -39,9 +39,12 @@ class PlaylistsPage(customtkinter.CTkFrame):
             for playlist_data in playlists_data:
                 if not os.path.exists(os.path.dirname(playlist_data.path)):
                     self.show_path_not_found_popup(playlist_data)
-            
-            self.join_thread = threading.Thread(target=self.join_load_managers_thread)
-            self.join_thread.start()
+
+            try:
+                self.join_thread = threading.Thread(target=self.join_load_managers_thread)
+                self.join_thread.start()
+            except Exception as e:
+                logging.debug(f"Error init central manager. : {e}")
 
     def show_path_not_found_popup(self, playlist_data):
         def on_close():
@@ -118,6 +121,8 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.load_managers_thread.join()
         self.notification_manager.show_notification("Playlists loaded successfully!")
         self.parent.playlist_loaded = True
+        for id, tile in self.playlist_tiles:
+            tile.update_cover()
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)

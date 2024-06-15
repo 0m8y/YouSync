@@ -6,11 +6,14 @@ from selenium.webdriver.common.by import By
 from core.youtube_audio_manager import *
 from core.utils import *
 import logging
+import requests
 
 class YoutubePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url, path_to_save_audio):
         print("YoutubePlaylistManager Loaded")  
+        self.html_page = requests.get(playlist_url).text
+        self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing YoutubePlaylistManager")  
         super().__init__(playlist_url, path_to_save_audio, get_youtube_playlist_id(playlist_url))
     
@@ -25,33 +28,12 @@ class YoutubePlaylistManager(IPlaylistManager):
             print(f"Error initializing YoutubeAudioManager: {e}")
         return audio_manager
 
-    #Override Method
-    def get_playlist_name(self, driver):
-        try:
-            elements = WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "yt-formatted-string#text"))
-            )
-            for element in elements:
-                if not element.find_elements(By.XPATH, "./ancestor::ytd-alert-with-button-renderer"):
-                    playlist_name = element.get_attribute("textContent")
-                    return playlist_name
-            raise Exception("Le nom de la playlist n'a pas été trouvé.")
-        except Exception as e:
-            logging.error(f"Une erreur est survenue lors de la récupération du nom de la playlist : {e}")
-            return None
-        
-    #Override Method
-    def get_playlist_image_url(self, driver):
-        try:
-            image_selector = "img#img"
-            image_element = WebDriverWait(driver, 10).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, image_selector))
-            )
-            image_url = image_element.get_attribute("src")
-            return image_url
-        except Exception as e:
-            logging.error(f"Une erreur est survenue lors de la récupération de l'URL de l'image : {e}")
-            return None
+    #Override Method    
+    def get_playlist_title(self):
+        soup = BeautifulSoup(self.html_page, 'html.parser')
+        title = soup.find('meta', property='og:title')['content']
+        print(f"title founded: {title}")
+        return title
 
     #Override Method
     def get_video_urls(self):
@@ -102,3 +84,9 @@ class YoutubePlaylistManager(IPlaylistManager):
         query = urlparse(url).query
         params = parse_qs(query)
         return params.get('v', [None])[0]
+    
+    #Override Function
+    def extract_image(self):
+        title = self.soup.find('meta', property='og:image')['content']
+        print(f"title founded: {title}")
+        return title

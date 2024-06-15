@@ -35,6 +35,17 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         self.setup_ui()
 
+    def update_cover(self, new_image_path):
+        if new_image_path == self.image_path:
+            return
+        if os.path.exists(new_image_path):
+            self.image_path = new_image_path
+            photo = create_image(self.image_path, 180, 180)
+            self.image_label.configure(image=photo)
+            self.image_label.image = photo
+        else:
+            print(f"Error: Image {new_image_path} not found.")
+
     def setup_ui(self):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
