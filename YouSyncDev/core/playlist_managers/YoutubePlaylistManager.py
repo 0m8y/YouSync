@@ -3,11 +3,15 @@ from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from selenium.webdriver.support.ui import WebDriverWait
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
+from selenium import webdriver
 from core.audio_managers.YoutubeAudioManager import YoutubeAudioManager
-from core.utils import *
+from core.utils import get_youtube_playlist_id, get_selenium_driver, scroll_down_page
+from bs4 import BeautifulSoup
 import logging
 import requests
 from typing import List, Optional
+from urllib.parse import urlparse, parse_qs
+
 
 class YoutubePlaylistManager(IPlaylistManager):
 

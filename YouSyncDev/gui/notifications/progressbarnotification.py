@@ -2,7 +2,8 @@
 
 import customtkinter
 from tkinter import Toplevel
-from gui.style import *
+from gui.style import BUTTON_COLOR, WHITE_TEXT_COLOR
+
 
 class ProgressBarNotification(Toplevel):
     def __init__(self, parent, total, text, **kwargs):

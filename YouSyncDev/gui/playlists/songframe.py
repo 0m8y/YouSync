@@ -1,10 +1,8 @@
-import os, threading, customtkinter
-from PIL import Image, ImageTk, ImageOps
-from concurrent.futures import ThreadPoolExecutor
-
-from gui.utils import create_image
+import threading
+import customtkinter
 from gui.tooltip import ToolTip
-from gui.style import *
+from gui.style import WHITE_TEXT_COLOR, HOVER_COLOR, NOTIFICATION_DURATION, FIRST_COLOR, SECOND_COLOR
+
 
 class SongFrame:
     def __init__(self, parent, track_frame, track_number, audio_manager, green_image, orange_image, red_image):
@@ -22,7 +20,7 @@ class SongFrame:
         self.song_frame.grid_columnconfigure(0, weight=0)
         self.song_frame.grid_columnconfigure(1, weight=5)
         self.song_frame.pack(fill="x", pady=2, padx=10)
-    
+
         self.track_number_label = customtkinter.CTkLabel(self.song_frame, text=f"{track_number}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
         self.track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
 
@@ -55,7 +53,7 @@ class SongFrame:
     def download_music(self):
         if self.on_progress:
             self.playlist_page.playlists_page.notification_manager.show_notification(
-                f"{self.audio_manager.video_title} is already in progress!", 
+                f"{self.audio_manager.video_title} is already in progress!",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
@@ -70,13 +68,13 @@ class SongFrame:
     def _download(self):
         self.on_progress = True
         self.playlist_page.playlists_page.notification_manager.show_notification(
-            f"Downloading {self.audio_manager.video_title}...", 
+            f"Downloading {self.audio_manager.video_title}...",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )
         self.download()
         self.playlist_page.playlists_page.notification_manager.show_notification(
-            f"{self.audio_manager.video_title} is downloaded!", 
+            f"{self.audio_manager.video_title} is downloaded!",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )

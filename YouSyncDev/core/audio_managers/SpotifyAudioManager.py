@@ -1,25 +1,22 @@
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.chrome.options import Options
 from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
-from selenium import webdriver
 from pytubefix import YouTube
-import eyed3
+import os
+import re
 
-from moviepy.editor import *
-from core.metadata_finder import *
-from core.utils import *
+from moviepy.editor import AudioFileClip
 import requests
 from bs4 import BeautifulSoup
 from typing import Optional
 from threading import Lock
 
+
 class SpotifyAudioManager(IAudioManager):
 
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
         self.html_page = requests.get(url)
-        self.soup = BeautifulSoup(self.html_page.text,'lxml')
+        self.soup = BeautifulSoup(self.html_page.text, 'lxml')
         super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(), lock)
 
 #----------------------------------Download Process-------------------------------------#
@@ -33,7 +30,7 @@ class SpotifyAudioManager(IAudioManager):
 
     def __get_youtube_url_from_spotify(self) -> str:
         title = self.soup.find('meta', property='og:title')['content']
-        artist = self.soup.find('meta', attrs={'name':'music:musician_description'})['content']
+        artist = self.soup.find('meta', attrs={'name': 'music:musician_description'})['content']
         video_search = str(title + " " + artist).replace(" ", "+")
         result = str(list(YoutubeSearch(str(video_search), max_results=1).to_dict())[-1]['url_suffix'])
         return result
@@ -44,7 +41,7 @@ class SpotifyAudioManager(IAudioManager):
         yt = YouTube(youtube_url)
         audio_stream = yt.streams.filter(only_audio=True).first()
         downloaded_file = audio_stream.download()
-        
+
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.path_to_save_audio_with_title)
         audio_clip.close()
@@ -65,15 +62,15 @@ class SpotifyAudioManager(IAudioManager):
 
     def __extract_title(self) -> str:
         return self.soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
-    
+
     def __extract_artist(self) -> str:
-        return self.soup.find('meta', attrs={'name':'music:musician_description'})['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
-    
+        return self.soup.find('meta', attrs={'name': 'music:musician_description'})['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+
     def __extract_album(self) -> str:
-        album_link = self.soup.find('meta', attrs={'name':'music:album'})['content']
+        album_link = self.soup.find('meta', attrs={'name': 'music:album'})['content']
         html_page = requests.get(album_link)
-        soup = BeautifulSoup(html_page.text,'lxml')
+        soup = BeautifulSoup(html_page.text, 'lxml')
         return soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
-    
+
     def extract_image(self) -> str:
-        return self.soup.find('meta', attrs={'name':'twitter:image'})['content']
+        return self.soup.find('meta', attrs={'name': 'twitter:image'})['content']

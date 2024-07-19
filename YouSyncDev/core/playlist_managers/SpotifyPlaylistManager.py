@@ -1,9 +1,13 @@
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from concurrent.futures import ThreadPoolExecutor
 from core.audio_managers.SpotifyAudioManager import SpotifyAudioManager
-from core.utils import *
-import logging, requests
-from typing import List, Optional, Any
+from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_soundcloud_total_songs, get_soundcloud_url_list
+import logging
+import requests
+from typing import List, Optional
+from bs4 import BeautifulSoup
+import re
+
 
 class SpotifyPlaylistManager(IPlaylistManager):
 

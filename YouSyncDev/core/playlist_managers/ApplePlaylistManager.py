@@ -1,12 +1,13 @@
-from selenium.webdriver.support import expected_conditions as EC
+import logging
+import requests
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
-from selenium.webdriver.support.ui import WebDriverWait
 from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.common.by import By
 from core.audio_managers.AppleAudioManager import AppleAudioManager
-from core.utils import *
-import logging, requests
+from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_soundcloud_total_songs, get_soundcloud_url_list
 from typing import List, Optional
+from bs4 import BeautifulSoup
+import re
+
 
 class ApplePlaylistManager(IPlaylistManager):
 

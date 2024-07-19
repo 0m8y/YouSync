@@ -6,8 +6,9 @@ import logging
 import requests
 import json
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from core.audio_managers.IAudioManager import IAudioManager
+
 
 class IPlaylistManager(ABC):
 
@@ -148,7 +149,7 @@ class IPlaylistManager(ABC):
 
     def get_audio_managers(self) -> List[IAudioManager]:
         return self.audio_managers
-    
+
     def __remove_audio(self, url: str) -> None:
         audio_manager_index = next((i for i, am in enumerate(self.audio_managers) if am.get_url() == url), None)
 

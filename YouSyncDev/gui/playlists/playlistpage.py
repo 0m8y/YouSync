@@ -1,11 +1,16 @@
-import os, threading, customtkinter, platform, subprocess
+import os
+import threading
+import customtkinter
+import platform
+import subprocess
 from PIL import Image, ImageTk, ImageOps
 from concurrent.futures import ThreadPoolExecutor
 
 from gui.utils import create_image
 from gui.tooltip import ToolTip
 from gui.playlists.songframe import SongFrame
-from gui.style import *
+from gui.style import WHITE_TEXT_COLOR, BUTTON_COLOR, HOVER_COLOR, NOTIFICATION_DURATION
+
 
 class PlaylistPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, image_file, playlist, playlist_tile, **kwargs):
@@ -57,7 +62,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         # Frame principale pour aligner le contenu à gauche
         main_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         main_frame.grid(row=0, column=0, padx=20, pady=20, sticky="ew")
-        
+
         # Configuration de la grille pour la disposition
         main_frame.grid_columnconfigure(0, minsize=180)
         main_frame.grid_columnconfigure(1, weight=1)
@@ -135,7 +140,7 @@ class PlaylistPage(customtkinter.CTkFrame):
     def download_playlist(self):
         if self.on_download:
             self.playlists_page.notification_manager.show_notification(
-                "download is already in progress!", 
+                "download is already in progress!",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
@@ -145,14 +150,14 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         if not audio_managers_not_downloaded:
             self.playlists_page.notification_manager.show_notification(
-                "Everything is downloaded!", 
+                "Everything is downloaded!",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
             return
 
         self.progress_notification = self.playlists_page.notification_manager.show_progress_bar_notification(
-            len(audio_managers_not_downloaded), 
+            len(audio_managers_not_downloaded),
             f"Downloading {len(audio_managers_not_downloaded)} songs."
         )
 
@@ -174,13 +179,13 @@ class PlaylistPage(customtkinter.CTkFrame):
 
     def init_tracklist(self):
         for i, manager in enumerate(self.audio_managers):
-            songframe = SongFrame(self, self.track_frame, i+1, manager, self.download_green, self.download_orange, self.download_red)
+            songframe = SongFrame(self, self.track_frame, i + 1, manager, self.download_green, self.download_orange, self.download_red)
             self.songframe_by_id[songframe.id] = songframe
 
     def update_tracklist(self):
         for audio_manager in self.audio_managers:
             if audio_manager.id not in self.songframe_by_id:
-                songframe = SongFrame(self, self.track_frame, 0, audio_manager, self.download_green, self.download_orange, self.download_red)#TODO: Enlever first_color et le déduire directement dans la classe
+                songframe = SongFrame(self, self.track_frame, 0, audio_manager, self.download_green, self.download_orange, self.download_red)
                 self.songframe_by_id[songframe.id] = songframe
 
         id_to_delete = [id for id, songframe in self.songframe_by_id.items() if not any(audio_manager.id == id for audio_manager in self.audio_managers)]

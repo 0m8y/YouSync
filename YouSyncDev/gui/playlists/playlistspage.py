@@ -1,14 +1,17 @@
-from tkinter import Canvas, filedialog
-import threading, os, customtkinter, sys
+from tkinter import filedialog
+import threading
+import os
+import customtkinter
+import sys
 from PIL import Image, ImageTk
 
 from gui.notifications.notificationmanager import NotificationManager
 from gui.playlists.playlisttile import PlaylistTile
 from gui.tooltip import ToolTip
-from gui.utils import *
-from gui.style import *
 import logging
 from core.CentralManager import CentralManager
+from gui.style import WHITE_TEXT_COLOR, BUTTON_COLOR, HOVER_COLOR, NOTIFICATION_DURATION, RED_COLOR, GREEN_COLOR, RED_HOVER_COLOR, GREEN_HOVER_COLOR
+
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -22,11 +25,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.adding_folder = False
-        
+
         self.notification_manager = NotificationManager(self, self.image_path)
         self.progress_notification = None
         self.init_central_manager()
-        
+
         self.setup_ui()
 
     def init_central_manager(self):
@@ -49,7 +52,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         def on_close():
             self.parent.quit()
             popup.destroy()
-            sys.exit(0) 
+            sys.exit(0)
         popup = customtkinter.CTkToplevel(self)
         popup.title(f"{playlist_data.title} path not found")
 
@@ -86,7 +89,6 @@ class PlaylistsPage(customtkinter.CTkFrame):
         popup.grab_set()  # Make the popup modal
         self.wait_window(popup)  # Wait until the popup is closed
 
-
     def delete_playlist(self, popup, playlist_data):
         popup.grab_release()  # Release the grab before destroying the popup
         popup.destroy()
@@ -94,7 +96,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
 
     def resync_playlist(self, popup, playlist_data):
         folder_selected = filedialog.askdirectory()
-        if (self.parent.central_manager.update_path(folder_selected, playlist_data.id)):     
+        if (self.parent.central_manager.update_path(folder_selected, playlist_data.id)):
             popup.grab_release()  # Release the grab before destroying the popup
             popup.destroy()
             return
@@ -103,7 +105,6 @@ class PlaylistsPage(customtkinter.CTkFrame):
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )
-        
 
     def reload(self):
         self.join_thread = threading.Thread(target=self.join_load_managers_thread)

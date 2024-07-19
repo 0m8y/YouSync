@@ -1,7 +1,11 @@
-from abc import ABC, abstractmethod
-import eyed3.id3, requests, json, os
+import os
+import json
+import requests
+import eyed3.id3
 from threading import Lock
 from typing import Dict, List, Any
+from abc import ABC, abstractmethod
+
 
 class IAudioManager(ABC):
 

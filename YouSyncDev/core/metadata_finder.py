@@ -4,15 +4,17 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from pytubefix import YouTube
 from selenium.webdriver.remote.webdriver import WebDriver
-
 from typing import Optional
+
 
 def find_title_yt(yt: YouTube) -> str:
     return yt.title.replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
 
+
 def find_title_url(url: str) -> str:
     yt = YouTube(url)
     return yt.title.replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+
 
 def find_title(driver: WebDriver) -> Optional[str]:
     try:
@@ -24,6 +26,7 @@ def find_title(driver: WebDriver) -> Optional[str]:
     print(f"Titre: {titre}")
     return titre
 
+
 def find_artist(driver: WebDriver) -> Optional[str]:
     try:
         artiste = WebDriverWait(driver, 1).until(
@@ -34,6 +37,7 @@ def find_artist(driver: WebDriver) -> Optional[str]:
     print(f"Artiste: {artiste}")
     return artiste
 
+
 def find_album(driver: WebDriver) -> Optional[str]:
     try:
         album = WebDriverWait(driver, 1).until(
@@ -43,6 +47,7 @@ def find_album(driver: WebDriver) -> Optional[str]:
         album = None
     print(f"Album: {album}")
     return album
+
 
 def find_image(driver: WebDriver) -> Optional[str]:
     try:

@@ -7,10 +7,12 @@ from selenium import webdriver
 
 from pytubefix import YouTube
 
-from moviepy.editor import *
-from core.metadata_finder import *
-from core.utils import *
+from core.metadata_finder import find_title, find_artist, find_album, find_image, find_title_yt
+from moviepy.editor import AudioFileClip
 from threading import Lock
+from core.utils import get_selenium_driver
+import os
+
 
 class YoutubeAudioManager(IAudioManager):
 
@@ -47,7 +49,7 @@ class YoutubeAudioManager(IAudioManager):
     def download_audio(self) -> None:
         audio_stream = self.yt.streams.filter(only_audio=True).first()
         downloaded_file = audio_stream.download()
-        
+
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.path_to_save_audio_with_title)
         audio_clip.close()

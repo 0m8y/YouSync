@@ -1,14 +1,22 @@
+import os
+import re
+import sys
+import json
+import logging
+import datetime
+from enum import Enum
+from concurrent.futures import ThreadPoolExecutor, Future
+from typing import List, Callable, Optional, Union, Dict, Any
+
+from core.audio_managers.IAudioManager import IAudioManager
 from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
 from core.playlist_managers.SpotifyPlaylistManager import SpotifyPlaylistManager
-from core.audio_managers.IAudioManager import IAudioManager
-import os, sys, json, datetime, logging, re
-from concurrent.futures import ThreadPoolExecutor, Future
-from enum import Enum
-from typing import List, Callable, Optional, Union, Dict, Any
+
 
 class Platform(Enum):
     YOUTUBE = 1
     SPOTIFY = 2
+
 
 class PlaylistData:
     def __init__(self, id: str, url: str, path: str, title: str, last_update: Optional[str] = None):
@@ -37,6 +45,7 @@ class PlaylistData:
             last_update=data.get("last_update")
         )
 
+
 class CentralManager:
     def __init__(self, json_filename: str, progress_callback: Optional[Callable[[int, int], None]] = None):
         print("CentralManager Open")
@@ -51,10 +60,10 @@ class CentralManager:
         if getattr(sys, 'frozen', False):
             user_dir = os.path.expanduser("~")
             project_dir = os.path.join(user_dir, '.yousync_project')
-            
+
             if not os.path.exists(project_dir):
                 os.makedirs(project_dir)
-            
+
             return project_dir
         else:
             return os.path.dirname(os.path.abspath(__file__))
@@ -124,7 +133,7 @@ class CentralManager:
 
         if any(pl.id == playlist_manager.id for pl in self.data["playlists"]):
             return "The playlist is already registered."
-        
+
         playlist_manager.download_cover_image()
         playlist_info = PlaylistData(
             id=playlist_manager.id,
@@ -141,9 +150,9 @@ class CentralManager:
         playlist_count = 0
         if not os.path.exists(folder_path):
             return f"{folder_path} folder does not exist"
-        
+
         yousync_folder_name = ".yousync"
-        
+
         if os.path.basename(folder_path) == yousync_folder_name:
             print(f"Vous êtes déjà dans le dossier {yousync_folder_name}.")
         else:
@@ -212,7 +221,7 @@ class CentralManager:
     def update_playlist(self, playlist_id: str) -> Union[str, None]:
         try:
             playlist = self.get_playlist(playlist_id)
-            
+
             if not playlist:
                 return f"Playlist with ID {playlist_id} not found."
 
@@ -235,7 +244,7 @@ class CentralManager:
             if pl.id == playlist_id:
                 return pl
         return None
-    
+
     def get_audio_managers(self, playlist_id: str) -> Optional[List[IAudioManager]]:
         for pl in self.playlist_managers:
             if pl.id == playlist_id:
@@ -245,7 +254,7 @@ class CentralManager:
     def delete_playlist(self, playlist_id: str) -> None:
         # Supprimer la playlist des données
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
-        
+
         # Sauvegarder les données mises à jour dans le fichier JSON
         self.save_data_to_json()
 
@@ -255,8 +264,6 @@ class CentralManager:
             new_path = os.path.join(new_path, yousync_folder_name)
             if not os.path.exists(new_path):
                 return False
-
-        updated = False
 
         # Vérifier si le fichier {playlist_data.id}.json se trouve dans le dossier
         playlist_file = f"{playlist_id}.json"

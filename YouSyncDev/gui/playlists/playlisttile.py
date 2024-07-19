@@ -1,10 +1,13 @@
-import customtkinter, os, threading
+import customtkinter
+import os
+import threading
 from PIL import ImageTk, Image
 from tkinter import Canvas
 
 from gui.utils import create_image, truncate_string
 from gui.playlists.playlistpage import PlaylistPage
 from gui.style import WHITE_TEXT_COLOR, NOTIFICATION_DURATION
+
 
 class PlaylistTile:
     def __init__(self, parent, row, column, playlist, image_path, scrollable_frame):
@@ -27,12 +30,11 @@ class PlaylistTile:
 
         self.cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
         if not os.path.exists(self.cover_filename):
-            self.cover_filename =os.path.join(self.image_path, "default_preview.png")
+            self.cover_filename = os.path.join(self.image_path, "default_preview.png")
         self.cover_img = create_image(self.cover_filename, 180, 140)
         self.cover_image_id = self.cover_canvas.create_image(90, 70, image=self.cover_img)
         self.cover_canvas.image = self.cover_img
         self.cover_canvas.tag_bind(self.cover_image_id, "<Button-1>", lambda event: self.open_playlist_page(self.playlist_data, self.cover_canvas))
-
 
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         self.cover_canvas.sync_icon_id = self.cover_canvas.create_image(160, 120, image=sync_icon_photo)
@@ -46,7 +48,7 @@ class PlaylistTile:
     def update_cover(self):
         print("Updating cover...")
         new_cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
-        if self.cover_filename == new_cover_filename: 
+        if self.cover_filename == new_cover_filename:
             return
         if not os.path.exists(new_cover_filename):
             self.cover_filename = os.path.join(self.image_path, "default_preview.png")

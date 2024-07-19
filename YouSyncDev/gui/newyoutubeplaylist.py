@@ -1,8 +1,11 @@
 from core.CentralManager import Platform
-import customtkinter, os, re, threading
+import customtkinter
+import os
+import re
+import threading
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
-from gui.style import *
+from gui.style import WHITE_TEXT_COLOR, HOVER_COLOR, BUTTON_COLOR
 
 
 class NewYoutubePlaylist(customtkinter.CTkFrame):
@@ -19,7 +22,6 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
     def go_back(self):
         self.parent_app.go_back_home()
-
 
     def setup_ui(self):
         self.grid_columnconfigure(0, weight=1)
@@ -47,7 +49,6 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
         self.url_entry.grid(row=3, column=1, padx=(0, 0), pady=10, sticky="ew")
 
-
         # Path Section
         self.create_label("Search path to save playlist", 4)
         self.path_entry = customtkinter.CTkEntry(self, placeholder_text="Path to save", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
@@ -62,7 +63,7 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
         # Save Button
         self.save_button = customtkinter.CTkButton(self, text="Save", command=self.save, width=120, height=45,
-                                                    fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+                                                   fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
         self.save_button.grid(row=6, column=1, padx=(0, 0), pady=40)
 
         # Notification Section
@@ -102,13 +103,12 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
             add_thread = threading.Thread(target=add_and_load)
             add_thread.start()
 
-
     def validate_youtube_url(self, url):
         youtube_regex = (
             r'^https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|playlist\?list=)|youtu\.be/)([\w\-]+)(?:&[\w\-]+)*$'
         )
         return re.match(youtube_regex, url) is not None
-    
+
     def validate_path(self, path):
         if not os.path.exists(path):
             return False
@@ -117,4 +117,3 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
             return False
 
         return True
-

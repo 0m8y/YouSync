@@ -1,5 +1,6 @@
 from tkinter import Toplevel, Label
-from gui.style import *
+from gui.style import WHITE_TEXT_COLOR, BUTTON_COLOR
+
 
 class ToolTip:
     def __init__(self, widget, text):

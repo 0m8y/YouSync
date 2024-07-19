@@ -1,7 +1,8 @@
 from PIL import Image, ImageOps, ImageTk
 import customtkinter
 import os
-from gui.style import *
+from gui.style import WHITE_TEXT_COLOR, HOVER_COLOR, BUTTON_COLOR, NOTIFICATION_DURATION
+
 
 class HomePage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -26,8 +27,8 @@ class HomePage(customtkinter.CTkFrame):
         tk_image = ImageTk.PhotoImage(resized_image)
 
         self.youtube_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
-                                                         command=self.youtube_button_event, text="",
-                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
+                                                      command=self.youtube_button_event, text="",
+                                                      fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.youtube_button.image = tk_image
         self.youtube_button.grid(row=1, column=0, padx=(50, 0), pady=(30, 0))
 
@@ -39,8 +40,8 @@ class HomePage(customtkinter.CTkFrame):
         tk_image = ImageTk.PhotoImage(resized_image)
 
         self.spotify_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
-                                                         command=self.spotify_button_event, text="",
-                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
+                                                      command=self.spotify_button_event, text="",
+                                                      fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.spotify_button.image = tk_image
         self.spotify_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
 
@@ -59,11 +60,10 @@ class HomePage(customtkinter.CTkFrame):
 
     def soundcloud_button_event(self):
         self.parent.playlists_page.notification_manager.show_notification(
-            "Soundcloud Comming soon...", 
+            "Soundcloud Comming soon...",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )
-
 
     def youtube_button_event(self):
         self.parent.show_new_youtube_playlist()

@@ -1,10 +1,7 @@
-import customtkinter
-from PIL import Image
-import os
-from tkinter import Toplevel
-from gui.style import *
+from gui.style import NOTIFICATION_DURATION, WHITE_TEXT_COLOR
 from gui.notifications.notification import Notification
 from gui.notifications.progressbarnotification import ProgressBarNotification
+
 
 class NotificationManager:
     def __init__(self, parent, image_path):
@@ -19,7 +16,7 @@ class NotificationManager:
         notification = Notification(self, message, self.image_path, duration, text_color=text_color)
         self.notifications.append(notification)
         self.place_notifications()
-        
+
     def place_notifications(self):
         for i, notification in enumerate(self.notifications):
             notification.update_idletasks()
@@ -49,4 +46,3 @@ class NotificationManager:
 
     def on_parent_configure(self, event):
         self.place_notifications()
-
