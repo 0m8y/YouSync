@@ -1,4 +1,4 @@
-import os, threading, customtkinter
+import os, threading, customtkinter, platform, subprocess
 from PIL import Image, ImageTk, ImageOps
 from concurrent.futures import ThreadPoolExecutor
 
@@ -24,6 +24,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         sync_image = Image.open(os.path.join(self.image_path, "sync2.png"))
         sync_padded_image = ImageOps.expand(sync_image, border=0, fill='black')
         self.sync_image = sync_padded_image.resize((25, 25))
+
         self.playlist_tile = playlist_tile
         self.progress_notification = None
         self.on_download = False
@@ -32,6 +33,9 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
         self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
         self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
+        folder_image = Image.open(os.path.join(self.image_path, "folder.png"))
+        sync_padded_image = ImageOps.expand(folder_image, border=0, fill='black')
+        self.folder_image = sync_padded_image.resize((26, 26))
 
         self.setup_ui()
 
@@ -104,10 +108,29 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.download_all_button.place(x=330, y=135)
         ToolTip(self.download_all_button, "Download all missing sounds.")
 
+        # Folder Button
+        folder_icon_photo = ImageTk.PhotoImage(self.folder_image)
+        self.folder_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=folder_icon_photo, command=lambda: self.go_to_folder())
+        self.folder_button.image = folder_icon_photo
+        self.folder_button.place(x=386, y=135)
+        ToolTip(self.folder_button, "Playlist folder.")
+
         self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         self.init_tracklist()
+
+    def go_to_folder(self):
+        systeme = platform.system()
+        path = os.path.dirname(os.path.dirname(self.playlist_data.path))
+        if systeme == "Windows":
+            os.startfile(path)
+        elif systeme == "Darwin":  # macOS
+            subprocess.Popen(["open", path])
+        elif systeme == "Linux":
+            subprocess.Popen(["xdg-open", path])
+        else:
+            raise NotImplementedError(f"Système d'exploitation non supporté: {systeme}")
 
     def download_playlist(self):
         if self.on_download:

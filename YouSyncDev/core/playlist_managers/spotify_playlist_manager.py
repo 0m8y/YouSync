@@ -21,6 +21,9 @@ class SpotifyPlaylistManager(IPlaylistManager):
     def new_audio_manager(self, url):
         try:
             logging.debug("Creating SpotifyPlaylistManager")
+            if url is None:
+                return
+            
             audio_manager = SpotifyAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             return audio_manager
         except Exception as e:

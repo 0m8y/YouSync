@@ -41,8 +41,9 @@ class IPlaylistManager(ABC):
                         self.audio_managers.append(youtube_audio)
                     except Exception as e:
                         logging.error(f"Error processing future: {e}", exc_info=True)
-
-            self.title = self.get_playlist_title()
+            
+            if self.title is None:
+                self.title = self.get_playlist_title()
             self.download_cover_image()
             
             logging.debug(f"playlist {self.id} is loaded successfully")
@@ -50,9 +51,11 @@ class IPlaylistManager(ABC):
             logging.error(f"Error in load_audio_managers: {e}", exc_info=True)
 
     def __initialize_playlist_data(self):
+        self.title = self.get_playlist_title()
         data = {
             "playlist_url": self.playlist_url,
             "path_to_save_audio": self.path_to_save_audio,
+            "title": self.title,
         }
         with self.lock:
             with open(self.playlist_data_filepath, 'w') as file:
@@ -60,7 +63,14 @@ class IPlaylistManager(ABC):
 
     def __get_video_urls_from_json(self):
         data = self.__load_playlist_data()
-        self.path_to_save_audio = data.get("path_to_save_audio", self.path_to_save_audio)  # Utiliser la valeur actuelle si la clé n'existe pas
+        self.path_to_save_audio = data.get("path_to_save_audio", self.path_to_save_audio)
+        self.title = data.get("title", None)
+
+        if self.title is None:
+            self.title = self.get_playlist_title()
+            data['title'] = self.title
+            self.save_playlist_data(data)
+
         audios = data.get("audios", [])
         for audio in audios:
             self.video_urls.append(audio["url"])

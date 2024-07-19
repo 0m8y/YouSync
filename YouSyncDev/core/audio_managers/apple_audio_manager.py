@@ -1,7 +1,7 @@
 from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
-from pytube import YouTube
+from pytubefix import YouTube
 
 from moviepy.editor import *
 from core.metadata_finder import *

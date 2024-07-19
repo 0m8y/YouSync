@@ -3,7 +3,6 @@ import threading, os, customtkinter, sys
 from PIL import Image, ImageTk
 
 from gui.notifications.notificationmanager import NotificationManager
-from gui.playlists.playlistpage import PlaylistPage
 from gui.playlists.playlisttile import PlaylistTile
 from gui.tooltip import ToolTip
 from gui.utils import *

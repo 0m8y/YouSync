@@ -101,6 +101,21 @@ def get_selenium_driver_for_spotify(url):
     
     return driver
 
+def get_selenium_driver_for_apple(url):
+    chrome_options = Options()
+    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--mute-audio")
+
+    driver = webdriver.Chrome(options=chrome_options)
+
+    driver.get(url)
+
+    WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.TAG_NAME, "body"))
+    )
+    
+    return driver
+
 def scroll_down_page(driver):
     last_height = driver.execute_script("return document.documentElement.scrollHeight")
 
@@ -151,3 +166,23 @@ def get_soundcloud_total_songs(driver):
         total_songs_element = elements[0]
 
     return int(total_songs_element.text.split()[0])
+
+def scroll_down_apple_page(driver):
+    last_height = driver.execute_script("return document.getElementById('scrollable-page').scrollHeight")
+
+    while True:
+        driver.execute_script("document.getElementById('scrollable-page').scrollTo(0, document.getElementById('scrollable-page').scrollHeight);")
+        
+        # Wait for the page to load new content
+        time.sleep(2)
+        
+        new_height = driver.execute_script("return document.getElementById('scrollable-page').scrollHeight")
+        
+        # If the new height is the same as the last height, wait for some time to ensure content has finished loading
+        if new_height == last_height:
+            time.sleep(2)
+            new_height = driver.execute_script("return document.getElementById('scrollable-page').scrollHeight")
+            if new_height == last_height:
+                break
+        
+        last_height = new_height

@@ -1,23 +1,23 @@
 from core.playlist_managers.youtube_playlist_manager import YoutubePlaylistManager
 from core.playlist_managers.spotify_playlist_manager import SpotifyPlaylistManager
-from core.utils import get_selenium_driver, get_selenium_driver_for_spotify
-import os, sys, json, requests, datetime, logging, re, shutil
-from concurrent.futures import ThreadPoolExecutor
+import os, sys, json, datetime, logging, re
+from concurrent.futures import ThreadPoolExecutor, Future
 from enum import Enum
+from typing import List, Callable, Optional, Union, Dict, Any
 
 class Platform(Enum):
     YOUTUBE = 1
     SPOTIFY = 2
 
 class PlaylistData:
-    def __init__(self, id, url, path, title, last_update=None):
+    def __init__(self, id: str, url: str, path: str, title: str, last_update: Optional[str] = None):
         self.id = id
         self.url = url
         self.path = path
         self.title = title
         self.last_update = last_update or datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "url": self.url,
@@ -27,7 +27,7 @@ class PlaylistData:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: Dict[str, Any]) -> 'PlaylistData':
         return cls(
             id=data["id"],
             url=data["url"],
@@ -37,16 +37,16 @@ class PlaylistData:
         )
 
 class CentralManager:
-    def __init__(self, json_filename, progress_callback=None):
+    def __init__(self, json_filename: str, progress_callback: Optional[Callable[[int, int], None]] = None):
         print("CentralManager Open")
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
         self.data = self.load_data_from_json()
-        self.playlist_managers = []
+        self.playlist_managers: List[Union[YoutubePlaylistManager, SpotifyPlaylistManager]] = []
         self.progress_callback = progress_callback
         self.playlist_loaded = False
 
-    def get_project_path(self):
+    def get_project_path(self) -> str:
         if getattr(sys, 'frozen', False):
             user_dir = os.path.expanduser("~")
             project_dir = os.path.join(user_dir, '.yousync_project')
@@ -58,7 +58,7 @@ class CentralManager:
         else:
             return os.path.dirname(os.path.abspath(__file__))
 
-    def load_data_from_json(self):
+    def load_data_from_json(self) -> Dict[str, Any]:
         if not os.path.exists(self.json_filepath):
             with open(self.json_filepath, 'w') as file:
                 json.dump({"playlists": []}, file)
@@ -70,20 +70,21 @@ class CentralManager:
                     "playlists": [PlaylistData.from_dict(pl) for pl in data["playlists"]]
                 }
 
-    def save_data_to_json(self):
+    def save_data_to_json(self) -> None:
         with open(self.json_filepath, 'w') as file:
             json.dump({
                 "playlists": [pl.to_dict() if isinstance(pl, PlaylistData) else PlaylistData.from_dict(pl).to_dict() for pl in self.data["playlists"]]
             }, file, indent=4)
 
-    def instantiate_playlist_managers(self):
+    def instantiate_playlist_managers(self) -> None:
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(self.create_playlist_manager, pl) for pl in self.data["playlists"]]
+            futures: List[Future] = [executor.submit(self.create_playlist_manager, pl) for pl in self.data["playlists"]]
             total_playlists = len(futures)
-            if (total_playlists == 0):
+            if total_playlists == 0:
                 self.playlist_loaded = True
                 return
-            self.progress_callback(0, total_playlists)
+            if self.progress_callback:
+                self.progress_callback(0, total_playlists)
             for i, future in enumerate(futures):
                 result = future.result()
                 if result:
@@ -92,7 +93,7 @@ class CentralManager:
                     self.progress_callback(i + 1, total_playlists)
         self.playlist_loaded = True
 
-    def create_playlist_manager(self, pl):
+    def create_playlist_manager(self, pl: PlaylistData) -> Optional[Union[YoutubePlaylistManager, SpotifyPlaylistManager]]:
         path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
         playlist_manager = next((pm for pm in self.playlist_managers if pm.id == pl.id), None)
         if not playlist_manager:
@@ -105,11 +106,11 @@ class CentralManager:
                 elif spotify_pattern.match(pl.url):
                     return SpotifyPlaylistManager(pl.url, path_to_save_audio)
             except Exception as e:
-                logging.debug(f"Error when create playlist manager: {e}")
+                logging.debug(f"Error when creating playlist manager: {e}")
         return None
 
-    def add_playlist(self, playlist_url, path_to_save_audio, plateform: Platform):
-        match plateform:
+    def add_playlist(self, playlist_url: str, path_to_save_audio: str, platform: Platform) -> str:
+        match platform:
             case Platform.YOUTUBE:
                 print("Adding new youtube playlist...")
                 playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
@@ -127,14 +128,15 @@ class CentralManager:
         playlist_info = PlaylistData(
             id=playlist_manager.id,
             url=playlist_url,
-            path= playlist_manager.playlist_data_filepath,
+            path=playlist_manager.playlist_data_filepath,
             title=playlist_manager.title,
         )
         self.data["playlists"].append(playlist_info)
         self.playlist_managers.append(playlist_manager)
         self.save_data_to_json()
+        return "Playlist added successfully."
 
-    def add_existing_playlists(self, folder_path):
+    def add_existing_playlists(self, folder_path: str) -> str:
         playlist_count = 0
         if not os.path.exists(folder_path):
             return f"{folder_path} folder does not exist"
@@ -178,7 +180,7 @@ class CentralManager:
                                 print(f"La playlist avec l'ID {playlist_manager.id} existe déjà.")
                                 continue
                             playlist_manager.download_cover_image()
-                            playlist_info = PlaylistData (
+                            playlist_info = PlaylistData(
                                 id=playlist_manager.id,
                                 url=playlist_url,
                                 path=filepath,
@@ -201,12 +203,12 @@ class CentralManager:
         else:
             return f"{playlist_count} playlists were found !"
 
-    def remove_playlist(self, playlist_id):
+    def remove_playlist(self, playlist_id: str) -> None:
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
         self.playlist_managers = [pm for pm in self.playlist_managers if pm.id != playlist_id]
         self.save_data_to_json()
 
-    def update_playlist(self, playlist_id):
+    def update_playlist(self, playlist_id: str) -> Union[str, None]:
         try:
             playlist = self.get_playlist(playlist_id)
             
@@ -222,31 +224,31 @@ class CentralManager:
             print(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
             logging.error(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
             return f"An error occurred while updating the playlist with ID {playlist_id}. Please check the logs for more details."
+        return None
 
-    def list_playlists(self):
+    def list_playlists(self) -> List[PlaylistData]:
         return [PlaylistData.from_dict(pl) if isinstance(pl, dict) else pl for pl in self.data["playlists"]]
 
-    def get_playlist(self, playlist_id):
+    def get_playlist(self, playlist_id: str) -> Optional[PlaylistData]:
         for pl in self.data["playlists"]:
             if pl.id == playlist_id:
                 return pl
         return None
     
-    def get_audio_managers(self, playlist_id):
+    def get_audio_managers(self, playlist_id: str) -> Optional[List[Any]]:
         for pl in self.playlist_managers:
             if pl.id == playlist_id:
                 return pl.get_audio_managers()
         return None
 
-
-    def delete_playlist(self, playlist_id):
+    def delete_playlist(self, playlist_id: str) -> None:
         # Supprimer la playlist des données
         self.data["playlists"] = [pl for pl in self.data["playlists"] if pl.id != playlist_id]
         
         # Sauvegarder les données mises à jour dans le fichier JSON
         self.save_data_to_json()
 
-    def update_path(self, new_path, playlist_id):
+    def update_path(self, new_path: str, playlist_id: str) -> bool:
         yousync_folder_name = ".yousync"
         if os.path.basename(new_path) != yousync_folder_name:
             new_path = os.path.join(new_path, yousync_folder_name)

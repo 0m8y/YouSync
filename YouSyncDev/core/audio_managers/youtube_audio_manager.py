@@ -1,13 +1,9 @@
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.chrome.options import Options
 from core.audio_managers.IAudioManager import IAudioManager
 
-from selenium import webdriver
-from pytube import YouTube
-import eyed3
+from pytubefix import YouTube
 
 from moviepy.editor import *
-import json
 from core.metadata_finder import *
 from core.utils import *
 

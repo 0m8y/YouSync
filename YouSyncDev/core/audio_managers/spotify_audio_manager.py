@@ -4,7 +4,7 @@ from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
 from selenium import webdriver
-from pytube import YouTube
+from pytubefix import YouTube
 import eyed3
 
 from moviepy.editor import *

@@ -88,5 +88,5 @@ class YoutubePlaylistManager(IPlaylistManager):
     #Override Function
     def extract_image(self):
         title = self.soup.find('meta', property='og:image')['content']
-        print(f"title founded: {title}")
+        print(f"extracting image: {title}")
         return title
