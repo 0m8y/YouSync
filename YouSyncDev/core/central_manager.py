@@ -1,5 +1,6 @@
 from core.playlist_managers.youtube_playlist_manager import YoutubePlaylistManager
 from core.playlist_managers.spotify_playlist_manager import SpotifyPlaylistManager
+from core.audio_managers.IAudioManager import IAudioManager
 import os, sys, json, datetime, logging, re
 from concurrent.futures import ThreadPoolExecutor, Future
 from enum import Enum
@@ -235,7 +236,7 @@ class CentralManager:
                 return pl
         return None
     
-    def get_audio_managers(self, playlist_id: str) -> Optional[List[Any]]:
+    def get_audio_managers(self, playlist_id: str) -> Optional[List[IAudioManager]]:
         for pl in self.playlist_managers:
             if pl.id == playlist_id:
                 return pl.get_audio_managers()

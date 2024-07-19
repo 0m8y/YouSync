@@ -7,8 +7,9 @@ from selenium import webdriver
 import platform, re, os, time
 from bs4 import BeautifulSoup
 import datetime
+from typing import Optional, List
 
-def check_yousync_folder(yousync_folder_path):
+def check_yousync_folder(yousync_folder_path: str) -> None:
     parent_folder = os.path.dirname(yousync_folder_path)
     
     # Check if parent folder exists
@@ -26,28 +27,26 @@ def check_yousync_folder(yousync_folder_path):
         if not ret:
             raise ctypes.WinError()
 
-def check_playlist_data_filepath(playlist_filepath):
+def check_playlist_data_filepath(playlist_filepath: str) -> None:
     if not os.path.exists(playlist_filepath):
         with open(playlist_filepath, 'w') as fichier:
             fichier.write("[]")
 
-def get_youtube_playlist_id(playlist_url):
+def get_youtube_playlist_id(playlist_url: str) -> Optional[str]:
     pattern = r"list=([a-zA-Z0-9_-]+)"
     match = re.search(pattern, playlist_url)
     if match:
         return match.group(1)
-    else:
-        return None
-    
-def get_spotify_playlist_id(playlist_url):
+    return None
+
+def get_spotify_playlist_id(playlist_url: str) -> Optional[str]:
     pattern = r"(track|playlist)/([a-zA-Z0-9]+)"
     match = re.search(pattern, playlist_url)
     if match:
         return match.group(2)
     return None
 
-
-def accept_youtube_cookies(driver):
+def accept_youtube_cookies(driver: webdriver.Chrome) -> None:
     wait = WebDriverWait(driver, 10)
     if 'consent.youtube.com' in driver.current_url:
         try:
@@ -64,8 +63,8 @@ def accept_youtube_cookies(driver):
                 accept_button.click()
         except Exception as e:
             print(f"Erreur lors de la tentative de clic sur le bouton 'Tout accepter': {e}")
-    
-def get_selenium_driver(url):
+
+def get_selenium_driver(url: str) -> webdriver.Chrome:
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
@@ -76,7 +75,7 @@ def get_selenium_driver(url):
     accept_youtube_cookies(driver)
     return driver
 
-def accept_spotify_cookies(driver):
+def accept_spotify_cookies(driver: webdriver.Chrome) -> bool:
     try:
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))).click()
         print("accepted cookies")
@@ -85,7 +84,7 @@ def accept_spotify_cookies(driver):
         print('no cookie button')
         return False
 
-def get_selenium_driver_for_spotify(url):
+def get_selenium_driver_for_spotify(url: str) -> webdriver.Chrome:
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
@@ -94,14 +93,14 @@ def get_selenium_driver_for_spotify(url):
 
     driver.get(url)
     i = 0
-    while accept_spotify_cookies(driver) is False:
+    while not accept_spotify_cookies(driver):
         i += 1
         if i > 4:
             break
-    
+
     return driver
 
-def get_selenium_driver_for_apple(url):
+def get_selenium_driver_for_apple(url: str) -> webdriver.Chrome:
     chrome_options = Options()
     # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
@@ -116,7 +115,7 @@ def get_selenium_driver_for_apple(url):
     
     return driver
 
-def scroll_down_page(driver):
+def scroll_down_page(driver: webdriver.Chrome) -> None:
     last_height = driver.execute_script("return document.documentElement.scrollHeight")
 
     while True:
@@ -129,7 +128,7 @@ def scroll_down_page(driver):
             break
         last_height = new_height
 
-def get_soundloud_song_link(html_content):
+def get_soundloud_song_link(html_content: str) -> Optional[str]:
     soup = BeautifulSoup(html_content, 'html.parser')
     track_link_tag = soup.select_one('a[data-testid="internal-track-link"]')
     
@@ -137,10 +136,9 @@ def get_soundloud_song_link(html_content):
         track_link = track_link_tag.get('href')
         full_link = re.sub(r'^.*(/track)', r'https://open.spotify.com\1', track_link)
         return full_link
-    else:
-        return None
+    return None
 
-def get_soundcloud_url_list(driver, total_songs, iterator = 0):
+def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
     print("searching songs...")
     song_list = []
     if iterator == 5:
@@ -154,7 +152,7 @@ def get_soundcloud_url_list(driver, total_songs, iterator = 0):
             return song_list
     return get_soundcloud_url_list(driver, total_songs, iterator + 1)
 
-def get_soundcloud_total_songs(driver):
+def get_soundcloud_total_songs(driver: webdriver.Chrome) -> int:
     time.sleep(0.5)
     elements = WebDriverWait(driver, 10).until(
         EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.encore-text.encore-text-body-small.RANLXG3qKB61Bh33I0r2'))
@@ -167,7 +165,7 @@ def get_soundcloud_total_songs(driver):
 
     return int(total_songs_element.text.split()[0])
 
-def scroll_down_apple_page(driver):
+def scroll_down_apple_page(driver: webdriver.Chrome) -> None:
     last_height = driver.execute_script("return document.getElementById('scrollable-page').scrollHeight")
 
     while True:
