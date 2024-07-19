@@ -1,37 +1,36 @@
-from selenium.webdriver.support import expected_conditions as EC
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
-from selenium.webdriver.support.ui import WebDriverWait
 from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.common.by import By
-from core.audio_managers.apple_audio_manager import AppleAudioManager
+from core.audio_managers.SpotifyAudioManager import SpotifyAudioManager
 from core.utils import *
 import logging, requests
-from typing import List, Optional
+from typing import List, Optional, Any
 
-class ApplePlaylistManager(IPlaylistManager):
+class SpotifyPlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
         self.html_page = requests.get(playlist_url).text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
-        logging.debug("Initializing ApplePlaylistManager")
+        logging.debug("Initializing SpotifyPlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_spotify_playlist_id(playlist_url))
 
 #----------------------------------------GETTER----------------------------------------#
 
     # Override Method
-    def new_audio_manager(self, url: str) -> Optional[AppleAudioManager]:
+    def new_audio_manager(self, url: str) -> Optional[SpotifyAudioManager]:
         try:
-            logging.debug("Creating AppleAudioManager")
-            audio_manager = AppleAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
+            logging.debug("Creating SpotifyAudioManager")
+            if url is None:
+                return None
+            audio_manager = SpotifyAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             return audio_manager
         except Exception as e:
-            logging.error(f"Error initializing AppleAudioManager: {e}")
-            print(f"Error initializing AppleAudioManager: {e}")
+            logging.error(f"Error initializing SpotifyAudioManager: {e}")
+            print(f"Error initializing SpotifyAudioManager: {e}")
             return None
 
     # Override Method
     def get_playlist_title(self) -> str:
-        return self.soup.find('meta', attrs={'name': 'apple:title'})['content']
+        return self.soup.find('meta', property='og:title')['content']
 
     def extract_image(self) -> str:
         return self.soup.find('meta', property='og:image')['content']
@@ -50,7 +49,7 @@ class ApplePlaylistManager(IPlaylistManager):
 
     # Override Method
     def download(self) -> None:
-        def download_audio(audio_manager: AppleAudioManager) -> None:
+        def download_audio(audio_manager: SpotifyAudioManager) -> None:
             audio_manager.download()
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(download_audio, audio_manager) for audio_manager in self.audio_managers]

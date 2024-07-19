@@ -8,7 +8,7 @@ from gui.tooltip import ToolTip
 from gui.utils import *
 from gui.style import *
 import logging
-from core.central_manager import CentralManager
+from core.CentralManager import CentralManager
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):

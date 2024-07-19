@@ -3,7 +3,7 @@ from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from selenium.webdriver.support.ui import WebDriverWait
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
-from core.audio_managers.youtube_audio_manager import *
+from core.audio_managers.YoutubeAudioManager import YoutubeAudioManager
 from core.utils import *
 import logging
 import requests

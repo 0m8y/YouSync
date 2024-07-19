@@ -2,7 +2,7 @@ import customtkinter, os, re, threading
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
 from gui.style import *
-from core.central_manager import Platform
+from core.CentralManager import Platform
 
 class NewSpotifyPlaylist(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):

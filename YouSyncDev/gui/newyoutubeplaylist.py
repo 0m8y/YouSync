@@ -1,4 +1,4 @@
-from core.central_manager import Platform
+from core.CentralManager import Platform
 import customtkinter, os, re, threading
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps

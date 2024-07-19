@@ -1,5 +1,5 @@
-from core.playlist_managers.youtube_playlist_manager import YoutubePlaylistManager
-from core.playlist_managers.spotify_playlist_manager import SpotifyPlaylistManager
+from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
+from core.playlist_managers.SpotifyPlaylistManager import SpotifyPlaylistManager
 from core.audio_managers.IAudioManager import IAudioManager
 import os, sys, json, datetime, logging, re
 from concurrent.futures import ThreadPoolExecutor, Future

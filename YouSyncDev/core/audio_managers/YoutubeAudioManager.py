@@ -9,7 +9,7 @@ from pytubefix import YouTube
 
 from moviepy.editor import *
 from core.metadata_finder import *
-from core.utils import get_selenium_driver, find_title_yt, find_title, find_artist, find_album, find_image
+from core.utils import *
 from threading import Lock
 
 class YoutubeAudioManager(IAudioManager):
