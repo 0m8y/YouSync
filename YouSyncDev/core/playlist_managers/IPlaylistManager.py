@@ -1,27 +1,31 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from abc import ABC, abstractmethod
 from threading import Lock
-from core.utils import *
-import logging, requests
+from core.utils import check_yousync_folder
+import logging
+import requests
 import json
+import os
+from typing import List, Optional, Dict, Any
+from core.audio_managers.IAudioManager import IAudioManager
 
 class IPlaylistManager(ABC):
-    
-    def __init__(self, playlist_url, path_to_save_audio, playlist_id):
+
+    def __init__(self, playlist_url: str, path_to_save_audio: str, playlist_id: str) -> None:
         logging.debug("Initializing IPlaylistManager")
         self.lock = Lock()
         self.playlist_url = playlist_url
         self.path_to_save_audio = path_to_save_audio
         self.id = playlist_id
-        self.playlist_data_filepath = self.path_to_save_audio + "\\.yousync\\" + self.id + ".json"
-        self.video_urls = []
-        self.audio_managers = []
+        self.playlist_data_filepath = os.path.join(self.path_to_save_audio, ".yousync", f"{self.id}.json")
+        self.video_urls: List[str] = []
+        self.audio_managers: List[IAudioManager] = []
 
         self.__recover_or_create_json_data()
 
 #-------------------------------------Get JSON Data--------------------------------------#
 
-    def __recover_or_create_json_data(self):
+    def __recover_or_create_json_data(self) -> None:
         check_yousync_folder(os.path.join(self.path_to_save_audio, ".yousync"))
 
         if not os.path.exists(self.playlist_data_filepath):
@@ -33,24 +37,24 @@ class IPlaylistManager(ABC):
 
         try:
             with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [executor.submit(self.new_audio_manager, video_url) for video_url in self.video_urls]
-                
+                futures: List[Future] = [executor.submit(self.new_audio_manager, video_url) for video_url in self.video_urls]
+
                 for future in as_completed(futures):
                     try:
                         youtube_audio = future.result()
                         self.audio_managers.append(youtube_audio)
                     except Exception as e:
                         logging.error(f"Error processing future: {e}", exc_info=True)
-            
+
             if self.title is None:
                 self.title = self.get_playlist_title()
             self.download_cover_image()
-            
+
             logging.debug(f"playlist {self.id} is loaded successfully")
         except Exception as e:
             logging.error(f"Error in load_audio_managers: {e}", exc_info=True)
 
-    def __initialize_playlist_data(self):
+    def __initialize_playlist_data(self) -> None:
         self.title = self.get_playlist_title()
         data = {
             "playlist_url": self.playlist_url,
@@ -61,7 +65,7 @@ class IPlaylistManager(ABC):
             with open(self.playlist_data_filepath, 'w') as file:
                 json.dump(data, file, indent=4)
 
-    def __get_video_urls_from_json(self):
+    def __get_video_urls_from_json(self) -> None:
         data = self.__load_playlist_data()
         self.path_to_save_audio = data.get("path_to_save_audio", self.path_to_save_audio)
         self.title = data.get("title", None)
@@ -75,10 +79,10 @@ class IPlaylistManager(ABC):
         for audio in audios:
             self.video_urls.append(audio["url"])
 
-    def download_cover_image(self):
+    def download_cover_image(self) -> None:
         logging.debug("Downloading cover image...")
         yousync_path = os.path.join(self.path_to_save_audio, '.yousync')
-        image_path = os.path.join(yousync_path, self.id + ".jpg")
+        image_path = os.path.join(yousync_path, f"{self.id}.jpg")
         if os.path.exists(image_path):
             logging.debug("Cover image is already downloaded")
             return
@@ -94,7 +98,7 @@ class IPlaylistManager(ABC):
 
 #-------------------------------------Load & Save--------------------------------------#
 
-    def __load_playlist_data(self):
+    def __load_playlist_data(self) -> Dict[str, Any]:
         with self.lock:
             try:
                 with open(self.playlist_data_filepath, 'r') as file:
@@ -104,9 +108,8 @@ class IPlaylistManager(ABC):
 
 #-------------------------------------Public Function--------------------------------------#
 
-    def update(self):
+    def update(self) -> None:
         print("Updating playlist " + self.id)
-        #TODO: Not working, to update with new logic
         try:
             new_video_urls = self.get_video_urls()
 
@@ -125,8 +128,7 @@ class IPlaylistManager(ABC):
         except Exception as e:
             raise Exception(f"Update Error: {e}")
 
-
-    def update_path(self, new_path):
+    def update_path(self, new_path: str) -> None:
         old_path = self.path_to_save_audio
         self.path_to_save_audio = new_path
 
@@ -139,15 +141,15 @@ class IPlaylistManager(ABC):
         data['path_to_save_audio'] = new_path
         self.save_playlist_data(data)
 
-    def save_playlist_data(self, data):
+    def save_playlist_data(self, data: Dict[str, Any]) -> None:
         with self.lock:
             with open(self.playlist_data_filepath, 'w') as file:
                 json.dump(data, file, indent=4)
 
-    def get_audio_managers(self):
+    def get_audio_managers(self) -> List[IAudioManager]:
         return self.audio_managers
     
-    def __remove_audio(self, url):
+    def __remove_audio(self, url: str) -> None:
         audio_manager_index = next((i for i, am in enumerate(self.audio_managers) if am.get_url() == url), None)
 
         if audio_manager_index is not None:
@@ -161,33 +163,33 @@ class IPlaylistManager(ABC):
         else:
             print(f"Audio non trouvé durant la supression : {url}")
 
-    def __add_audio(self, audio_manager):
-            audio_manager.update_data()
-            self.audio_managers.append(audio_manager)
-            self.video_urls.append(audio_manager.get_url())
+    def __add_audio(self, audio_manager: IAudioManager) -> None:
+        audio_manager.update_data()
+        self.audio_managers.append(audio_manager)
+        self.video_urls.append(audio_manager.get_url())
 
     @abstractmethod
-    def new_audio_manager(self, url):
+    def new_audio_manager(self, url: str) -> IAudioManager:
         pass
 
     @abstractmethod
-    def get_video_urls(self):
+    def get_video_urls(self) -> List[str]:
         pass
 
     @abstractmethod
-    def get_playlist_title(self):
+    def get_playlist_title(self) -> str:
         pass
 
 #----------------------------------Download Process-------------------------------------#
 
     @abstractmethod
-    def download(self):
+    def download(self) -> None:
         pass
 
     @abstractmethod
-    def extract_video_id(self, url):
+    def extract_video_id(self, url: str) -> str:
         pass
 
     @abstractmethod
-    def extract_image(self):
+    def extract_image(self) -> str:
         pass

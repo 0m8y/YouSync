@@ -9,6 +9,8 @@ from core.utils import *
 import requests
 from bs4 import BeautifulSoup
 
+from typing import List, Optional
+
 class AppleAudioManager(IAudioManager):
 
     def __init__(self, url, path_to_save_audio, data_filepath, lock):

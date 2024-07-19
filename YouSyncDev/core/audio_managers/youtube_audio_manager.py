@@ -1,21 +1,26 @@
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 from core.audio_managers.IAudioManager import IAudioManager
+from selenium import webdriver
 
 from pytubefix import YouTube
 
 from moviepy.editor import *
 from core.metadata_finder import *
-from core.utils import *
+from core.utils import get_selenium_driver, find_title_yt, find_title, find_artist, find_album, find_image
+from threading import Lock
 
 class YoutubeAudioManager(IAudioManager):
 
-    def __init__(self, url, path_to_save_audio, data_filepath, lock):
+    def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
         self.yt = YouTube(url)
         super().__init__(url, path_to_save_audio, data_filepath, self.yt.video_id, find_title_yt(self.yt), lock)
 
 #----------------------------------Download Process-------------------------------------#
 
-    def __get_selenium_driver(self):
+    def __get_selenium_driver(self) -> webdriver.Chrome:
         driver = get_selenium_driver(self.url)
 
         success = False
@@ -37,9 +42,9 @@ class YoutubeAudioManager(IAudioManager):
             print("Impossible de cliquer sur le bouton 'Afficher plus' après plusieurs tentatives.")
 
         return driver
-    
+
     #Override Function
-    def download_audio(self):
+    def download_audio(self) -> None:
         audio_stream = self.yt.streams.filter(only_audio=True).first()
         downloaded_file = audio_stream.download()
         
@@ -49,8 +54,8 @@ class YoutubeAudioManager(IAudioManager):
         os.remove(downloaded_file)
 
     #Override Function
-    def add_metadata(self):
-        if self.is_downloaded is False or self.metadata_updated is True:
+    def add_metadata(self) -> None:
+        if not self.is_downloaded or self.metadata_updated:
             print("Audio is not downloaded")
             return
 
