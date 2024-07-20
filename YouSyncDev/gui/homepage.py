@@ -49,7 +49,7 @@ class HomePage(customtkinter.CTkFrame):
     def __create_apple_button__(self):
         apple_image = Image.open(os.path.join(self.image_path, "Apple_logo.png"))
         padded_image = ImageOps.expand(apple_image, border=0, fill='black')
-        resized_image = padded_image.resize((213, 51))
+        resized_image = padded_image.resize((221, 51))
 
         tk_image = ImageTk.PhotoImage(resized_image)
 
