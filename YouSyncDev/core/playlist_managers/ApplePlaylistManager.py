@@ -3,7 +3,7 @@ import requests
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from concurrent.futures import ThreadPoolExecutor
 from core.audio_managers.AppleAudioManager import AppleAudioManager
-from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_soundcloud_total_songs, get_soundcloud_url_list
+from core.utils import get_selenium_driver_for_apple, scroll_down_apple_page
 from typing import List, Optional
 from bs4 import BeautifulSoup
 import re
@@ -15,14 +15,19 @@ class ApplePlaylistManager(IPlaylistManager):
         self.html_page = requests.get(playlist_url).text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing ApplePlaylistManager")
-        super().__init__(playlist_url, path_to_save_audio, get_spotify_playlist_id(playlist_url))
+        super().__init__(playlist_url, path_to_save_audio, self.get_apple_playlist_id())
 
 #----------------------------------------GETTER----------------------------------------#
+
+    def get_apple_playlist_id(self):
+        return self.soup.find('meta', attrs={'name': 'apple:content_id'})['content'].replace('-', '').replace('.', '')
 
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[AppleAudioManager]:
         try:
             logging.debug("Creating AppleAudioManager")
+            if url is None:
+                return None
             audio_manager = AppleAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             return audio_manager
         except Exception as e:
@@ -34,16 +39,20 @@ class ApplePlaylistManager(IPlaylistManager):
     def get_playlist_title(self) -> str:
         return self.soup.find('meta', attrs={'name': 'apple:title'})['content']
 
+    # Override Function
     def extract_image(self) -> str:
         return self.soup.find('meta', property='og:image')['content']
 
     # Override Method
     def get_video_urls(self) -> List[str]:
-        driver = get_selenium_driver_for_spotify(self.playlist_url)
-        driver.execute_script("document.body.style.zoom = '0.001'")
-        total_songs = get_soundcloud_total_songs(driver)
-        urls = get_soundcloud_url_list(driver, total_songs)
-        print(f"{len(urls)} songs found.")
+        driver = get_selenium_driver_for_apple(self.playlist_url)
+
+        scroll_down_apple_page(driver)
+
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        song_links = soup.select('a[data-testid="track-seo-link"]')
+        urls = {link['href'] for link in song_links}
+
         driver.quit()
         return urls
 
@@ -61,7 +70,7 @@ class ApplePlaylistManager(IPlaylistManager):
 
     # Override Function
     def extract_video_id(self, url: str) -> Optional[str]:
-        pattern = r"track/([a-zA-Z0-9]+)"
+        pattern = r"/song/[^/]+/([0-9]+)"
         match = re.search(pattern, url)
         if match:
             return match.group(1)

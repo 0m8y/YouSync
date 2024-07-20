@@ -4,6 +4,7 @@ import os
 import customtkinter
 import sys
 from PIL import Image, ImageTk
+import queue
 
 from gui.notifications.notificationmanager import NotificationManager
 from gui.playlists.playlisttile import PlaylistTile
@@ -116,13 +117,27 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.notification_manager.update_progress_bar_notification(self.progress_notification, current)
 
     def join_load_managers_thread(self):
-        self.load_managers_thread = threading.Thread(target=self.parent.central_manager.instantiate_playlist_managers)
+        def load_managers():
+            self.parent.central_manager.instantiate_playlist_managers()
+            self.queue.put("playlists_loaded")
+
+        self.queue = queue.Queue()
+        self.load_managers_thread = threading.Thread(target=load_managers)
         self.load_managers_thread.start()
-        self.load_managers_thread.join()
-        self.notification_manager.show_notification("Playlists loaded successfully!")
-        self.parent.playlist_loaded = True
-        for id, tile in self.playlist_tiles:
-            tile.update_cover()
+        self.check_queue()
+
+    def check_queue(self):
+        try:
+            while True:
+                task = self.queue.get_nowait()
+                if task == "playlists_loaded":
+                    self.notification_manager.show_notification("Playlists loaded successfully!")
+                    self.parent.playlist_loaded = True
+                    for id, tile in self.playlist_tiles:
+                        tile.update_cover()
+        except queue.Empty:
+            pass
+        self.after(100, self.check_queue)
 
     def setup_ui(self):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)

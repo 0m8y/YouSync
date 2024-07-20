@@ -14,6 +14,7 @@ class HomePage(customtkinter.CTkFrame):
         self.create_label("Add new playlist")
         self.__create_youtube_button__()
         self.__create_spotify_button__()
+        self.__create_apple_button__()
         self.__create_soundcloud_button__()
 
     def create_label(self, text):
@@ -45,6 +46,19 @@ class HomePage(customtkinter.CTkFrame):
         self.spotify_button.image = tk_image
         self.spotify_button.grid(row=1, column=1, padx=(0, 50), pady=(30, 0))
 
+    def __create_apple_button__(self):
+        apple_image = Image.open(os.path.join(self.image_path, "Apple_logo.png"))
+        padded_image = ImageOps.expand(apple_image, border=0, fill='black')
+        resized_image = padded_image.resize((213, 51))
+
+        tk_image = ImageTk.PhotoImage(resized_image)
+
+        self.apple_button = customtkinter.CTkButton(self, image=tk_image, width=300, height=120,
+                                                         command=self.apple_button_event, text="",
+                                                         fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
+        self.apple_button.image = tk_image
+        self.apple_button.grid(row=2, column=0, padx=(50, 0), pady=(40, 0))
+
     def __create_soundcloud_button__(self):
         soundcloud_image = Image.open(os.path.join(self.image_path, "SoundCloud_logo.png"))
         padded_image = ImageOps.expand(soundcloud_image, border=0, fill='black')
@@ -56,7 +70,7 @@ class HomePage(customtkinter.CTkFrame):
                                                          command=self.soundcloud_button_event, text="",
                                                          fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.soundcloud_button.image = tk_image
-        self.soundcloud_button.grid(row=2, column=0, padx=(50, 0), pady=(40, 0))
+        self.soundcloud_button.grid(row=2, column=1, padx=(0, 50), pady=(40, 0))
 
     def soundcloud_button_event(self):
         self.parent.playlists_page.notification_manager.show_notification(
@@ -70,3 +84,6 @@ class HomePage(customtkinter.CTkFrame):
 
     def spotify_button_event(self):
         self.parent.show_new_spotify_playlist()
+
+    def apple_button_event(self):
+        self.parent.show_new_apple_playlist()

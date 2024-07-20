@@ -11,11 +11,13 @@ from typing import List, Callable, Optional, Union, Dict, Any
 from core.audio_managers.IAudioManager import IAudioManager
 from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
 from core.playlist_managers.SpotifyPlaylistManager import SpotifyPlaylistManager
+from core.playlist_managers.ApplePlaylistManager import ApplePlaylistManager
 
 
 class Platform(Enum):
     YOUTUBE = 1
     SPOTIFY = 2
+    APPLE = 3
 
 
 class PlaylistData:
@@ -52,7 +54,7 @@ class CentralManager:
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
         self.data = self.load_data_from_json()
-        self.playlist_managers: List[Union[YoutubePlaylistManager, SpotifyPlaylistManager]] = []
+        self.playlist_managers: List[Union[YoutubePlaylistManager, SpotifyPlaylistManager, ApplePlaylistManager]] = []
         self.progress_callback = progress_callback
         self.playlist_loaded = False
 
@@ -103,7 +105,7 @@ class CentralManager:
                     self.progress_callback(i + 1, total_playlists)
         self.playlist_loaded = True
 
-    def create_playlist_manager(self, pl: PlaylistData) -> Optional[Union[YoutubePlaylistManager, SpotifyPlaylistManager]]:
+    def create_playlist_manager(self, pl: PlaylistData) -> Optional[Union[YoutubePlaylistManager, SpotifyPlaylistManager, ApplePlaylistManager]]:
         path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
         playlist_manager = next((pm for pm in self.playlist_managers if pm.id == pl.id), None)
         if not playlist_manager:
@@ -115,6 +117,8 @@ class CentralManager:
                     return YoutubePlaylistManager(pl.url, path_to_save_audio)
                 elif spotify_pattern.match(pl.url):
                     return SpotifyPlaylistManager(pl.url, path_to_save_audio)
+                elif "music.apple.com" in pl.url:
+                    return ApplePlaylistManager(pl.url, path_to_save_audio)
             except Exception as e:
                 logging.debug(f"Error when creating playlist manager: {e}")
         return None
@@ -127,6 +131,9 @@ class CentralManager:
             case Platform.SPOTIFY:
                 print("Adding new spotify playlist...")
                 playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
+            case Platform.APPLE:
+                print("Adding new apple playlist...")
+                playlist_manager = ApplePlaylistManager(playlist_url, path_to_save_audio)
             case _:
                 print("Adding new youtube playlist...")
                 playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
@@ -144,6 +151,7 @@ class CentralManager:
         self.data["playlists"].append(playlist_info)
         self.playlist_managers.append(playlist_manager)
         self.save_data_to_json()
+        print("Playlist added successfully.")
         return "Playlist added successfully."
 
     def add_existing_playlists(self, folder_path: str) -> str:
@@ -180,6 +188,8 @@ class CentralManager:
                                     playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
                                 elif spotify_pattern.match(playlist_url):
                                     playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
+                                elif "music.apple.com" in playlist_url:
+                                    playlist_manager = ApplePlaylistManager(playlist_url, path_to_save_audio)
                                 else:
                                     raise Exception(f"Unknown playlist url: {playlist_url}")
                             except Exception as e:

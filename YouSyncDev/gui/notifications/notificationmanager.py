@@ -1,7 +1,7 @@
 from gui.style import NOTIFICATION_DURATION, WHITE_TEXT_COLOR
 from gui.notifications.notification import Notification
 from gui.notifications.progressbarnotification import ProgressBarNotification
-
+import queue
 
 class NotificationManager:
     def __init__(self, parent, image_path):
@@ -10,12 +10,29 @@ class NotificationManager:
         self.notifications = []
         self.image_path = image_path
 
+        self.queue = queue.Queue()
         self.app.bind("<Configure>", self.on_parent_configure)
+        self.check_queue()
 
     def show_notification(self, message, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR):
+        self.queue.put(("show_notification", message, duration, text_color))
+
+    def handle_show_notification(self, message, duration, text_color):
         notification = Notification(self, message, self.image_path, duration, text_color=text_color)
         self.notifications.append(notification)
         self.place_notifications()
+
+    def check_queue(self):
+        while not self.queue.empty():
+            task = self.queue.get()
+            if task[0] == "show_notification":
+                self.handle_show_notification(*task[1:])
+        self.app.after(100, self.check_queue)
+
+    # def show_notification(self, message, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR):
+    #     notification = Notification(self, message, self.image_path, duration, text_color=text_color)
+    #     self.notifications.append(notification)
+    #     self.place_notifications()
 
     def place_notifications(self):
         for i, notification in enumerate(self.notifications):

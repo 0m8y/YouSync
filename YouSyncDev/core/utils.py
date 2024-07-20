@@ -51,6 +51,9 @@ def get_spotify_playlist_id(playlist_url: str) -> Optional[str]:
         return match.group(2)
     return None
 
+# def get_apple_playlist_id(playlist_url: str) -> Optional[str]:
+
+
 
 def accept_youtube_cookies(driver: webdriver.Chrome) -> None:
     wait = WebDriverWait(driver, 10)
@@ -116,7 +119,7 @@ def get_selenium_driver_for_apple(url: str) -> webdriver.Chrome:
     chrome_options.add_argument("--mute-audio")
 
     driver = webdriver.Chrome(options=chrome_options)
-
+    print(f"url: {url}")
     driver.get(url)
 
     WebDriverWait(driver, 20).until(

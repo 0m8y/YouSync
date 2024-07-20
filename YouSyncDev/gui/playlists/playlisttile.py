@@ -46,7 +46,7 @@ class PlaylistTile:
         title_label.pack(pady=(0, 10))
 
     def update_cover(self):
-        print("Updating cover...")
+        print(f"Updating cover: {self.cover_filename}")
         new_cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
         if self.cover_filename == new_cover_filename:
             return

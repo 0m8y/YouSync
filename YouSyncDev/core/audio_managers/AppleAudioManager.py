@@ -8,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
-
+import time
 
 class AppleAudioManager(IAudioManager):
 
@@ -21,7 +21,7 @@ class AppleAudioManager(IAudioManager):
 
     def __extract_apple_id(self, apple_url):
         # Définir une expression régulière pour extraire l'ID de la piste
-        pattern = r"track/([a-zA-Z0-9]+)"
+        pattern = r"/song/[^/]+/([0-9]+)"
         match = re.search(pattern, apple_url)
         if match:
             return match.group(1)
@@ -44,7 +44,19 @@ class AppleAudioManager(IAudioManager):
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.path_to_save_audio_with_title)
         audio_clip.close()
-        os.remove(downloaded_file)
+
+        # Attempt to remove the file with a retry mechanism
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                os.remove(downloaded_file)
+                print(f"File {downloaded_file} removed successfully")
+                break
+            except PermissionError:
+                print(f"PermissionError: retrying to remove the file {downloaded_file} (attempt {attempt + 1}/{max_retries})")
+                time.sleep(1)  # Wait a bit before retrying
+        else:
+            print(f"Failed to remove the file {downloaded_file} after {max_retries} attempts")
 
     #Override Function
     def add_metadata(self):

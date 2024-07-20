@@ -166,6 +166,7 @@ class PlaylistPage(customtkinter.CTkFrame):
         download_thread.start()
 
     def _download_playlist(self, audio_managers_not_downloaded):
+
         self.on_download = True
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(self.download_audio, audio_manager) for audio_manager in audio_managers_not_downloaded]
