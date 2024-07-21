@@ -152,17 +152,17 @@ class PlaylistsPage(customtkinter.CTkFrame):
         filter_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         filter_frame.pack(pady=(0, 10))
 
-        all_button = customtkinter.CTkButton(filter_frame, text="All", command=lambda: self.filter_playlists("all"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
-        all_button.pack(side="left", padx=10)
+        self.all_button = customtkinter.CTkButton(filter_frame, text="All", command=lambda: self.filter_playlists("all"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        self.all_button.pack(side="left", padx=10)
 
-        youtube_button = customtkinter.CTkButton(filter_frame, text="YouTube", command=lambda: self.filter_playlists("youtube"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
-        youtube_button.pack(side="left", padx=10)
+        self.youtube_button = customtkinter.CTkButton(filter_frame, text="YouTube", command=lambda: self.filter_playlists("youtube"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        self.youtube_button.pack(side="left", padx=10)
 
-        spotify_button = customtkinter.CTkButton(filter_frame, text="Spotify", command=lambda: self.filter_playlists("spotify"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
-        spotify_button.pack(side="left", padx=10)
+        self.spotify_button = customtkinter.CTkButton(filter_frame, text="Spotify", command=lambda: self.filter_playlists("spotify"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        self.spotify_button.pack(side="left", padx=10)
 
-        apple_button = customtkinter.CTkButton(filter_frame, text="Apple Music", command=lambda: self.filter_playlists("apple"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
-        apple_button.pack(side="left", padx=10)
+        self.apple_button = customtkinter.CTkButton(filter_frame, text="Apple Music", command=lambda: self.filter_playlists("apple"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        self.apple_button.pack(side="left", padx=10)
 
         self.scrollable_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         self.scrollable_frame.pack(fill="both", expand=True, pady=20, padx=(30, 0))
@@ -175,6 +175,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.add_button.place(x=800, y=30)
         ToolTip(self.add_button, "Retreive existing playlist")
 
+        self.update_button_colors()
         self.load_playlists()
 
     def load_playlists(self):
@@ -193,8 +194,24 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 index += 1
 
     def filter_playlists(self, platform):
-        self.platform = platform
-        self.load_playlists()
+        if self.platform != platform:
+            self.platform = platform
+            self.update_button_colors()
+            self.load_playlists()
+
+    def update_button_colors(self):
+        buttons = {
+            "all": self.all_button,
+            "youtube": self.youtube_button,
+            "spotify": self.spotify_button,
+            "apple": self.apple_button
+        }
+
+        for key, button in buttons.items():
+            if key == self.platform:
+                button.configure(fg_color=HOVER_COLOR)
+            else:
+                button.configure(fg_color=BUTTON_COLOR)
 
     def add_playlist_tile(self, row, column, playlist):
         return PlaylistTile(self, row, column, playlist, self.image_path, self.scrollable_frame)

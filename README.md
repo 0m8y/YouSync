@@ -16,6 +16,9 @@ YouSync is an application that allows you to synchronize your playlists with you
 ### YouSync 1.2 Features
 - **Apple Music Support**: Sync Apple Music playlists.
 - **Performance improvement**: Improved performance and application fluidity.
+- **Platform thumbnail**: Add the logo of the playlist's platform to show where the playlist comes from
+- **Platform filter**: To filter only the playlists of a platform. For example, display only youtube playlists.
+- **2 new buttons on the playlist page**: One button redirects to the backup folder, another to the playlist link.
 
 ### Upcoming Features
 

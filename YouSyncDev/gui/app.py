@@ -1,13 +1,14 @@
 #app.py
 import customtkinter
 import os
-from PIL import Image
+from PIL import Image, ImageTk
 from gui.homepage import HomePage
 from gui.newyoutubeplaylist import NewYoutubePlaylist
 from gui.newspotifyplaylist import NewSpotifyPlaylist
 from gui.newappleplaylist import NewApplePlaylist
 from gui.playlists.playlistspage import PlaylistsPage
 from gui.style import FIRST_COLOR, WHITE_TEXT_COLOR, HOVER_COLOR
+import logging
 
 
 class App(customtkinter.CTk):
@@ -17,6 +18,8 @@ class App(customtkinter.CTk):
         self.title("YouSync")
         self.geometry("1100x650")
         self._fg_color = FIRST_COLOR
+        self.image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
+        self.set_icon()
 
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -30,7 +33,6 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        self.image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/images")
         yousync_logo = Image.open(os.path.join(self.image_path, "YouSyncLogo.png"))
         self.logo_image = customtkinter.CTkImage(light_image=yousync_logo,
                                                  dark_image=yousync_logo, size=(180, 65))
@@ -90,6 +92,12 @@ class App(customtkinter.CTk):
         self.new_apple_playlist_page.lower()
 
         self.select_frame_by_name("home")
+
+    def set_icon(self):
+        try:
+            self.wm_iconbitmap(os.path.join(self.image_path, "yousync.ico"))
+        except Exception as e:
+            logging.error(f"Failed to set window icon: {e}")
 
     def show_new_youtube_playlist(self):
         self.select_frame_by_name("new_youtube_playlist")
