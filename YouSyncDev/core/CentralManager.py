@@ -15,6 +15,7 @@ from core.playlist_managers.ApplePlaylistManager import ApplePlaylistManager
 
 spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
 youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
 
 class Platform(Enum):
     YOUTUBE = 1
@@ -116,7 +117,7 @@ class CentralManager:
                     return YoutubePlaylistManager(pl.url, path_to_save_audio)
                 elif spotify_pattern.match(pl.url):
                     return SpotifyPlaylistManager(pl.url, path_to_save_audio)
-                elif "music.apple.com" in pl.url:
+                elif apple_pattern.match(pl.url):
                     return ApplePlaylistManager(pl.url, path_to_save_audio)
             except Exception as e:
                 logging.debug(f"Error when creating playlist manager: {e}")
@@ -184,7 +185,7 @@ class CentralManager:
                                     playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
                                 elif spotify_pattern.match(playlist_url):
                                     playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
-                                elif "music.apple.com" in playlist_url:
+                                elif apple_pattern.match(playlist_url):
                                     playlist_manager = ApplePlaylistManager(playlist_url, path_to_save_audio)
                                 else:
                                     raise Exception(f"Unknown playlist url: {playlist_url}")

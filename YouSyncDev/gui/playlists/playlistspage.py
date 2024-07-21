@@ -3,6 +3,7 @@ import threading
 import os
 import customtkinter
 import sys
+import re
 from PIL import Image, ImageTk
 import queue
 
@@ -13,6 +14,9 @@ import logging
 from core.CentralManager import CentralManager
 from gui.style import WHITE_TEXT_COLOR, BUTTON_COLOR, HOVER_COLOR, NOTIFICATION_DURATION, RED_COLOR, GREEN_COLOR, RED_HOVER_COLOR, GREEN_HOVER_COLOR
 
+spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
 
 class PlaylistsPage(customtkinter.CTkFrame):
     def __init__(self, parent, image_path, **kwargs):
@@ -23,6 +27,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.playlist_tiles = []
         self.syncing_playlists = []
         self.syncing_icons = []
+        self.platform = "all"
 
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.adding_folder = False
@@ -143,6 +148,22 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         self.title_label.pack(pady=20, padx=20, fill="x")
 
+        # Filter buttons
+        filter_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        filter_frame.pack(pady=(0, 10))
+
+        all_button = customtkinter.CTkButton(filter_frame, text="All", command=lambda: self.filter_playlists("all"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        all_button.pack(side="left", padx=10)
+
+        youtube_button = customtkinter.CTkButton(filter_frame, text="YouTube", command=lambda: self.filter_playlists("youtube"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        youtube_button.pack(side="left", padx=10)
+
+        spotify_button = customtkinter.CTkButton(filter_frame, text="Spotify", command=lambda: self.filter_playlists("spotify"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        spotify_button.pack(side="left", padx=10)
+
+        apple_button = customtkinter.CTkButton(filter_frame, text="Apple Music", command=lambda: self.filter_playlists("apple"), fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_TEXT_COLOR)
+        apple_button.pack(side="left", padx=10)
+
         self.scrollable_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         self.scrollable_frame.pack(fill="both", expand=True, pady=20, padx=(30, 0))
 
@@ -164,9 +185,16 @@ class PlaylistsPage(customtkinter.CTkFrame):
         playlists = self.parent.central_manager.list_playlists()
 
         rowlen = 4
-        for index, playlist in enumerate(playlists):
-            tile = self.add_playlist_tile(1 + index // rowlen, index % rowlen, playlist)
-            self.playlist_tiles.append((playlist.id, tile))
+        index = 0
+        for playlist in playlists:
+            if self.platform == "all" or (self.platform == "spotify" and spotify_pattern.match(playlist.url)) or (self.platform == "youtube" and youtube_pattern.match(playlist.url)) or (self.platform == "apple" and apple_pattern.match(playlist.url)):
+                tile = self.add_playlist_tile(1 + index // rowlen, index % rowlen, playlist)
+                self.playlist_tiles.append((playlist.id, tile))
+                index += 1
+
+    def filter_playlists(self, platform):
+        self.platform = platform
+        self.load_playlists()
 
     def add_playlist_tile(self, row, column, playlist):
         return PlaylistTile(self, row, column, playlist, self.image_path, self.scrollable_frame)

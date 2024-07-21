@@ -1,13 +1,17 @@
 import customtkinter
 import os
+import re
 import threading
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageOps
 from tkinter import Canvas
 
 from gui.utils import create_image, truncate_string
 from gui.playlists.playlistpage import PlaylistPage
 from gui.style import WHITE_TEXT_COLOR, NOTIFICATION_DURATION
 
+spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
+apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
 
 class PlaylistTile:
     def __init__(self, parent, row, column, playlist, image_path, scrollable_frame):
@@ -21,6 +25,9 @@ class PlaylistTile:
         self.playlist_page = None
 
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
+        self.apple_image = Image.open(os.path.join(self.image_path, "apple_icon.png"))
+        self.youtube_image = Image.open(os.path.join(self.image_path, "youtube_icon.png"))
+        self.spotify_image = Image.open(os.path.join(self.image_path, "spotify_icon.png"))
 
         self.cover_frame = customtkinter.CTkFrame(self.scrollable_frame, corner_radius=5, fg_color="transparent")
         self.cover_frame.grid(row=row, column=column, padx=10, pady=10, sticky="nsew")
@@ -39,6 +46,18 @@ class PlaylistTile:
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         self.cover_canvas.sync_icon_id = self.cover_canvas.create_image(160, 120, image=sync_icon_photo)
         self.cover_canvas.sync_icon_photo = sync_icon_photo
+
+        if youtube_pattern.match(playlist.url):
+            platform_icon_photo = ImageTk.PhotoImage(self.youtube_image)
+        elif spotify_pattern.match(playlist.url):
+            platform_icon_photo = ImageTk.PhotoImage(self.spotify_image)
+        elif apple_pattern.match(playlist.url):
+            platform_icon_photo = ImageTk.PhotoImage(self.apple_image)
+        else:
+            platform_icon_photo = ImageTk.PhotoImage(self.youtube_image)
+
+        self.cover_canvas.platform_icon_id = self.cover_canvas.create_image(20, 120, image=platform_icon_photo)
+        self.cover_canvas.platform_icon_photo = platform_icon_photo
 
         self.cover_canvas.tag_bind(self.cover_canvas.sync_icon_id, "<Button-1>", lambda event, c=self.cover_canvas: self.update_playlist())
 
