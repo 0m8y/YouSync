@@ -13,6 +13,8 @@ from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
 from core.playlist_managers.SpotifyPlaylistManager import SpotifyPlaylistManager
 from core.playlist_managers.ApplePlaylistManager import ApplePlaylistManager
 
+spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
+youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
 
 class Platform(Enum):
     YOUTUBE = 1
@@ -109,9 +111,6 @@ class CentralManager:
         path_to_save_audio = os.path.dirname(os.path.dirname(pl.path))
         playlist_manager = next((pm for pm in self.playlist_managers if pm.id == pl.id), None)
         if not playlist_manager:
-            spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
-            youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
-
             try:
                 if youtube_pattern.match(pl.url):
                     return YoutubePlaylistManager(pl.url, path_to_save_audio)
@@ -181,9 +180,6 @@ class CentralManager:
                         path_to_save_audio = playlist_data.get("path_to_save_audio")
                         if playlist_url and path_to_save_audio:
                             try:
-                                spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
-                                youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
-
                                 if youtube_pattern.match(playlist_url):
                                     playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
                                 elif spotify_pattern.match(playlist_url):

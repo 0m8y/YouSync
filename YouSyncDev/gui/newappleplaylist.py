@@ -37,7 +37,7 @@ class NewApplePlaylist(customtkinter.CTkFrame):
         # Logo Apple
         apple_logo = Image.open(os.path.join(self.image_path, "Apple_logo.png"))
         padded_image = ImageOps.expand(apple_logo, border=0, fill='black')
-        resized_image = padded_image.resize((213, 51))
+        resized_image = padded_image.resize((221, 51))
         tk_logo = ImageTk.PhotoImage(resized_image)
         self.logo_label = customtkinter.CTkLabel(self, image=tk_logo, text="")
         self.logo_label.image = tk_logo

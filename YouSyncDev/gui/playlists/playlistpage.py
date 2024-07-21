@@ -5,6 +5,7 @@ import platform
 import subprocess
 from PIL import Image, ImageTk, ImageOps
 from concurrent.futures import ThreadPoolExecutor
+import webbrowser
 
 from gui.utils import create_image
 from gui.tooltip import ToolTip
@@ -38,9 +39,14 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.download_green = Image.open(os.path.join(self.image_path, "download_green.png"))
         self.download_orange = Image.open(os.path.join(self.image_path, "download_orange.png"))
         self.download_red = Image.open(os.path.join(self.image_path, "download_red.png"))
+
         folder_image = Image.open(os.path.join(self.image_path, "folder.png"))
-        sync_padded_image = ImageOps.expand(folder_image, border=0, fill='black')
-        self.folder_image = sync_padded_image.resize((26, 26))
+        folder_padded_image = ImageOps.expand(folder_image, border=0, fill='black')
+        self.folder_image = folder_padded_image.resize((25, 25))
+
+        link_image = Image.open(os.path.join(self.image_path, "link.png"))
+        link_padded_image = ImageOps.expand(link_image, border=0, fill='black')
+        self.link_image = link_padded_image.resize((25, 25))
 
         self.setup_ui()
 
@@ -75,7 +81,7 @@ class PlaylistPage(customtkinter.CTkFrame):
 
         # Sous-frame pour les labels de texte
         text_frame = customtkinter.CTkFrame(main_frame, fg_color="transparent")
-        text_frame.grid(row=0, column=1, sticky="ew")
+        text_frame.grid(row=0, column=1, sticky="nw")
 
         # Titre de la playlist
         self.title_label = customtkinter.CTkLabel(text_frame, text=self.title, font=("Roboto", 20, "bold"))
@@ -96,11 +102,16 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.back_button = customtkinter.CTkButton(self, text="", command=self.main_app.go_back_playlists, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=15, y=30)
 
+        x_pos_1 = 274
+        x_pos_2 = 330
+        y_pos_1 = 120
+        y_pos_2 = 166
+
         # Synchronization Button
         sync_icon_photo = ImageTk.PhotoImage(self.sync_image)
         self.sync_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=sync_icon_photo, command=lambda: self.playlist_tile.update_playlist())
         self.sync_button.image = sync_icon_photo
-        self.sync_button.place(x=274, y=135)
+        self.sync_button.place(x=x_pos_1, y=y_pos_1)
         ToolTip(self.sync_button, "Synchronize playlist.")
 
         # Download Button
@@ -110,20 +121,34 @@ class PlaylistPage(customtkinter.CTkFrame):
         dl_icon_photo = ImageTk.PhotoImage(resized_image)
         self.download_all_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=dl_icon_photo, command=lambda: self.download_playlist())
         self.download_all_button.image = dl_icon_photo
-        self.download_all_button.place(x=330, y=135)
+        self.download_all_button.place(x=x_pos_2, y=y_pos_1)
         ToolTip(self.download_all_button, "Download all missing sounds.")
 
         # Folder Button
         folder_icon_photo = ImageTk.PhotoImage(self.folder_image)
         self.folder_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=folder_icon_photo, command=lambda: self.go_to_folder())
         self.folder_button.image = folder_icon_photo
-        self.folder_button.place(x=386, y=135)
+        self.folder_button.place(x=x_pos_1, y=y_pos_2)
         ToolTip(self.folder_button, "Playlist folder.")
+
+        # Link Button
+        link_icon_photo = ImageTk.PhotoImage(self.link_image)
+        self.link_button = customtkinter.CTkButton(self, width=25, height=25, text="", fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR, image=link_icon_photo, command=lambda: self.go_to_url())
+        self.link_button.image = link_icon_photo
+        self.link_button.place(x=x_pos_2, y=y_pos_2)
+        ToolTip(self.link_button, "Link to playlist.")
 
         self.track_frame = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
         self.track_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         self.init_tracklist()
+
+    def go_to_url(self):
+        try:
+            webbrowser.open(self.playlist_data.url, new=2)  # new=2 opens in a new tab if possible
+            print(f"Opened URL: {self.playlist_data.url}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def go_to_folder(self):
         systeme = platform.system()
