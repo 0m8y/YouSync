@@ -6,43 +6,47 @@ import sys
 import re
 from PIL import Image, ImageTk
 import queue
+from typing import Any
 
 from gui.notifications.notificationmanager import NotificationManager
+from gui.notifications.progressbarnotification import ProgressBarNotification
 from gui.playlists.playlisttile import PlaylistTile
 from gui.tooltip import ToolTip
 import logging
 from core.CentralManager import CentralManager
 from gui.style import WHITE_TEXT_COLOR, BUTTON_COLOR, HOVER_COLOR, NOTIFICATION_DURATION, RED_COLOR, GREEN_COLOR, RED_HOVER_COLOR, GREEN_HOVER_COLOR
+from gui.playlists.playlisttile import PlaylistTile
+from core.CentralManager import PlaylistData
 
 spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
 youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
 apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
 
 class PlaylistsPage(customtkinter.CTkFrame):
-    def __init__(self, parent, image_path, **kwargs):
+    def __init__(self, parent: Any, image_path: str, **kwargs: Any) -> None:
         super().__init__(parent, **kwargs)
         self.parent = parent
         self.image_path = image_path
 
-        self.playlist_tiles = []
-        self.syncing_playlists = []
-        self.syncing_icons = []
-        self.platform = "all"
+        self.playlist_tiles: list[PlaylistTile] = []
+        self.platform: str = "all"
+
+        self.central_manager: CentralManager | None = None
 
         self.load_image = Image.open(os.path.join(self.image_path, "load.png"))
         self.adding_folder = False
 
         self.notification_manager = NotificationManager(self, self.image_path)
-        self.progress_notification = None
+        self.progress_notification: ProgressBarNotification = None
         self.init_central_manager()
 
         self.setup_ui()
 
-    def init_central_manager(self):
-        if self.parent.central_manager is None:
-            self.parent.central_manager = CentralManager("playlists.json", self.update_progress)
+    def init_central_manager(self) -> None:
+        if self.central_manager is None:
+            self.central_manager = CentralManager("playlists.json", self.update_progress)
 
-            playlists_data = self.parent.central_manager.list_playlists()
+            playlists_data = self.central_manager.list_playlists()
 
             for playlist_data in playlists_data:
                 if not os.path.exists(os.path.dirname(playlist_data.path)):
@@ -54,8 +58,8 @@ class PlaylistsPage(customtkinter.CTkFrame):
             except Exception as e:
                 logging.debug(f"Error init central manager. : {e}")
 
-    def show_path_not_found_popup(self, playlist_data):
-        def on_close():
+    def show_path_not_found_popup(self, playlist_data: PlaylistData) -> None:
+        def on_close() -> None:
             self.parent.quit()
             popup.destroy()
             sys.exit(0)
@@ -95,14 +99,14 @@ class PlaylistsPage(customtkinter.CTkFrame):
         popup.grab_set()  # Make the popup modal
         self.wait_window(popup)  # Wait until the popup is closed
 
-    def delete_playlist(self, popup, playlist_data):
+    def delete_playlist(self, popup: customtkinter.CTkToplevel, playlist_data: PlaylistData) -> None:
         popup.grab_release()  # Release the grab before destroying the popup
         popup.destroy()
-        self.parent.central_manager.delete_playlist(playlist_data.id)
+        self.central_manager.delete_playlist(playlist_data.id)
 
-    def resync_playlist(self, popup, playlist_data):
+    def resync_playlist(self, popup: customtkinter.CTkToplevel, playlist_data: PlaylistData) -> None:
         folder_selected = filedialog.askdirectory()
-        if (self.parent.central_manager.update_path(folder_selected, playlist_data.id)):
+        if (self.central_manager.update_path(folder_selected, playlist_data.id)):
             popup.grab_release()  # Release the grab before destroying the popup
             popup.destroy()
             return
@@ -112,26 +116,26 @@ class PlaylistsPage(customtkinter.CTkFrame):
             text_color=WHITE_TEXT_COLOR
         )
 
-    def reload(self):
+    def reload(self) -> None:
         self.join_thread = threading.Thread(target=self.join_load_managers_thread)
         self.join_thread.start()
 
-    def update_progress(self, current, total):
+    def update_progress(self, current: int, total: int) -> None:
         if self.progress_notification is None:
             self.progress_notification = self.notification_manager.show_progress_bar_notification(total, "Loading playlists...")
         self.notification_manager.update_progress_bar_notification(self.progress_notification, current)
 
-    def join_load_managers_thread(self):
-        def load_managers():
-            self.parent.central_manager.instantiate_playlist_managers()
+    def join_load_managers_thread(self) -> None:
+        def load_managers() -> None:
+            self.central_manager.instantiate_playlist_managers()
             self.queue.put("playlists_loaded")
 
-        self.queue = queue.Queue()
+        self.queue: queue.Queue[str] = queue.Queue()
         self.load_managers_thread = threading.Thread(target=load_managers)
         self.load_managers_thread.start()
         self.check_queue()
 
-    def check_queue(self):
+    def check_queue(self) -> None:
         try:
             while True:
                 task = self.queue.get_nowait()
@@ -144,7 +148,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
             pass
         self.after(100, self.check_queue)
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.title_label = customtkinter.CTkLabel(self, text="My playlists", font=("Roboto", 24, "bold"), fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         self.title_label.pack(pady=20, padx=20, fill="x")
 
@@ -178,12 +182,12 @@ class PlaylistsPage(customtkinter.CTkFrame):
         self.update_button_colors()
         self.load_playlists()
 
-    def load_playlists(self):
+    def load_playlists(self) -> None:
         for tile in self.playlist_tiles:
             tile[1].destroy()
         self.playlist_tiles.clear()
 
-        playlists = self.parent.central_manager.list_playlists()
+        playlists = self.central_manager.list_playlists()
 
         rowlen = 4
         index = 0
@@ -193,13 +197,13 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 self.playlist_tiles.append((playlist.id, tile))
                 index += 1
 
-    def filter_playlists(self, platform):
+    def filter_playlists(self, platform: str) -> None:
         if self.platform != platform:
             self.platform = platform
             self.update_button_colors()
             self.load_playlists()
 
-    def update_button_colors(self):
+    def update_button_colors(self) -> None:
         buttons = {
             "all": self.all_button,
             "youtube": self.youtube_button,
@@ -213,11 +217,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
             else:
                 button.configure(fg_color=BUTTON_COLOR)
 
-    def add_playlist_tile(self, row, column, playlist):
+    def add_playlist_tile(self, row: int, column: int, playlist: PlaylistData) -> PlaylistTile:
         return PlaylistTile(self, row, column, playlist, self.image_path, self.scrollable_frame)
 
 #*********************************ADD EXISTING PLAYLIST*********************************#
-    def add_existing_playlist(self):
+    def add_existing_playlist(self) -> None:
         if self.adding_folder:
             self.notification_manager.show_notification(
                 "One file is already being recovered. Please try again later.",
@@ -233,11 +237,11 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 text_color=WHITE_TEXT_COLOR
             )
             self.adding_folder = True
-            add_thread = threading.Thread(target=self.parent.central_manager.add_existing_playlists, args=(folder_selected,))
+            add_thread = threading.Thread(target=self.parent.add_existing_playlists, args=(folder_selected,))
             add_thread.start()
             self.sync_add_button_rotation(add_thread)
 
-    def sync_add_button_rotation(self, thread, angle=0):
+    def sync_add_button_rotation(self, thread: threading.Thread, angle: int = 0) -> None:
         if thread.is_alive():
             rotated_image = self.load_image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)

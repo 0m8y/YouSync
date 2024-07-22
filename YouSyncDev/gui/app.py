@@ -3,16 +3,19 @@ import customtkinter
 import os
 from PIL import Image, ImageTk
 from gui.homepage import HomePage
-from gui.newyoutubeplaylist import NewYoutubePlaylist
-from gui.newspotifyplaylist import NewSpotifyPlaylist
-from gui.newappleplaylist import NewApplePlaylist
+from gui.add_playlist.newyoutubeplaylist import NewYoutubePlaylist
+from gui.add_playlist.newspotifyplaylist import NewSpotifyPlaylist
+from gui.add_playlist.newappleplaylist import NewApplePlaylist
 from gui.playlists.playlistspage import PlaylistsPage
-from gui.style import FIRST_COLOR, WHITE_TEXT_COLOR, HOVER_COLOR
+from gui.style import FIRST_COLOR, WHITE_TEXT_COLOR, HOVER_COLOR, BUTTON_COLOR
 import logging
+
+from gui.notifications.notificationmanager import NotificationManager
+from core.CentralManager import CentralManager
 
 
 class App(customtkinter.CTk):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.title("YouSync")
@@ -67,53 +70,56 @@ class App(customtkinter.CTk):
         self.frame_3_button.grid(row=3, column=0, sticky="ew")
 
         self.home_page = HomePage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        self.home_page.grid(row=0, column=1, sticky="nsew")
 
-        self.central_manager = None
         self.playlist_page = None
         self.playlists_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
+        self.playlists_page.grid(row=0, column=1, sticky="nsew")
+        self.playlists_page.lower()
+        self.notification_manager: NotificationManager = self.playlists_page.notification_manager
 
         self.third_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.third_frame.grid(row=0, column=1, sticky="nsew")
+        self.third_frame.lower()
 
         self.new_youtube_playlist_page = NewYoutubePlaylist(self, self.image_path, fg_color="transparent")
-        self.new_spotify_playlist_page = NewSpotifyPlaylist(self, self.image_path, fg_color="transparent")
-        self.new_apple_playlist_page = NewApplePlaylist(self, self.image_path, fg_color="transparent")
-
-        self.home_page.grid(row=0, column=1, sticky="nsew")
-        self.playlists_page.grid(row=0, column=1, sticky="nsew")
-        self.third_frame.grid(row=0, column=1, sticky="nsew")
         self.new_youtube_playlist_page.grid(row=0, column=1, sticky="nsew")
-        self.new_spotify_playlist_page.grid(row=0, column=1, sticky="nsew")
-        self.new_apple_playlist_page.grid(row=0, column=1, sticky="nsew")
-
-        self.playlists_page.lower()
-        self.third_frame.lower()
         self.new_youtube_playlist_page.lower()
+
+        self.new_spotify_playlist_page = NewSpotifyPlaylist(self, self.image_path, fg_color="transparent")
+        self.new_spotify_playlist_page.grid(row=0, column=1, sticky="nsew")
         self.new_spotify_playlist_page.lower()
+
+        self.new_apple_playlist_page = NewApplePlaylist(self, self.image_path, fg_color="transparent")
+        self.new_apple_playlist_page.grid(row=0, column=1, sticky="nsew")
         self.new_apple_playlist_page.lower()
 
         self.select_frame_by_name("home")
 
-    def set_icon(self):
+    def set_icon(self) -> None:
         try:
             self.wm_iconbitmap(os.path.join(self.image_path, "yousync.ico"))
         except Exception as e:
             logging.error(f"Failed to set window icon: {e}")
 
-    def show_new_youtube_playlist(self):
+    def get_central_manager(self) -> CentralManager | None:
+        return self.playlists_page.central_manager
+
+    def show_new_youtube_playlist(self) -> None:
         self.select_frame_by_name("new_youtube_playlist")
 
-    def show_new_spotify_playlist(self):
+    def show_new_spotify_playlist(self) -> None:
         self.select_frame_by_name("new_spotify_playlist")
 
-    def show_new_apple_playlist(self):
+    def show_new_apple_playlist(self) -> None:
         self.select_frame_by_name("new_apple_playlist")
 
-    def select_frame_by_name(self, name):
+    def select_frame_by_name(self, name: str) -> None:
         self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" or name == "new_youtube_playlist" or name == "new_spotify_playlist" or name == "new_apple_playlist" else "transparent")
         self.frame_2_button.configure(fg_color=("gray75", "gray25") if name == "playlists_page" else "transparent")
         self.frame_3_button.configure(fg_color=("gray75", "gray25") if name == "frame_3" else "transparent")
 
-        for frame in [self.home_page, self.playlists_page, self.third_frame, self.new_youtube_playlist_page]:
+        for frame in [self.home_page, self.playlists_page, self.third_frame, self.new_youtube_playlist_page, self.new_spotify_playlist_page, self.new_apple_playlist_page]:
             frame.lower()
         if name == "home":
             self.home_page.lift()
@@ -128,24 +134,21 @@ class App(customtkinter.CTk):
         elif name == "new_apple_playlist":
             self.new_apple_playlist_page.lift()
 
-    def home_button_event(self):
+    def home_button_event(self) -> None:
         self.select_frame_by_name("home")
 
-    def frame_2_button_event(self):
-        if not self.playlist_page:
-            self.playlist_page = PlaylistsPage(self, self.image_path, corner_radius=0, fg_color="transparent")
-            self.playlist_page.grid(row=0, column=1, sticky="nsew")
+    def frame_2_button_event(self) -> None:
         self.select_frame_by_name("playlists_page")
 
-    def frame_3_button_event(self):
+    def frame_3_button_event(self) -> None:
         self.select_frame_by_name("frame_3")
 
-    def change_appearance_mode_event(self, new_appearance_mode):
+    def change_appearance_mode_event(self, new_appearance_mode: str) -> None:
         customtkinter.set_appearance_mode(new_appearance_mode)
         self.playlists_page.update_image_mode()
 
-    def go_back_home(self):
+    def go_back_home(self) -> None:
         self.home_page.lift()
 
-    def go_back_playlists(self):
+    def go_back_playlists(self) -> None:
         self.playlists_page.lift()

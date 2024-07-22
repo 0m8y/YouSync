@@ -2,20 +2,25 @@ import customtkinter
 import os
 import re
 import threading
-from PIL import ImageTk, Image, ImageOps
+from PIL import ImageTk, Image
 from tkinter import Canvas
+from typing import Any
+
+from core.CentralManager import PlaylistData
 
 from gui.utils import create_image, truncate_string
 from gui.playlists.playlistpage import PlaylistPage
 from gui.style import WHITE_TEXT_COLOR, NOTIFICATION_DURATION
+from gui.notifications.notificationmanager import NotificationManager
 
 spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
 youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
 apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
 
 class PlaylistTile:
-    def __init__(self, parent, row, column, playlist, image_path, scrollable_frame):
+    def __init__(self, parent: Any, row: int, column: int, playlist: PlaylistData, image_path: str, scrollable_frame: Any) -> None:
         self.playlists_page = parent
+        self.central_manager = self.playlists_page.central_manager
         self.row = row
         self.column = column
         self.playlist_data = playlist
@@ -23,6 +28,7 @@ class PlaylistTile:
         self.scrollable_frame = scrollable_frame
         self.on_update = False
         self.playlist_page = None
+        self.notification_manager: NotificationManager = self.playlists_page.notification_manager
 
         self.sync_image = Image.open(os.path.join(self.image_path, "sync.png"))
         self.apple_image = Image.open(os.path.join(self.image_path, "apple_icon.png"))
@@ -64,8 +70,7 @@ class PlaylistTile:
         title_label = customtkinter.CTkLabel(self.cover_frame, text=truncate_string(self.playlist_data.title, 18), text_color=WHITE_TEXT_COLOR)
         title_label.pack(pady=(0, 10))
 
-    def update_cover(self):
-        print(f"Updating cover: {self.cover_filename}")
+    def update_cover(self) -> None:
         new_cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
         if self.cover_filename == new_cover_filename:
             return
@@ -77,31 +82,31 @@ class PlaylistTile:
         self.cover_canvas.itemconfig(self.cover_image_id, image=self.cover_img)
         print(f"Cover updated: {self.cover_filename}")
 
-    def update_playlist(self):
+    def update_playlist(self) -> None:
         if self.on_update:
-            self.playlists_page.notification_manager.show_notification(
+            self.notification_manager.show_notification(
                 "This playlist is on update. Please try again later.",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
-        elif self.playlists_page.parent.central_manager.playlist_loaded:
-            self.playlists_page.notification_manager.show_notification(
+        elif self.central_manager.playlist_loaded:
+            self.notification_manager.show_notification(
                 f"{self.playlist_data.title} synchronization in progress...",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
             self.on_update = True
-            self.update_thread = threading.Thread(target=self.playlists_page.parent.central_manager.update_playlist, args=(self.playlist_data.id,))
+            self.update_thread = threading.Thread(target=self.central_manager.update_playlist, args=(self.playlist_data.id,))
             self.update_thread.start()
             self.sync_playlist_rotation()
         else:
-            self.playlists_page.notification_manager.show_notification(
+            self.notification_manager.show_notification(
                 "Playlist is not yet loaded. Please try again later.",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
 
-    def sync_playlist_rotation(self, angle=0):
+    def sync_playlist_rotation(self, angle: int = 0) -> None:
         if self.on_update and self.update_thread is not None and self.update_thread.is_alive():
             rotated_image = self.sync_image.rotate(angle)
             rotated_photo = ImageTk.PhotoImage(rotated_image)
@@ -117,7 +122,7 @@ class PlaylistTile:
             self.cover_canvas.sync_icon_photo = sync_icon_photo
             self.cover_canvas.tag_bind(self.cover_canvas.sync_icon_id, "<Button-1>", lambda event: self.update_playlist())
             self.on_update = False
-            self.playlists_page.notification_manager.show_notification(
+            self.notification_manager.show_notification(
                 f"{self.playlist_data.title} is synchronized.",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
@@ -128,9 +133,9 @@ class PlaylistTile:
                 self.playlist_page.sync_completed()
                 self.playlist_page.update_tracklist()
 
-    def open_playlist_page(self, playlist, canvas):
-        if not self.playlists_page.parent.central_manager.playlist_loaded:
-            self.playlists_page.notification_manager.show_notification(
+    def open_playlist_page(self, playlist: PlaylistData, canvas: Canvas) -> None:
+        if not self.central_manager.playlist_loaded:
+            self.notification_manager.show_notification(
                 "This playlist is being synchronized. Please try again later.",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
@@ -140,12 +145,12 @@ class PlaylistTile:
         self.playlist_page.grid(row=0, column=1, sticky="nsew")
         self.playlist_page.lift()
 
-    def update_sync_icon(self, angle):
+    def update_sync_icon(self, angle: int) -> None:
         rotated_image = self.sync_image.rotate(angle)
         rotated_photo = ImageTk.PhotoImage(rotated_image)
         self.cover_canvas.itemconfig(self.cover_canvas.sync_icon_id, image=rotated_photo)
         self.cover_canvas.sync_icon_photo = rotated_photo  # Update reference!
         self.cover_canvas.update_idletasks()
 
-    def destroy(self):
+    def destroy(self) -> None:
         self.cover_frame.destroy()

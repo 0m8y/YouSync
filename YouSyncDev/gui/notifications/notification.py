@@ -1,12 +1,14 @@
+import os
 import customtkinter
 from PIL import Image
-import os
+from typing import Any
 from tkinter import Toplevel
+
 from gui.style import NOTIFICATION_DURATION, WHITE_TEXT_COLOR, BUTTON_COLOR, HOVER_COLOR
 
 
 class Notification(Toplevel):
-    def __init__(self, parent, message, image_path, duration=NOTIFICATION_DURATION, text_color=WHITE_TEXT_COLOR, **kwargs):
+    def __init__(self, parent: Any, message: str, image_path: str, duration: int = NOTIFICATION_DURATION, text_color: str = WHITE_TEXT_COLOR, **kwargs: Any) -> None:
         super().__init__(parent.parent)
         self.parent = parent
         self.message = message
@@ -27,5 +29,5 @@ class Notification(Toplevel):
 
         self.after(self.duration, self.close_notification)
 
-    def close_notification(self):
+    def close_notification(self) -> None:
         self.parent.close_notification(self)

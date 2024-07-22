@@ -1,6 +1,7 @@
 import threading
 import customtkinter
 from gui.tooltip import ToolTip
+from gui.notifications.notificationmanager import NotificationManager
 from gui.style import WHITE_TEXT_COLOR, HOVER_COLOR, NOTIFICATION_DURATION, FIRST_COLOR, SECOND_COLOR
 
 
@@ -27,6 +28,8 @@ class SongFrame:
         song_title_label = customtkinter.CTkLabel(self.song_frame, text=f"{self.audio_manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
 
+        self.notification_manager: NotificationManager = self.playlist_page.notification_manager
+
         self.update_icon_status()
 
     def update_icon_status(self):
@@ -52,7 +55,7 @@ class SongFrame:
 
     def download_music(self):
         if self.on_progress:
-            self.playlist_page.playlists_page.notification_manager.show_notification(
+            self.notification_manager.show_notification(
                 f"{self.audio_manager.video_title} is already in progress!",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
@@ -67,13 +70,13 @@ class SongFrame:
 
     def _download(self):
         self.on_progress = True
-        self.playlist_page.playlists_page.notification_manager.show_notification(
+        self.notification_manager.show_notification(
             f"Downloading {self.audio_manager.video_title}...",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )
         self.download()
-        self.playlist_page.playlists_page.notification_manager.show_notification(
+        self.notification_manager.show_notification(
             f"{self.audio_manager.video_title} is downloaded!",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR

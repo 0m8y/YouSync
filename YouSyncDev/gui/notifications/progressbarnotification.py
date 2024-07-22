@@ -1,14 +1,13 @@
-# progressbarnotification.py
-
 import customtkinter
+from typing import Any
 from tkinter import Toplevel
+
 from gui.style import BUTTON_COLOR, WHITE_TEXT_COLOR
 
 
 class ProgressBarNotification(Toplevel):
-    def __init__(self, parent, total, text, **kwargs):
+    def __init__(self, parent: Any, total: int, text: str, **kwargs: Any) -> None:
         super().__init__(parent.parent)
-        print("OPEN PROGRESS BAR")
         self.parent = parent
         self.total = total
         self.current = 0
@@ -24,14 +23,12 @@ class ProgressBarNotification(Toplevel):
         self.progress_bar.set(0)
         self.progress_bar.pack(side="right", padx=10, pady=5, fill="x", expand=True)
 
-    def update_progress(self, current):
-        print("UPDATE PROGRESS BAR")
+    def update_progress(self, current: int) -> None:
         self.current = current
         progress = self.current / self.total
         self.progress_bar.set(progress)
         if self.current >= self.total:
             self.close_notification()
 
-    def close_notification(self):
-        print("CLOSE PROGRESS BAR")
+    def close_notification(self) -> None:
         self.parent.close_notification(self)

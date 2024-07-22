@@ -16,7 +16,6 @@ from urllib.parse import urlparse, parse_qs
 class YoutubePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
-        print("YoutubePlaylistManager Loaded")
         self.html_page = requests.get(playlist_url).text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing YoutubePlaylistManager")
