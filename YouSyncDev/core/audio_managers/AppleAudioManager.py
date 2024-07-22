@@ -2,6 +2,7 @@ from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
 from pytubefix import YouTube
+import tempfile
 
 from moviepy.editor import AudioFileClip
 import requests
@@ -39,7 +40,9 @@ class AppleAudioManager(IAudioManager):
         youtube_url = self.__get_youtube_url_from_apple()
         yt = YouTube(youtube_url)
         audio_stream = yt.streams.filter(only_audio=True).first()
-        downloaded_file = audio_stream.download()
+
+        temp_dir = tempfile.gettempdir()
+        downloaded_file = audio_stream.download(output_path=temp_dir)
 
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.path_to_save_audio_with_title)

@@ -113,8 +113,6 @@ class IPlaylistManager(ABC):
         print("Updating playlist " + self.id)
         try:
             new_video_urls = self.get_video_urls()
-            for url in new_video_urls:
-                print(f"NEW URL: {url}")
             for new_video_url in new_video_urls:
                 new_video_id = self.extract_video_id(new_video_url)
                 existing_video_ids = [self.extract_video_id(video_url) for video_url in self.video_urls]

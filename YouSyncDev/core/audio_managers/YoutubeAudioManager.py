@@ -4,6 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from core.audio_managers.IAudioManager import IAudioManager
 from selenium import webdriver
+import tempfile
 
 from pytubefix import YouTube
 
@@ -48,7 +49,9 @@ class YoutubeAudioManager(IAudioManager):
     #Override Function
     def download_audio(self) -> None:
         audio_stream = self.yt.streams.filter(only_audio=True).first()
-        downloaded_file = audio_stream.download()
+
+        temp_dir = tempfile.gettempdir()
+        downloaded_file = audio_stream.download(output_path=temp_dir)
 
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.path_to_save_audio_with_title)
