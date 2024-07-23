@@ -61,20 +61,26 @@ class IAudioManager(ABC):
     def download_audio(self) -> None:
         pass
 
-    def register_metadata(self, video_title: str, title: str, artist: str, album: str, image_url: str) -> None:
+    def register_metadata(self, video_title: str | None = None, title: str | None = None, artist: str | None = None, album: str | None = None, image_url: str | None = None) -> None:
         self.video_title = video_title
-        self.title = title
-        self.artist = artist
-        self.album = album
+        if title is not None:
+            self.title = title
+        if artist is not None:
+            self.artist = artist
+        if album is not None:
+            self.album = album
         self.image_url = image_url
 
         audiofile = eyed3.load(self.path_to_save_audio_with_title)
         if audiofile.tag is None:
             audiofile.initTag()
+        if title is not None:
+            audiofile.tag.title = title
+        if album is not None:
+            audiofile.tag.album = album
+        if artist is not None:
+            audiofile.tag.artist = artist
 
-        audiofile.tag.title = self.title
-        audiofile.tag.album = self.album
-        audiofile.tag.artist = self.artist
         if self.image_url:
             response = requests.get(self.image_url)
             if response.status_code == 200:
