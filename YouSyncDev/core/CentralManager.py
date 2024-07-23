@@ -12,15 +12,20 @@ from core.audio_managers.IAudioManager import IAudioManager
 from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
 from core.playlist_managers.SpotifyPlaylistManager import SpotifyPlaylistManager
 from core.playlist_managers.ApplePlaylistManager import ApplePlaylistManager
+from core.playlist_managers.SoundCloudPlaylistManager import SoundCloudPlaylistManager
+from core.cryptography.decrypt import decrypt_client_id
+from core.cryptography.encrypt import encrypt_client_id
 
 spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
 youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
 apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
+soundcloud_pattern = re.compile(r'https://soundcloud\.com/[^/]+/(sets/[^/]+|[^/]+)?')
 
 class Platform(Enum):
     YOUTUBE = 1
     SPOTIFY = 2
     APPLE = 3
+    SOUNDCLOUD = 4
 
 
 class PlaylistData:
@@ -57,7 +62,7 @@ class CentralManager:
         self.project_path = self.get_project_path()
         self.json_filepath = os.path.join(self.project_path, json_filename)
         self.data = self.load_data_from_json()
-        self.playlist_managers: List[Union[YoutubePlaylistManager, SpotifyPlaylistManager, ApplePlaylistManager]] = []
+        self.playlist_managers: List[Union[YoutubePlaylistManager, SpotifyPlaylistManager, ApplePlaylistManager, SoundCloudPlaylistManager]] = []
         self.progress_callback = progress_callback
         self.playlist_loaded = False
 
@@ -76,19 +81,21 @@ class CentralManager:
     def load_data_from_json(self) -> Dict[str, Any]:
         if not os.path.exists(self.json_filepath):
             with open(self.json_filepath, 'w') as file:
-                json.dump({"playlists": []}, file)
-            return {"playlists": []}
+                json.dump({"playlists": [], "soundcloud_client_id": None}, file)
+            return {"playlists": [], "soundcloud_client_id": None}
         else:
             with open(self.json_filepath, 'r') as file:
                 data = json.load(file)
                 return {
-                    "playlists": [PlaylistData.from_dict(pl) for pl in data["playlists"]]
+                    "playlists": [PlaylistData.from_dict(pl) for pl in data["playlists"]],
+                    "soundcloud_client_id": data.get("soundcloud_client_id")
                 }
 
     def save_data_to_json(self) -> None:
         with open(self.json_filepath, 'w') as file:
             json.dump({
-                "playlists": [pl.to_dict() if isinstance(pl, PlaylistData) else PlaylistData.from_dict(pl).to_dict() for pl in self.data["playlists"]]
+                "playlists": [pl.to_dict() if isinstance(pl, PlaylistData) else PlaylistData.from_dict(pl).to_dict() for pl in self.data["playlists"]],
+                "soundcloud_client_id": self.data.get("soundcloud_client_id")
             }, file, indent=4)
 
     def instantiate_playlist_managers(self) -> None:
@@ -119,6 +126,8 @@ class CentralManager:
                     return SpotifyPlaylistManager(pl.url, path_to_save_audio)
                 elif apple_pattern.match(pl.url):
                     return ApplePlaylistManager(pl.url, path_to_save_audio)
+                elif soundcloud_pattern.match(pl.url):
+                    return SoundCloudPlaylistManager(pl.url, path_to_save_audio, self.decrypt_client_id())
             except Exception as e:
                 logging.debug(f"Error when creating playlist manager: {e}")
         return None
@@ -134,6 +143,9 @@ class CentralManager:
             case Platform.APPLE:
                 print("Adding new apple playlist...")
                 playlist_manager = ApplePlaylistManager(playlist_url, path_to_save_audio)
+            case Platform.SOUNDCLOUD:
+                print("Adding new soundcloud playlist...")
+                playlist_manager = SoundCloudPlaylistManager(playlist_url, path_to_save_audio, self.decrypt_client_id())
             case _:
                 print("Adding new youtube playlist...")
                 playlist_manager = YoutubePlaylistManager(playlist_url, path_to_save_audio)
@@ -187,6 +199,8 @@ class CentralManager:
                                     playlist_manager = SpotifyPlaylistManager(playlist_url, path_to_save_audio)
                                 elif apple_pattern.match(playlist_url):
                                     playlist_manager = ApplePlaylistManager(playlist_url, path_to_save_audio)
+                                elif soundcloud_pattern.match(playlist_url):
+                                    playlist_manager = SoundCloudPlaylistManager(playlist_url, path_to_save_audio, self.decrypt_client_id())
                                 else:
                                     raise Exception(f"Unknown playlist url: {playlist_url}")
                             except Exception as e:
@@ -238,7 +252,7 @@ class CentralManager:
                 playlist.last_update = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
                 self.save_data_to_json()
         except Exception as e:
-            print(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
+            print(f"Error updating playlist with ID {playlist_id}: {e}")
             logging.error(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
             return f"An error occurred while updating the playlist with ID {playlist_id}. Please check the logs for more details."
         return None
@@ -289,3 +303,20 @@ class CentralManager:
             return False
         else:
             return False
+
+    def encrypt_client_id(self, client_id: str) -> None:
+        encrypted_client_id = encrypt_client_id(client_id).decode('utf-8')
+        print(f"Client ID: {client_id}")
+        print(f"Encrypted client ID: {encrypted_client_id}")
+        self.data["soundcloud_client_id"] = encrypted_client_id
+        self.save_data_to_json()
+
+
+    def decrypt_client_id(self) -> str | None:
+        encrypted_client_id = self.data.get("soundcloud_client_id")
+        if encrypted_client_id:
+            return decrypt_client_id(encrypted_client_id.encode('utf-8'))
+        return None
+
+    def have_soundcloud_client_id(self) -> bool:
+        return "soundcloud_client_id" in self.data and self.data["soundcloud_client_id"] is not None
