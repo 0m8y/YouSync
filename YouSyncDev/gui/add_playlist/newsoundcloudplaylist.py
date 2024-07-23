@@ -1,21 +1,21 @@
 import os
-import re
 import threading
 import customtkinter
 from typing import Any
 from tkinter import filedialog
 from PIL import Image, ImageTk, ImageOps
 
-from core.CentralManager import Platform
+from core.CentralManager import Platform, CentralManager
 from gui.style import WHITE_TEXT_COLOR, HOVER_COLOR, BUTTON_COLOR
 from gui.notifications.notificationmanager import NotificationManager
+from gui.add_playlist.AddClientIdPopup import AddClientIdPopup
 
-
-class NewYoutubePlaylist(customtkinter.CTkFrame):
+class NewSoundCloudPlaylist(customtkinter.CTkFrame):
     def __init__(self, parent: customtkinter.CTk, image_path: str, **kwargs: Any):
         self.image_path: str = image_path
         self.parent_app: customtkinter.CTk = parent
         self.notification_manager: NotificationManager = self.parent_app.playlists_page.notification_manager
+        self.central_manager: CentralManager = self.parent_app.get_central_manager()
         super().__init__(parent, **kwargs)
         self.setup_ui()
 
@@ -37,16 +37,16 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
         self.back_button = customtkinter.CTkButton(self, text="", command=self.go_back, height=45, width=45, image=self.back_ctk_image, fg_color=BUTTON_COLOR, hover_color=HOVER_COLOR)
         self.back_button.place(x=30, y=30)
 
-        # Logo YouTube
-        youtube_logo = Image.open(os.path.join(self.image_path, "Youtube_logo.png"))
-        padded_image = ImageOps.expand(youtube_logo, border=0, fill='black')
-        resized_image = padded_image.resize((179, 75))
+        # Logo SoundCloud
+        soundcloud_logo = Image.open(os.path.join(self.image_path, "SoundCloud_logo.png"))
+        padded_image = ImageOps.expand(soundcloud_logo, border=0, fill='black')
+        resized_image = padded_image.resize((160, 91))
         tk_logo = ImageTk.PhotoImage(resized_image)
         self.logo_label = customtkinter.CTkLabel(self, image=tk_logo, text="")
         self.logo_label.image = tk_logo
         self.logo_label.grid(row=0, column=1, pady=(30, 40))
 
-        # Youtube URL Section
+        # SoundCloud URL Section
         self.create_label("Enter Playlist URL", 1)
         self.create_label("Make sure the playlist is not private.", 2, font_size=11, pady=(0, 0))
         self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
@@ -90,14 +90,15 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
     def save(self) -> None:
         url = self.url_entry.get()
         path = self.path_entry.get()
-        if not self.validate_youtube_url(url):
-            self.notification_manager.show_notification("Please enter a valid YouTube URL.", text_color=("red"))
-        elif not self.validate_path(path):
+        if not self.central_manager.have_soundcloud_client_id():
+            AddClientIdPopup(self, self.central_manager)
+            return
+        if not self.validate_path(path):
             self.notification_manager.show_notification("Please enter a valid path.", text_color=("red"))
         else:
             def add_and_load() -> None:
                 self.notification_manager.show_notification("Adding playlist...")
-                self.parent_app.get_central_manager().add_playlist(url, path, Platform.YOUTUBE)
+                self.parent_app.get_central_manager().add_playlist(url, path, Platform.SOUNDCLOUD)
                 self.notification_manager.show_notification("The playlist has been added!")
                 self.parent_app.playlists_page.reload()
                 self.parent_app.playlists_page.load_playlists()
@@ -105,12 +106,6 @@ class NewYoutubePlaylist(customtkinter.CTkFrame):
 
             add_thread = threading.Thread(target=add_and_load)
             add_thread.start()
-
-    def validate_youtube_url(self, url: str) -> bool:
-        youtube_regex = (
-            r'^https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|playlist\?list=)|youtu\.be/)([\w\-]+)(?:&[\w\-]+)*$'
-        )
-        return re.match(youtube_regex, url) is not None
 
     def validate_path(self, path: str) -> bool:
         if not os.path.exists(path):

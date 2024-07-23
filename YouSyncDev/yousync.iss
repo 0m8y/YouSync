@@ -17,6 +17,7 @@ PrivilegesRequired=admin
 [Files]
 Source: "core\playlists.json"; DestDir: "{app}\core"; Flags: dontcopy
 Source: "installer.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "install_ffmpeg.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "yousync.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "core\*"; DestDir: "{app}\core"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -33,6 +34,7 @@ Type: files; Name: "{app}\yousync.exe"
 Type: files; Name: "{app}\yousync.spec"
 Type: files; Name: "{app}\requirements.txt"
 Type: files; Name: "{app}\installer.bat"
+Type: files; Name: "{app}\install_ffmpeg.bat"
 Type: files; Name: "{app}\core\*.*"
 Type: files; Name: "{app}\gui\*.*"
 Type: files; Name: "{app}\build\*.*"

@@ -78,11 +78,7 @@ class HomePage(customtkinter.CTkFrame):
         self.soundcloud_button.grid(row=2, column=1, padx=(0, 50), pady=(40, 0))
 
     def soundcloud_button_event(self) -> None:
-        self.parent.playlists_page.notification_manager.show_notification(
-            "Soundcloud Comming soon...",
-            duration=NOTIFICATION_DURATION,
-            text_color=WHITE_TEXT_COLOR
-        )
+        self.parent.show_new_soundcloud_playlist()
 
     def youtube_button_event(self) -> None:
         self.parent.show_new_youtube_playlist()
