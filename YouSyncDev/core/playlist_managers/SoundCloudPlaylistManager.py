@@ -14,16 +14,14 @@ class SoundCloudPlaylistManager(IPlaylistManager):
         self.client = SoundCloud(self.client_id)
         resolved_url = self.client.resolve(playlist_url)
 
-        if not resolved_url or resolved_url.kind not in ['track', 'playlist']:
+        if not resolved_url or resolved_url.kind != 'playlist':
             print("Invalid URL")
-            raise ValueError(f'Playlist NOT FOUND: {playlist_url}, {resolved_url.kind}')
+            raise ValueError(f'Playlist NOT FOUND: {playlist_url}')
 
         self.playlist_data = resolved_url
 
         logging.debug("Initializing SoundCloudPlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, str(self.playlist_data.id))
-
-#----------------------------------------GETTER----------------------------------------#
 
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[SoundCloudAudioManager]:
@@ -53,9 +51,26 @@ class SoundCloudPlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_video_urls(self) -> List[str]:
-            return [track.permalink_url for track in self.playlist_data.tracks]
-
-# #----------------------------------Download Process-------------------------------------#
+        # Check if tracks are of type MiniTrack and resolve them to full tracks if necessary
+        full_tracks = []
+        for track in self.playlist_data.tracks:
+            if not hasattr(track, 'permalink_url'):
+                # If the track does not have a permalink_url, make an API request to get the full track details
+                track_url = f"https://api.soundcloud.com/tracks/{track.id}?client_id={self.client_id}"
+                print(track_url)
+                track_response = requests.get(track_url)
+                print(f"track response: {track_response}")
+                if track_response.status_code == 200:
+                    track_data = track_response.json()
+                    print(f"track track_data: {track_data}")
+                    track.permalink_url = track_data['permalink_url']
+                    print(f"track permalink_url: {track.permalink_url}")
+                else:
+                    logging.error(f"Failed to fetch track details for track ID {track.id}")
+                    print(f"Failed to fetch track details for track ID {track.id}")
+                    continue
+            full_tracks.append(track)
+        return [track.permalink_url for track in full_tracks]
 
     # Override Method
     def download(self) -> None:
@@ -70,5 +85,4 @@ class SoundCloudPlaylistManager(IPlaylistManager):
     # Override Function
     def extract_video_id(self, url: str) -> Optional[str]:
         track = next((track for track in self.playlist_data.tracks if track.permalink_url == url), None)
-        return str(track.id)
-
+        return str(track.id) if track else None
