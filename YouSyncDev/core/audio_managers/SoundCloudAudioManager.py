@@ -25,4 +25,8 @@ class SoundCloudAudioManager(IAudioManager):
             print("Audio is not downloaded")
             return
 
+        self.title = self.track_info.title
+        self.artist = self.track_info.user.full_name
+        self.video_title = self.track_info.title
+
         self.register_metadata(image_url=self.track_info.artwork_url)
