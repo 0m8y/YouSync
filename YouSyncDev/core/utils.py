@@ -88,7 +88,7 @@ def get_selenium_driver(url: str) -> webdriver.Chrome:
 
 def accept_spotify_cookies(driver: webdriver.Chrome) -> bool:
     try:
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))).click()
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "onetrust-reject-all-handler"))).click()
         print("accepted cookies")
         return True
     except Exception as e:
@@ -109,7 +109,6 @@ def get_selenium_driver_for_spotify(url: str) -> webdriver.Chrome:
         i += 1
         if i > 4:
             break
-
     return driver
 
 
@@ -157,7 +156,7 @@ def get_soundloud_song_link(html_content: str) -> Optional[str]:
 def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
     print("searching songs...")
     song_list = []
-    if iterator == 5:
+    if iterator == 30:
         raise Exception("Impossible to get all playlist sound url")
     songs = WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.XPATH, "//div[@data-testid='tracklist-row']")))
     song_count = 0
@@ -172,7 +171,7 @@ def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator
 def get_soundcloud_total_songs(driver: webdriver.Chrome) -> int:
     time.sleep(0.5)
     elements = WebDriverWait(driver, 10).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.encore-text.encore-text-body-small.RANLXG3qKB61Bh33I0r2'))
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.encore-text.encore-text-body-small.w1TBi3o5CTM7zW1EB3Bm'))
     )
 
     if len(elements) > 1:

@@ -237,7 +237,7 @@ class PlaylistsPage(customtkinter.CTkFrame):
                 text_color=WHITE_TEXT_COLOR
             )
             self.adding_folder = True
-            add_thread = threading.Thread(target=self.parent.add_existing_playlists, args=(folder_selected,))
+            add_thread = threading.Thread(target=self.central_manager.add_existing_playlists, args=(folder_selected,))
             add_thread.start()
             self.sync_add_button_rotation(add_thread)
 
