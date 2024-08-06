@@ -157,7 +157,7 @@ def get_soundloud_song_link(html_content: str) -> Optional[str]:
 def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
     print("searching songs...")
     song_list = []
-    if iterator == 5:
+    if iterator == 30:
         raise Exception("Impossible to get all playlist sound url")
     songs = WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.XPATH, "//div[@data-testid='tracklist-row']")))
     song_count = 0
