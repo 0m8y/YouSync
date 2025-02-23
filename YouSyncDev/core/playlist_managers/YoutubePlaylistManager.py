@@ -11,7 +11,7 @@ import logging
 import requests
 from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
-
+from pytube import Playlist
 
 class YoutubePlaylistManager(IPlaylistManager):
 
@@ -41,14 +41,9 @@ class YoutubePlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_video_urls(self) -> List[str]:
-        driver = get_selenium_driver(self.playlist_url)
-        WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located((By.XPATH, "//*[@id=\"page-manager\"]/ytd-browse/ytd-playlist-header-renderer/div/div[2]/div[1]/div"))
-        )
-        scroll_down_page(driver)
-        urls = self.__get_video_urls_from_driver(driver)
-        driver.quit()
-        return urls
+        print("Getting video URLs")
+        playlist = Playlist(self.playlist_url)
+        return playlist.video_urls
 
     def __get_video_urls_from_driver(self, driver: webdriver.Chrome) -> List[str]:
         video_links = driver.find_elements(By.CSS_SELECTOR, 'a.yt-simple-endpoint.style-scope.ytd-playlist-video-renderer')

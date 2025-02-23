@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import customtkinter
 from typing import Any
