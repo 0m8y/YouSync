@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 def check_yousync_folder(yousync_folder_path: str) -> None:
     parent_folder = os.path.dirname(yousync_folder_path)
@@ -120,16 +120,18 @@ def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator
 
 def get_soundcloud_total_songs(driver: webdriver.Chrome) -> int:
     time.sleep(0.5)
-    elements = WebDriverWait(driver, 10).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.encore-text.encore-text-body-small.w1TBi3o5CTM7zW1EB3Bm'))
-    )
 
-    if len(elements) > 1:
-        total_songs_element = elements[1]
-    else:
-        total_songs_element = elements[0]
+    try:
+        elements = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.GI8QLntnaSCh2ONX_y2c > span[data-encore-id="text"]'))
+        )
 
-    return int(total_songs_element.text.split()[0])
+        print(elements.text)  # Devrait afficher "143 titres"
+        return int(elements.text.split()[0])
+
+    except (TimeoutException, NoSuchElementException, ValueError) as e:
+        print(f"❌ Erreur lors de la récupération du nombre de morceaux : {e}")
+        return 0  # Retourne 0 en cas d'erreur
 
 
 def scroll_down_apple_page(driver: webdriver.Chrome) -> None:
