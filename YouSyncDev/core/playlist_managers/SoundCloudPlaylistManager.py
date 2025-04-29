@@ -52,12 +52,23 @@ class SoundCloudPlaylistManager(IPlaylistManager):
     # Override Method
     def get_video_urls(self) -> List[str]:
         # Check if tracks are of type MiniTrack and resolve them to full tracks if necessary
+        print("-----------------------------------------")
+        print("-----------------------------------------")
+        for track in self.playlist_data.tracks:
+            print(f"{track} - {track.id}")
+        print("-----------------------------------------")
+        print("-----------------------------------------")
+
         full_tracks = []
         for track in self.playlist_data.tracks:
             if not hasattr(track, 'permalink_url'):
                 # If the track does not have a permalink_url, make an API request to get the full track details
                 track_url = f"https://api.soundcloud.com/tracks/{track.id}?client_id={self.client_id}"
-                print(track_url)
+                # print("-----------------------------------------")
+                # print(f"track_url: {track_url}")
+                # print(f"title: {track}")
+                # print(f"id: {track.id}")
+                # print("-----------------------------------------")
                 track_response = requests.get(track_url)
                 print(f"track response: {track_response}")
                 if track_response.status_code == 200:
