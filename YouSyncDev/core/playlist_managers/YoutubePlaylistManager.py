@@ -11,7 +11,7 @@ import logging
 import requests
 from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
-from pytube import Playlist
+from pytubefix import Playlist
 
 class YoutubePlaylistManager(IPlaylistManager):
 
