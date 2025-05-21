@@ -1,20 +1,14 @@
-import json
-from bs4 import BeautifulSoup
-import requests
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 from core.audio_managers.IAudioManager import IAudioManager
-from selenium import webdriver
-import tempfile
-
-from pytubefix import YouTube
-
 from core.metadata_finder import find_title_yt
 from core.utils import extract_json_object
-from moviepy.editor import AudioFileClip
+
+from moviepy import AudioFileClip
+from bs4 import BeautifulSoup
+from pytubefix import YouTube
 from threading import Lock
+import requests
+import tempfile
+import json
 import os
 
 
