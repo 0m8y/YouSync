@@ -53,7 +53,7 @@ class YoutubeAudioManager(IAudioManager):
         # Chercher le script contenant "horizontalCardListRenderer"
         script_tags = soup.find_all("script")
         for script in script_tags:
-            if script.string and "horizontalCardListRenderer" in script.string:
+            if script.string and "horizontalCardListRenderer" in script.string and "videoAttributeViewModel" in script.string:
                 json_data = extract_json_object(script.string, "horizontalCardListRenderer")
                 if json_data:
                     break

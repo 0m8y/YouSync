@@ -1,5 +1,4 @@
 MyPlaylistTest
-__pycache__
 data
 dist/
 build/
@@ -10,4 +9,4 @@ build/
 *.json
 *.log
 txt.Txt
-Test.py
+temp_files/
