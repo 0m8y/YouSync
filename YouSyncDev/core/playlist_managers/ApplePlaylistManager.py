@@ -16,8 +16,11 @@ class ApplePlaylistManager(IPlaylistManager):
         if not is_valid_apple_music_url(playlist_url):
             raise ValueError("Lien Apple Music invalide ou non partageable.")
 
-        self.html_page = requests.get(playlist_url).text
+        response = requests.get(playlist_url)
+        response.encoding = 'utf-8'
+        self.html_page = response.text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
+
         logging.debug("Initializing ApplePlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, self.get_apple_playlist_id())
 

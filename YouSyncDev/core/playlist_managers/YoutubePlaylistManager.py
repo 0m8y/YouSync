@@ -16,7 +16,10 @@ from pytubefix import Playlist
 class YoutubePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
-        self.html_page = requests.get(playlist_url).text
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(playlist_url, headers=headers)
+        response.encoding = "utf-8"  # 🔥 essentiel pour accents
+        self.html_page = response.text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing YoutubePlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_youtube_playlist_id(playlist_url))

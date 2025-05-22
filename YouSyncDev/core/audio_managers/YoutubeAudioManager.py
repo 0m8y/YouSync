@@ -48,6 +48,7 @@ class YoutubeAudioManager(IAudioManager):
             print("❌ Erreur lors de la récupération de la page.")
             return
 
+        response.encoding = 'utf-8'
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Chercher le script contenant "horizontalCardListRenderer"

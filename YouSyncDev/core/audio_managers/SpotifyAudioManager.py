@@ -18,6 +18,7 @@ class SpotifyAudioManager(IAudioManager):
 
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
         self.html_page = requests.get(url)
+        self.html_page.encoding = 'utf-8'
         self.soup = BeautifulSoup(self.html_page.text, 'lxml')
         logging.debug(f"New SpotifyAudioManager\nURL: {url}\npath_to_save_audio: {path_to_save_audio}\ndata_filepath: {data_filepath}\n")
         super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(), lock)
