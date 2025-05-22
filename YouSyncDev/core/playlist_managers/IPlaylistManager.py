@@ -88,6 +88,8 @@ class IPlaylistManager(ABC):
             logging.debug("Cover image is already downloaded")
             return
         cover_image_url = self.extract_image()
+        print(f"Cover URL: {cover_image_url}")
+
         logging.debug(f"Cover image url: {cover_image_url}, playlist: {self.playlist_url}")
         response = requests.get(cover_image_url)
         if response.status_code == 200:

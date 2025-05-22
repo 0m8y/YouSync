@@ -30,6 +30,9 @@ class PlaylistPage(customtkinter.CTkFrame):
         self.cover_pic = os.path.join(self.image_path, image_file)
         self.last_update = self.playlist_data.last_update
         self.audio_managers: List[IAudioManager] | None = self.main_app.get_central_manager().get_audio_managers(playlist.id)
+        if self.audio_managers is None:
+            self.audio_managers = []
+
         self.song_count: int = len(self.audio_managers)
         self.on_update = False
 

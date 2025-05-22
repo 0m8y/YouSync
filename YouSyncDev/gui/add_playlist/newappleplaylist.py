@@ -47,7 +47,7 @@ class NewApplePlaylist(customtkinter.CTkFrame):
 
         # Apple URL Section
         self.create_label("Enter Playlist URL", 1)
-        self.create_label("Make sure the playlist is not private.", 2, font_size=11, pady=(0, 0))
+        self.create_label("Don't copy the link from the search bar, go to Share -> Copy link.", 2, font_size=11, pady=(0, 0))
         self.url_entry = customtkinter.CTkEntry(self, placeholder_text="Playlist URL", width=600, height=45, border_width=0, fg_color=BUTTON_COLOR)
         self.url_entry.grid(row=3, column=1, padx=(0, 0), pady=10, sticky="ew")
 
@@ -89,19 +89,26 @@ class NewApplePlaylist(customtkinter.CTkFrame):
     def save(self) -> None:
         url = self.url_entry.get()
         path = self.path_entry.get()
+
         if not self.validate_path(path):
             self.notification_manager.show_notification("Please enter a valid path.", text_color=("red"))
-        else:
-            def add_and_load() -> None:
+            return
+
+        def add_and_load() -> None:
+            try:
                 self.notification_manager.show_notification("Adding playlist...")
                 self.parent_app.get_central_manager().add_playlist(url, path, Platform.APPLE)
                 self.notification_manager.show_notification("The playlist has been added!")
                 self.parent_app.playlists_page.reload()
                 self.parent_app.playlists_page.load_playlists()
                 self.clear_entries()
+            except Exception as e:
+                print(f"[ERROR] Failed to add playlist: {e}")
+                self.notification_manager.show_notification("❌ Unable to add playlist. Be sure to copy the link from the Share button.", text_color=("red"))
 
-            add_thread = threading.Thread(target=add_and_load)
-            add_thread.start()
+        add_thread = threading.Thread(target=add_and_load)
+        add_thread.start()
+
 
     def validate_path(self, path: str) -> bool:
         if not os.path.exists(path):

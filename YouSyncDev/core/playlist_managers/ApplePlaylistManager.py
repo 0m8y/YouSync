@@ -1,17 +1,21 @@
-import logging
-import requests
+from core.utils import get_selenium_driver_for_apple, scroll_down_apple_page, is_valid_apple_music_url
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
-from concurrent.futures import ThreadPoolExecutor
 from core.audio_managers.AppleAudioManager import AppleAudioManager
-from core.utils import get_selenium_driver_for_apple, scroll_down_apple_page
+
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 from bs4 import BeautifulSoup
+import requests
+import logging
 import re
 
 
 class ApplePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
+        if not is_valid_apple_music_url(playlist_url):
+            raise ValueError("Lien Apple Music invalide ou non partageable.")
+
         self.html_page = requests.get(playlist_url).text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
         logging.debug("Initializing ApplePlaylistManager")

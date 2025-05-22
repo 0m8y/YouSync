@@ -1,6 +1,7 @@
 import re
 import os
 import time
+import requests
 import platform
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -79,7 +80,7 @@ def get_selenium_driver_for_spotify(url: str) -> webdriver.Chrome:
 
 def get_selenium_driver_for_apple(url: str) -> webdriver.Chrome:
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
 
     driver = webdriver.Chrome(options=chrome_options)
@@ -153,6 +154,33 @@ def scroll_down_apple_page(driver: webdriver.Chrome) -> None:
                 break
 
         last_height = new_height
+
+def is_valid_apple_music_url(url: str) -> bool:
+    # Refuser les liens de bibliothèque privée
+    if "/library/" in url:
+        return False
+
+    # Vérifier qu'il s'agit bien d'une playlist ou d'un album
+    if not re.search(r'/playlist/|/album/', url):
+        return False
+
+    try:
+        response = requests.get(url, timeout=5, headers={
+            "User-Agent": "Mozilla/5.0"
+        })
+        if response.status_code != 200:
+            return False
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Vérifie la présence de métadonnées spécifiques à Apple Music
+        if soup.find('meta', attrs={'name': 'apple:content_id'}) or soup.find('meta', property='og:title'):
+            return True
+
+    except Exception as e:
+        print(f"Erreur lors de la validation du lien Apple Music : {e}")
+
+    return False
 
 def extract_json_object(text, key):
     """

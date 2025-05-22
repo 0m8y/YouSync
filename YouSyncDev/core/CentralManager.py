@@ -15,7 +15,7 @@ from core.playlist_managers.ApplePlaylistManager import ApplePlaylistManager
 
 spotify_pattern = re.compile(r'https://open\.spotify\.com/.*')
 youtube_pattern = re.compile(r'https://(www\.)?(youtube\.com|youtu\.be)/.*')
-apple_pattern = re.compile(r'https://music\.apple\.com/[a-z]{2}/(album|playlist)/[a-zA-Z0-9\-%.]+/[a-zA-Z0-9\-%.]+')
+apple_pattern = re.compile(r'^https://music\.apple\.com/[a-z]{2}/(album|playlist)/.+')
 
 class Platform(Enum):
     YOUTUBE = 1
@@ -256,6 +256,8 @@ class CentralManager:
         for pl in self.playlist_managers:
             if pl.id == playlist_id:
                 return pl.get_audio_managers()
+        print(f"Playlist {playlist_id} not found in CentralManager.")
+        logging.error(f"Playlist {playlist_id} not found in CentralManager.")
         return None
 
     def delete_playlist(self, playlist_id: str) -> None:

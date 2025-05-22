@@ -10,3 +10,4 @@ build/
 *.log
 txt.Txt
 temp_files/
+__pycache__/
