@@ -7,6 +7,8 @@ build/
 *.mp4
 
 *.json
+!launch.json
+!settings.json
 *.log
 txt.Txt
 temp_files/

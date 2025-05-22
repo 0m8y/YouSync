@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug all tests in file",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "YouSyncDev/tests/core/audio_managers/test_IAudioManager.py",
+        "YouSyncDev/tests/core/audio_managers/test_YoutubeAudioManager.py",
+        "YouSyncDev/tests/core/audio_managers/test_AppleAudioManager.py"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}
