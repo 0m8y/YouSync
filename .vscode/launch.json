@@ -9,7 +9,9 @@
       "args": [
         "YouSyncDev/tests/core/audio_managers/test_IAudioManager.py",
         "YouSyncDev/tests/core/audio_managers/test_YoutubeAudioManager.py",
-        "YouSyncDev/tests/core/audio_managers/test_AppleAudioManager.py"
+        "YouSyncDev/tests/core/audio_managers/test_AppleAudioManager.py",
+        "YouSyncDev/tests/core/audio_managers/test_SpotifyAudioManager.py",
+        "YouSyncDev/tests/core/playlist_managers/test_IPlaylistManager.py"
       ],
       "console": "integratedTerminal",
       "justMyCode": false

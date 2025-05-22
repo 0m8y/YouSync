@@ -80,7 +80,7 @@ def get_selenium_driver_for_spotify(url: str) -> webdriver.Chrome:
 
 def get_selenium_driver_for_apple(url: str) -> webdriver.Chrome:
     chrome_options = Options()
-    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
 
     driver = webdriver.Chrome(options=chrome_options)

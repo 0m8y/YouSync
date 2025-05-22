@@ -12,8 +12,7 @@ import re
 class SpotifyPlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(playlist_url, headers=headers)
+        response = requests.get(playlist_url)
         response.encoding = "utf-8"
         self.html_page = response.text
         self.soup = BeautifulSoup(self.html_page, 'html.parser')
