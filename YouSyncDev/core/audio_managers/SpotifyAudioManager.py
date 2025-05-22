@@ -21,7 +21,7 @@ class SpotifyAudioManager(IAudioManager):
         self.html_page.encoding = 'utf-8'
         self.soup = BeautifulSoup(self.html_page.text, 'lxml')
         logging.debug(f"New SpotifyAudioManager\nURL: {url}\npath_to_save_audio: {path_to_save_audio}\ndata_filepath: {data_filepath}\n")
-        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(), lock)
+        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(url, True), lock)
 
 #----------------------------------Download Process-------------------------------------#
 
@@ -60,19 +60,25 @@ class SpotifyAudioManager(IAudioManager):
             print("Audio is not downloaded")
             return
 
-        video_title = self.__extract_title()
+        title = self.__extract_title(self.url)
         artist = self.__extract_artist()
         album = self.__extract_album()
         image_url = self.extract_image()
         print("Image URL: " + image_url)
-        self.register_metadata(video_title, video_title, artist, album, image_url)
+        self.register_metadata(self.video_title, title, artist, album, image_url)
 
-    def __extract_title(self) -> str:
-        title = self.soup.find('meta', property='og:title')['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
-        return title
+    def __extract_title(self, url, file_mode: bool = False) -> str:
+        raw_title = self.soup.find('meta', property='og:title')['content'].strip()
+
+        if file_mode:
+            cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
+        else:
+            cleaned_title = raw_title
+
+        return cleaned_title or f"track_{self.__extract_spotify_id(url)}"
 
     def __extract_artist(self) -> str:
-        return self.soup.find('meta', attrs={'name': 'music:musician_description'})['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+        return self.soup.find('meta', attrs={'name': 'music:musician_description'})['content'].strip()
 
     def __extract_album(self) -> str:
         try:
@@ -88,7 +94,7 @@ class SpotifyAudioManager(IAudioManager):
             if not title_meta:
                 return ""
 
-            return title_meta['content'].replace("|", "").replace(":", "").replace("\"", "").replace("/", "").replace("\\", "").replace("?", "").replace("*", "").replace("<", "").replace(">", "")
+            return title_meta['content'].strip()
         except Exception as e:
             print(f"An error occurred: {e}")
             return ""
