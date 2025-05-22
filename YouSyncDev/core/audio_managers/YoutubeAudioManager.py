@@ -1,5 +1,4 @@
 from core.audio_managers.IAudioManager import IAudioManager
-from core.metadata_finder import find_title_yt
 from core.utils import extract_json_object
 
 from moviepy import AudioFileClip
@@ -16,7 +15,7 @@ class YoutubeAudioManager(IAudioManager):
 
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
         self.yt = YouTube(url)
-        super().__init__(url, path_to_save_audio, data_filepath, self.yt.video_id, find_title_yt(self.yt), lock)
+        super().__init__(url, path_to_save_audio, data_filepath, self.yt.video_id, self.__extract_title(True), lock)
 
 #----------------------------------Download Process-------------------------------------#
 
@@ -82,3 +81,17 @@ class YoutubeAudioManager(IAudioManager):
         except (KeyError, json.JSONDecodeError) as e:
             print(f"⚠️ Erreur lors de l'extraction des métadonnées : {e}")
             return None
+
+    def __extract_title(self, file_mode: bool = False):
+        raw_title = self.yt.title
+
+        if file_mode:
+            # Supprime les caractères interdits dans les noms de fichiers
+            cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
+        else:
+            cleaned_title = raw_title.strip()
+
+        if not cleaned_title:
+            return f"track_{self.yt.video_id}"
+
+        return cleaned_title

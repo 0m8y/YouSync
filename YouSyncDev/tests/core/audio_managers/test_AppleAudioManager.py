@@ -5,9 +5,9 @@ from core.audio_managers.AppleAudioManager import AppleAudioManager
 import eyed3
 
 NORMAL_SONG_URL         = "https://music.apple.com/us/song/run/1766991039"
-SPECIAL_CHAR_TITLE_URL  = "https://music.apple.com/us/song/1726637267"
-SPECIAL_CHAR_ALBUM_URL  = "https://music.apple.com/fr/song/lapprentie-sorci%C3%A8re/1596501827"
-SPECIAL_CHAR_ARTIST_URL = "https://music.apple.com/fr/song/obito/1604595119"
+URL_SPECIAL_CHAR_TITLE  = "https://music.apple.com/us/song/1726637267"
+URL_SPECIAL_CHAR_ALBUM  = "https://music.apple.com/fr/song/lapprentie-sorci%C3%A8re/1596501827"
+URL_SPECIAL_CHAR_ARTIST = "https://music.apple.com/fr/song/obito/1604595119"
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def temp_path():
     os.makedirs(path, exist_ok=True)
     return path
 
-def test_apple_audio_download_normal(temp_path):
+def test_download_normal(temp_path):
     manager = None
     try:
         json_file = os.path.join(temp_path, "test_AppleAudioManager.json")
@@ -42,13 +42,13 @@ def test_apple_audio_download_normal(temp_path):
         if manager:
             manager.delete()
 
-def test_apple_audio_title_special_chars(temp_path):
+def test_download_title_special_chars(temp_path):
     manager = None
     try:
         json_file = os.path.join(temp_path, "test_AppleAudioManager.json")
 
         manager = AppleAudioManager(
-            url=SPECIAL_CHAR_TITLE_URL,
+            url=URL_SPECIAL_CHAR_TITLE,
             path_to_save_audio=temp_path,
             data_filepath=json_file,
             lock=Lock()
@@ -68,13 +68,13 @@ def test_apple_audio_title_special_chars(temp_path):
         if manager:
             manager.delete()
 
-def test_apple_audio_album_special_chars(temp_path):
+def test_download_album_special_chars(temp_path):
     manager = None
     try:
         json_file = os.path.join(temp_path, "test_AppleAudioManager.json")
 
         manager = AppleAudioManager(
-            url=SPECIAL_CHAR_ALBUM_URL,
+            url=URL_SPECIAL_CHAR_ALBUM,
             path_to_save_audio=temp_path,
             data_filepath=json_file,
             lock=Lock()
@@ -98,13 +98,13 @@ def test_apple_audio_album_special_chars(temp_path):
             manager.delete()
 
 
-def test_apple_audio_artist_special_chars(temp_path):
+def test_download_artist_special_chars(temp_path):
     manager = None
     try:
         json_file = os.path.join(temp_path, "test_AppleAudioManager.json")
 
         manager = AppleAudioManager(
-            url=SPECIAL_CHAR_ARTIST_URL,
+            url=URL_SPECIAL_CHAR_ARTIST,
             path_to_save_audio=temp_path,
             data_filepath=json_file,
             lock=Lock()
