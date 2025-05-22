@@ -1,3 +1,4 @@
+import shutil
 from core.playlist_managers.YoutubePlaylistManager import YoutubePlaylistManager
 from threading import Lock
 import pytest
@@ -16,10 +17,11 @@ def test_youtube_playlist_manager_real(temp_path):
     manager = None
     try:
         manager = YoutubePlaylistManager(YOUTUBE_PLAYLIST_URL, temp_path)
+        manager.update()
         audio_managers = manager.get_audio_managers()
 
         # ✅ Vérifie que 5 morceaux sont bien chargés (1 URL est invalide)
-        assert len(audio_managers) == 5 or len(audio_managers) == 6  # tolérance pour l'URL invalide
+        assert len(audio_managers) == 5 # tolérance pour l'URL invalide
 
         # ✅ Lancer le téléchargement complet
         manager.download()
@@ -40,3 +42,8 @@ def test_youtube_playlist_manager_real(temp_path):
                     am.delete()
                 except Exception as e:
                     print(f"Erreur lors du delete: {e}")
+        if os.path.exists(temp_path):
+            try:
+                shutil.rmtree(temp_path)
+            except Exception as e:
+                print(f"Erreur lors de la suppression du dossier {temp_path}: {e}")

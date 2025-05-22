@@ -34,7 +34,17 @@ class IPlaylistManager(ABC):
                 fichier.write("[]")
             self.__initialize_playlist_data()
         else:
-            self.__get_video_urls_from_json()
+            try:
+                with open(self.playlist_data_filepath, 'r') as f:
+                    content = json.load(f)
+                if isinstance(content, dict):
+                    self.__get_video_urls_from_json()
+                else:
+                    logging.warning(f"Le fichier {self.playlist_data_filepath} est vide ou invalide, réinitialisation...")
+                    self.__initialize_playlist_data()
+            except json.JSONDecodeError:
+                logging.warning(f"Le fichier {self.playlist_data_filepath} est corrompu, réinitialisation...")
+                self.__initialize_playlist_data()
 
         try:
             with ThreadPoolExecutor(max_workers=10) as executor:
