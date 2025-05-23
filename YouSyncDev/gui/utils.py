@@ -1,4 +1,5 @@
-from PIL import Image, ImageDraw, ImageTk
+import os
+from PIL import Image, ImageDraw, ImageTk, UnidentifiedImageError
 
 def add_round_corners(im: Image.Image, rad: int) -> Image.Image:
     circle = Image.new('L', (rad * 2, rad * 2), 0)
@@ -35,3 +36,13 @@ def truncate_string(s: str | None, max_length: int) -> str | None:
     if len(s) > max_length:
         return s[:max_length - 3] + "..."
     return s
+
+def is_image_valid(path: str) -> bool:
+    if not os.path.exists(path):
+        return False
+    try:
+        with Image.open(path) as img:
+            img.verify()  # Vérifie l'intégrité sans charger tout
+        return True
+    except (UnidentifiedImageError, OSError):
+        return False

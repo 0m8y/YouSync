@@ -8,7 +8,7 @@ from typing import Any
 
 from core.CentralManager import PlaylistData
 
-from gui.utils import create_image, truncate_string
+from gui.utils import create_image, is_image_valid, truncate_string
 from gui.playlists.playlistpage import PlaylistPage
 from gui.style import WHITE_TEXT_COLOR, NOTIFICATION_DURATION
 from gui.notifications.notificationmanager import NotificationManager
@@ -42,7 +42,7 @@ class PlaylistTile:
         self.cover_canvas.pack()
 
         self.cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
-        if not os.path.exists(self.cover_filename):
+        if not is_image_valid(self.cover_filename):
             self.cover_filename = os.path.join(self.image_path, "default_preview.png")
         self.cover_img = create_image(self.cover_filename, 180, 140)
         self.cover_image_id = self.cover_canvas.create_image(90, 70, image=self.cover_img)
@@ -74,7 +74,7 @@ class PlaylistTile:
         new_cover_filename = os.path.join(os.path.dirname(self.playlist_data.path), self.playlist_data.id + ".jpg")
         if self.cover_filename == new_cover_filename:
             return
-        if not os.path.exists(new_cover_filename):
+        if not is_image_valid(new_cover_filename):
             self.cover_filename = os.path.join(self.image_path, "default_preview.png")
         else:
             self.cover_filename = new_cover_filename

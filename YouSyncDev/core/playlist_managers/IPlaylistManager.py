@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from abc import ABC, abstractmethod
 from threading import Lock
+
+from PIL import UnidentifiedImageError, Image
 from core.utils import check_yousync_folder
 import logging
 import requests
@@ -90,11 +92,26 @@ class IPlaylistManager(ABC):
         for audio in audios:
             self.video_urls.append(audio["url"])
 
+    def is_image_valid(self, path: str) -> bool:
+        if not os.path.exists(path):
+            return False
+        try:
+            with Image.open(path) as img:
+                img.verify()
+            return True
+        except (UnidentifiedImageError, OSError):
+            try:
+                os.remove(path)
+                print(f"Image corrompue supprimée : {path}")
+            except Exception as e:
+                print(f"Erreur lors de la suppression de l'image : {e}")
+            return False
+
     def download_cover_image(self) -> None:
         logging.debug("Downloading cover image...")
         yousync_path = os.path.join(self.path_to_save_audio, '.yousync')
         image_path = os.path.join(yousync_path, f"{self.id}.jpg")
-        if os.path.exists(image_path):
+        if self.is_image_valid(image_path):
             logging.debug("Cover image is already downloaded")
             return
         cover_image_url = self.extract_image()

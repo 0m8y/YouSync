@@ -15,6 +15,14 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Run YouSync",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/YouSyncDev/yousync.py",
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ]
 }

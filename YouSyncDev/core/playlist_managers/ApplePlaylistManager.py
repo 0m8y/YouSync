@@ -1,3 +1,4 @@
+import os
 from core.utils import get_selenium_driver_for_apple, scroll_down_apple_page, is_valid_apple_music_url
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from core.audio_managers.AppleAudioManager import AppleAudioManager
@@ -5,6 +6,8 @@ from core.audio_managers.AppleAudioManager import AppleAudioManager
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 from bs4 import BeautifulSoup
+from io import BytesIO
+from PIL import Image
 import requests
 import logging
 import re
@@ -48,7 +51,45 @@ class ApplePlaylistManager(IPlaylistManager):
 
     # Override Function
     def extract_image(self) -> str:
-        return self.soup.find('meta', property='og:image')['content']
+        image_url = self.soup.find('meta', property='og:image')['content']
+
+        # Vérifie si l'image est valide
+        try:
+            response = requests.get(image_url, stream=True, timeout=5)
+            if response.status_code != 200 or 'apple-music-60.png' in image_url:
+                raise ValueError("Image invalide détectée")
+        except Exception as e:
+            print(f"⚠️ Image invalide détectée, tentative de fallback : {e}")
+            return self.generate_collage_from_first_songs()
+
+        return image_url
+
+    def generate_collage_from_first_songs(self) -> str:
+        urls = self.get_video_urls()[:4]
+        images = []
+
+        for url in urls:
+            try:
+                audio_manager = AppleAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
+                audio_manager.download()
+                response = requests.get(audio_manager.extract_image(), timeout=5)
+                img = Image.open(BytesIO(response.content)).resize((180, 180))
+                images.append(img)
+            except Exception as e:
+                print(f"Erreur de téléchargement d'image : {e}")
+
+        if len(images) == 0:
+            return os.path.join(self.path_to_save_audio, "default_preview.png")
+
+        collage = Image.new('RGB', (360, 360))
+        positions = [(0,0), (180,0), (0,180), (180,180)]
+        for i, img in enumerate(images):
+            collage.paste(img, positions[i])
+
+        collage_path = os.path.join(self.path_to_save_audio, ".yousync", f"{self.id}_collage.jpg")
+        collage.save(collage_path)
+        return collage_path
+
 
     # Override Method
     def get_video_urls(self) -> List[str]:
@@ -57,11 +98,12 @@ class ApplePlaylistManager(IPlaylistManager):
         scroll_down_apple_page(driver)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        song_links = soup.select('a[data-testid="track-seo-link"]')
-        urls = {link['href'] for link in song_links}
+        song_links = [link['href'] for link in soup.select('a[data-testid="click-action"]')
+                    if link.has_attr('href') and "/song/" in link['href']]
+
 
         driver.quit()
-        return urls
+        return song_links
 
 #----------------------------------Download Process-------------------------------------#
 
