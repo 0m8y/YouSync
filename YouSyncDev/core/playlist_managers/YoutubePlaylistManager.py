@@ -1,3 +1,4 @@
+from yt_dlp import YoutubeDL
 from selenium.webdriver.support import expected_conditions as EC
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from selenium.webdriver.support.ui import WebDriverWait
@@ -12,6 +13,7 @@ import requests
 from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
 from pytubefix import Playlist
+from pytubefix.exceptions import VideoUnavailable
 
 class YoutubePlaylistManager(IPlaylistManager):
 
@@ -43,9 +45,24 @@ class YoutubePlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_video_urls(self) -> List[str]:
-        print("Getting video URLs")
-        playlist = Playlist(self.playlist_url)
-        return playlist.video_urls
+        print("🔗 Fast fetching playlist with yt_dlp (flat)...")
+        ydl_opts = {
+            'quiet': True,
+            'extract_flat': True,
+            'skip_download': True,
+        }
+
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                result = ydl.extract_info(self.playlist_url, download=False)
+                entries = result.get("entries", [])
+                urls = [entry['url'] for entry in entries if 'url' in entry]
+
+            print(f"🎥 {len(urls)} videos found (flat mode).")
+            return urls
+        except Exception as e:
+            print(f"❌ yt_dlp extract_flat error: {e}")
+            return []
 
     def __get_video_urls_from_driver(self, driver: webdriver.Chrome) -> List[str]:
         video_links = driver.find_elements(By.CSS_SELECTOR, 'a.yt-simple-endpoint.style-scope.ytd-playlist-video-renderer')
@@ -71,12 +88,17 @@ class YoutubePlaylistManager(IPlaylistManager):
     # Override Method
     def download(self) -> None:
         def download_audio(audio_manager: YoutubeAudioManager) -> None:
-            audio_manager.download()
+            try:
+                audio_manager.download()
+            except VideoUnavailable as e:
+                print(f"❌ Vidéo non disponible : {e}")
+            except Exception as e:
+                print(f"❌ Erreur lors du téléchargement : {e}")
+
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(download_audio, audio_manager) for audio_manager in self.audio_managers]
             for future in futures:
                 future.result()
-        logging.debug("Downloading videos ...")
 
     # Override Function
     def extract_video_id(self, url: str) -> Optional[str]:

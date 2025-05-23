@@ -34,8 +34,9 @@ class YoutubeAudioManager(IAudioManager):
     #Override Function
     def add_metadata(self) -> None:
         print("Adding Metada...")
+
         if not self.is_downloaded or self.metadata_updated:
-            print("Audio is not downloaded")
+            print("Audio is not downloaded or already updated")
             return
 
         headers = {
@@ -52,24 +53,29 @@ class YoutubeAudioManager(IAudioManager):
 
         # Chercher le script contenant "horizontalCardListRenderer"
         script_tags = soup.find_all("script")
+        json_data = None
         for script in script_tags:
             if script.string and "horizontalCardListRenderer" in script.string and "videoAttributeViewModel" in script.string:
                 json_data = extract_json_object(script.string, "horizontalCardListRenderer")
                 if json_data:
                     break
-        else:
+
+        if not json_data:
             self.register_metadata(self.video_title, "", "", "", self.yt.thumbnail_url)
             return
 
-        # Essayer de parser le JSON extrait
         try:
             data = json.loads(json_data)
-            music_data = data["horizontalCardListRenderer"]["cards"][0]["videoAttributeViewModel"]
+            cards = data.get("horizontalCardListRenderer", {}).get("cards", [])
+            if not cards:
+                raise KeyError("cards")
 
-            title = music_data["title"]
-            artist = music_data["subtitle"]
-            album = music_data["secondarySubtitle"]["content"]
-            image_url = music_data["image"]["sources"][0]["url"]
+            music_data = cards[0].get("videoAttributeViewModel", {})
+            title = music_data.get("title", "")
+            artist = music_data.get("subtitle", "")
+            album = music_data.get("secondarySubtitle", {}).get("content", "")
+            image_sources = music_data.get("image", {}).get("sources", [])
+            image_url = image_sources[0].get("url", "") if image_sources else self.yt.thumbnail_url
 
             print(f"**Titre**   : {title}")
             print(f"**Artiste** : {artist}")
@@ -77,10 +83,11 @@ class YoutubeAudioManager(IAudioManager):
             print(f"**Image**   : {image_url}")
 
             self.register_metadata(self.video_title, title, artist, album, image_url)
+            print(f"[{self.video_title}] Metadata updated? {self.metadata_updated}")
 
         except (KeyError, json.JSONDecodeError) as e:
-            print(f"⚠️ Erreur lors de l'extraction des métadonnées : {e}")
-            return None
+            print(f"⚠️ Erreur lors de l'extraction des métadonnées pour {self.url}: {e}")
+            self.register_metadata(self.video_title, "", "", "", self.yt.thumbnail_url)
 
     def __extract_title(self, file_mode: bool = False):
         raw_title = self.yt.title
