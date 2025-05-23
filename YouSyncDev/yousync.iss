@@ -18,7 +18,7 @@ PrivilegesRequired=admin
 Source: "yousync.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\gui\assets\images\yousync.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 
 [UninstallDelete]
 Type: files; Name: "{app}\yousync.exe"
