@@ -1,3 +1,5 @@
+import json
+from core.utils import get_cached_video_title
 from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
@@ -14,15 +16,23 @@ import time
 class AppleAudioManager(IAudioManager):
 
     def __init__(self, url, path_to_save_audio, data_filepath, lock):
+        self.url = url
+        self.soup = None
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url, True)
+
+        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_apple_id(url), cached_title, lock)
+
+#----------------------------------Download Process-------------------------------------#
+
+    def __ensure_soup_loaded(self):
+        if self.soup:
+            return
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
-        self.html_page = requests.get(url, headers=headers, timeout=10)
-        self.html_page.encoding = 'utf-8'
-        self.soup = BeautifulSoup(self.html_page.text, 'lxml')
-        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_apple_id(url), self.__extract_title(url, True), lock)
-
-#----------------------------------Download Process-------------------------------------#
+        response = requests.get(self.url, headers=headers, timeout=10)
+        response.encoding = 'utf-8'
+        self.soup = BeautifulSoup(response.text, 'lxml')
 
     def __extract_apple_id(self, apple_url):
         # Définir une expression régulière pour extraire l'ID de la piste
@@ -82,6 +92,7 @@ class AppleAudioManager(IAudioManager):
         self.register_metadata(self.video_title, title, artist, album, image_url)
 
     def __extract_title(self, url, file_mode: bool = False):
+        self.__ensure_soup_loaded()
         raw_title = self.soup.find('meta', attrs={'name': 'apple:title'})['content']
         if file_mode:
             cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
@@ -94,10 +105,12 @@ class AppleAudioManager(IAudioManager):
         return cleaned_title
 
     def __extract_artist(self):
+        self.__ensure_soup_loaded()
         artist_elements = self.soup.select('span.song-subtitles-item span a[data-testid="click-action"]')
         return ", ".join([artist.get_text(strip=True) for artist in artist_elements])
 
     def __extract_album(self):
+        self.__ensure_soup_loaded()
         album_element = self.soup.select_one('span[data-testid="song-subtitle-album"] span[data-testid="song-subtitle-album-link"] a[data-testid="click-action"]')
         if album_element:
             return album_element.get_text(strip=True)
@@ -105,4 +118,5 @@ class AppleAudioManager(IAudioManager):
             return None
 
     def extract_image(self):
+        self.__ensure_soup_loaded()
         return self.soup.find('meta', attrs={'name': 'twitter:image'})['content']

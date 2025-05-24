@@ -18,14 +18,18 @@ from pytubefix.exceptions import VideoUnavailable
 class YoutubePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
-        response = requests.get(playlist_url)
-        response.encoding = "utf-8"  # 🔥 essentiel pour accents
-        self.html_page = response.text
-        self.soup = BeautifulSoup(self.html_page, 'html.parser')
+        self.soup = None
         logging.debug("Initializing YoutubePlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_youtube_playlist_id(playlist_url))
 
 #----------------------------------------GETTER----------------------------------------#
+
+    def __ensure_soup_loaded(self):
+        if self.soup is not None:
+            return
+        response = requests.get(self.playlist_url)
+        response.encoding = 'utf-8'
+        self.soup = BeautifulSoup(response.text, 'lxml')
 
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[YoutubeAudioManager]:
@@ -39,6 +43,7 @@ class YoutubePlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_playlist_title(self) -> str:
+        self.__ensure_soup_loaded()
         title = self.soup.find('meta', property='og:title')['content']
         print(f"title found: {title}")
         return title
@@ -108,6 +113,7 @@ class YoutubePlaylistManager(IPlaylistManager):
 
     # Override Function
     def extract_image(self) -> str:
+        self.__ensure_soup_loaded()
         title = self.soup.find('meta', property='og:image')['content']
         print(f"Extracting image: {title}")
         return title

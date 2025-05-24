@@ -1,3 +1,4 @@
+import json
 import re
 import os
 import time
@@ -211,3 +212,50 @@ def extract_json_object(text, key):
 
     json_text = text[json_start:json_end]
     return json_text
+
+def get_cached_video_title(url, data_filepath):
+    if os.path.exists(data_filepath):
+        try:
+            with open(data_filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for audio in data.get("audios", []):
+                    if audio.get("url") == url:
+                        return audio.get("video_title", "")
+        except Exception as e:
+            print(f"⚠️ Erreur lecture JSON pour vidéo title : {e}")
+    return None
+
+def get_cached_video_id(url: str, data_filepath: str) -> Optional[str]:
+    if os.path.exists(data_filepath):
+        try:
+            with open(data_filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for audio in data.get("audios", []):
+                    if audio.get("url") == url:
+                        return audio.get("id", None)
+        except Exception as e:
+            print(f"⚠️ Erreur lecture JSON pour video_id : {e}")
+    return None
+
+def get_cached_playlist_title(playlist_url: str, data_filepath: str) -> Optional[str]:
+    if not os.path.exists(data_filepath):
+        return None
+    try:
+        with open(data_filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("title", None)
+    except Exception as e:
+        print(f"⚠️ Erreur lecture JSON pour playlist title : {e}")
+        return None
+
+def get_cached_playlist_id(playlist_url: str, data_filepath: str) -> Optional[str]:
+    if not os.path.exists(data_filepath):
+        return None
+    try:
+        with open(data_filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("id", None)
+    except Exception as e:
+        print(f"⚠️ Erreur lecture JSON pour playlist id : {e}")
+        return None
+

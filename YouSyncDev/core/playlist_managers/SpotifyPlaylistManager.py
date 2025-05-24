@@ -12,14 +12,18 @@ import re
 class SpotifyPlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
-        response = requests.get(playlist_url)
-        response.encoding = "utf-8"
-        self.html_page = response.text
-        self.soup = BeautifulSoup(self.html_page, 'html.parser')
+        self.soup = None
         logging.debug("Initializing SpotifyPlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_spotify_playlist_id(playlist_url))
 
 #----------------------------------------GETTER----------------------------------------#
+
+    def __ensure_soup_loaded(self):
+        if self.soup is not None:
+            return
+        response = requests.get(self.playlist_url)
+        response.encoding = 'utf-8'
+        self.soup = BeautifulSoup(response.text, 'lxml')
 
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[SpotifyAudioManager]:
@@ -36,9 +40,11 @@ class SpotifyPlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_playlist_title(self) -> str:
+        self.__ensure_soup_loaded()
         return self.soup.find('meta', property='og:title')['content']
 
     def extract_image(self) -> str:
+        self.__ensure_soup_loaded()
         return self.soup.find('meta', property='og:image')['content']
 
     # Override Method

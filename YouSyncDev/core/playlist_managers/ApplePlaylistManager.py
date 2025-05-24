@@ -1,5 +1,5 @@
 import os
-from core.utils import get_selenium_driver_for_apple, scroll_down_apple_page, is_valid_apple_music_url
+from core.utils import get_cached_playlist_id, get_selenium_driver_for_apple, scroll_down_apple_page, is_valid_apple_music_url
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from core.audio_managers.AppleAudioManager import AppleAudioManager
 
@@ -16,20 +16,23 @@ import re
 class ApplePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
+        self.soup = None
         if not is_valid_apple_music_url(playlist_url):
             raise ValueError("Lien Apple Music invalide ou non partageable.")
-
-        response = requests.get(playlist_url)
-        response.encoding = 'utf-8'
-        self.html_page = response.text
-        self.soup = BeautifulSoup(self.html_page, 'html.parser')
 
         logging.debug("Initializing ApplePlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, self.get_apple_playlist_id())
 
 #----------------------------------------GETTER----------------------------------------#
+    def __ensure_soup_loaded(self):
+        if self.soup is not None:
+            return
+        response = requests.get(self.playlist_url)
+        response.encoding = 'utf-8'
+        self.soup = BeautifulSoup(response.text, 'lxml')
 
     def get_apple_playlist_id(self):
+        self.__ensure_soup_loaded()
         return self.soup.find('meta', attrs={'name': 'apple:content_id'})['content'].replace('-', '').replace('.', '')
 
     # Override Method
@@ -47,10 +50,12 @@ class ApplePlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_playlist_title(self) -> str:
+        self.__ensure_soup_loaded()
         return self.soup.find('meta', attrs={'name': 'apple:title'})['content']
 
     # Override Function
     def extract_image(self) -> str:
+        self.__ensure_soup_loaded()
         image_url = self.soup.find('meta', property='og:image')['content']
 
         # Vérifie si l'image est valide

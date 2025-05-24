@@ -1,5 +1,5 @@
 from core.audio_managers.IAudioManager import IAudioManager
-from core.utils import extract_json_object
+from core.utils import extract_json_object, get_cached_video_title, get_cached_video_id
 
 from moviepy import AudioFileClip
 from bs4 import BeautifulSoup
@@ -14,13 +14,26 @@ import os
 class YoutubeAudioManager(IAudioManager):
 
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
-        self.yt = YouTube(url)
-        super().__init__(url, path_to_save_audio, data_filepath, self.yt.video_id, self.__extract_title(True), lock)
+        self.url = url
+        self.yt = None
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(True)
+        video_id = get_cached_video_id(url, data_filepath) or self.__get_video_id()
+        super().__init__(url, path_to_save_audio, data_filepath, video_id, cached_title, lock)
 
 #----------------------------------Download Process-------------------------------------#
 
+    def __ensure_youtube_loaded(self):
+        if self.yt:
+            return
+        self.yt = YouTube(self.url)
+
+    def __get_video_id(self):
+        self.__ensure_youtube_loaded()
+        return self.yt.video_id
+
     #Override Function
     def download_audio(self) -> None:
+        self.__ensure_youtube_loaded()
         audio_stream = self.yt.streams.filter(only_audio=True).first()
 
         temp_dir = tempfile.gettempdir()
@@ -33,6 +46,8 @@ class YoutubeAudioManager(IAudioManager):
 
     #Override Function
     def add_metadata(self) -> None:
+        self.__ensure_youtube_loaded()
+
         print("Adding Metada...")
 
         if not self.is_downloaded or self.metadata_updated:
@@ -90,6 +105,8 @@ class YoutubeAudioManager(IAudioManager):
             self.register_metadata(self.video_title, "", "", "", self.yt.thumbnail_url)
 
     def __extract_title(self, file_mode: bool = False):
+        self.__ensure_youtube_loaded()
+
         raw_title = self.yt.title
 
         if file_mode:

@@ -48,7 +48,7 @@ def test_apple_playlist_manager_real(temp_path):
                 print(f"Folder deletion error {temp_path}: {e}")
 
 
-# @pytest.mark.skip(reason="To run only for advanced testing")
+@pytest.mark.skip(reason="To run only for advanced testing")
 def test_apple_playlist_manager_300_songs(temp_path):
     manager = None
     try:

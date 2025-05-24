@@ -1,3 +1,5 @@
+import json
+from core.utils import get_cached_video_title
 from core.audio_managers.IAudioManager import IAudioManager
 
 from youtube_search import YoutubeSearch
@@ -17,13 +19,25 @@ import logging
 class SpotifyAudioManager(IAudioManager):
 
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
-        self.html_page = requests.get(url)
-        self.html_page.encoding = 'utf-8'
-        self.soup = BeautifulSoup(self.html_page.text, 'lxml')
+        self.url = url
+        self.soup = None
+
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url, True)
+
         logging.debug(f"New SpotifyAudioManager\nURL: {url}\npath_to_save_audio: {path_to_save_audio}\ndata_filepath: {data_filepath}\n")
-        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), self.__extract_title(url, True), lock)
+        super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), cached_title, lock)
 
 #----------------------------------Download Process-------------------------------------#
+
+    def __ensure_soup_loaded(self):
+        if self.soup is not None:
+            return
+        headers = {
+            "User-Agent": "... (comme avant)"
+        }
+        response = requests.get(self.url, headers=headers)
+        response.encoding = 'utf-8'
+        self.soup = BeautifulSoup(response.text, 'lxml')
 
     def __extract_spotify_id(self, spotify_url: str) -> Optional[str]:
         pattern = r"track/([a-zA-Z0-9]+)"
@@ -34,11 +48,21 @@ class SpotifyAudioManager(IAudioManager):
         return None
 
     def __get_youtube_url_from_spotify(self) -> str:
-        title = self.soup.find('meta', property='og:title')['content']
-        artist = self.soup.find('meta', attrs={'name': 'music:musician_description'})['content']
-        video_search = str(title + " " + artist).replace(" ", "+")
-        result = str(list(YoutubeSearch(str(video_search), max_results=1).to_dict())[-1]['url_suffix'])
-        return result
+        self.__ensure_soup_loaded()
+
+        title = self.soup.find('meta', property='og:title')
+        artist = self.soup.find('meta', attrs={'name': 'music:musician_description'})
+
+        if not title or not artist:
+            raise ValueError("Impossible d'extraire le titre ou l'artiste depuis Spotify")
+
+        video_search = str(title['content'] + " " + artist['content']).replace(" ", "+")
+        results = list(YoutubeSearch(video_search, max_results=1).to_dict())
+
+        if not results:
+            raise ValueError(f"Aucun résultat YouTube trouvé pour : {video_search}")
+
+        return "https://www.youtube.com" + results[0]['url_suffix']
 
     #Override Function
     def download_audio(self) -> None:
@@ -68,6 +92,8 @@ class SpotifyAudioManager(IAudioManager):
         self.register_metadata(self.video_title, title, artist, album, image_url)
 
     def __extract_title(self, url, file_mode: bool = False) -> str:
+        self.__ensure_soup_loaded()
+
         raw_title = self.soup.find('meta', property='og:title')['content'].strip()
 
         if file_mode:
@@ -78,9 +104,13 @@ class SpotifyAudioManager(IAudioManager):
         return cleaned_title or f"track_{self.__extract_spotify_id(url)}"
 
     def __extract_artist(self) -> str:
+        self.__ensure_soup_loaded()
+
         return self.soup.find('meta', attrs={'name': 'music:musician_description'})['content'].strip()
 
     def __extract_album(self) -> str:
+        self.__ensure_soup_loaded()
+
         try:
             album_link_meta = self.soup.find('meta', attrs={'name': 'music:album'})
             if not album_link_meta:
@@ -100,4 +130,6 @@ class SpotifyAudioManager(IAudioManager):
             return ""
 
     def extract_image(self) -> str:
+        self.__ensure_soup_loaded()
+
         return self.soup.find('meta', attrs={'name': 'twitter:image'})['content']
