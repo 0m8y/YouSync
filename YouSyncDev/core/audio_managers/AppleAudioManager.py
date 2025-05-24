@@ -14,7 +14,10 @@ import time
 class AppleAudioManager(IAudioManager):
 
     def __init__(self, url, path_to_save_audio, data_filepath, lock):
-        self.html_page = requests.get(url)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+        self.html_page = requests.get(url, headers=headers, timeout=10)
         self.html_page.encoding = 'utf-8'
         self.soup = BeautifulSoup(self.html_page.text, 'lxml')
         super().__init__(url, path_to_save_audio, data_filepath, self.__extract_apple_id(url), self.__extract_title(url, True), lock)
@@ -53,12 +56,15 @@ class AppleAudioManager(IAudioManager):
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                os.remove(downloaded_file)
-                print(f"File {downloaded_file} removed successfully")
+                if os.path.exists(downloaded_file):
+                    os.remove(downloaded_file)
+                    print(f"File {downloaded_file} removed successfully")
+                else:
+                    print(f"File {downloaded_file} not found at deletion time")
                 break
             except PermissionError:
                 print(f"PermissionError: retrying to remove the file {downloaded_file} (attempt {attempt + 1}/{max_retries})")
-                time.sleep(1)  # Wait a bit before retrying
+                time.sleep(1)
         else:
             print(f"Failed to remove the file {downloaded_file} after {max_retries} attempts")
 
