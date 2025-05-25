@@ -80,15 +80,14 @@ def test_spotify_playlist_manager_300_songs(temp_path):
             assert audio.tag is not None
 
     finally:
-        print("finally")
-        # if manager:
-        #     for am in manager.get_audio_managers():
-        #         try:
-        #             am.delete()
-        #         except Exception as e:
-        #             print(f"Erreur lors du delete: {e}")
-        # if os.path.exists(temp_path):
-        #     try:
-        #         shutil.rmtree(temp_path)
-        #     except Exception as e:
-        #         print(f"Erreur lors de la suppression du dossier {temp_path}: {e}")
+        if manager:
+            for am in manager.get_audio_managers():
+                try:
+                    am.delete()
+                except Exception as e:
+                    print(f"Erreur lors du delete: {e}")
+        if os.path.exists(temp_path):
+            try:
+                shutil.rmtree(temp_path)
+            except Exception as e:
+                print(f"Erreur lors de la suppression du dossier {temp_path}: {e}")
