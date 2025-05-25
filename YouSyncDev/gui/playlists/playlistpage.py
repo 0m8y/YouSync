@@ -169,7 +169,7 @@ class PlaylistPage(customtkinter.CTkFrame):
             )
             return
 
-        audio_managers_not_downloaded = [am for am in self.audio_managers if (not am.is_downloaded or not am.metadata_updated) and not self.songframe_by_id[am.id].on_progress]
+        audio_managers_not_downloaded = [am for am in self.audio_managers if (not am.metadata.is_downloaded or not am.metadata.metadata_updated) and not self.songframe_by_id[am.id].on_progress]
 
         if not audio_managers_not_downloaded:
             self.notification_manager.show_notification(

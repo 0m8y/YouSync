@@ -25,7 +25,7 @@ class SongFrame:
         self.track_number_label = customtkinter.CTkLabel(self.song_frame, text=f"{track_number}.", anchor="w", fg_color="transparent", text_color=HOVER_COLOR)
         self.track_number_label.grid(row=0, column=0, sticky="w", padx=(10, 5))
 
-        song_title_label = customtkinter.CTkLabel(self.song_frame, text=f"{self.audio_manager.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
+        song_title_label = customtkinter.CTkLabel(self.song_frame, text=f"{self.audio_manager.metadata.video_title}", anchor="w", fg_color="transparent", text_color=WHITE_TEXT_COLOR)
         song_title_label.grid(row=0, column=1, sticky="w", padx=(5, 10))
 
         self.notification_manager: NotificationManager = self.playlist_page.notification_manager
@@ -36,10 +36,10 @@ class SongFrame:
         if hasattr(self, 'icon_label'):
             self.icon_label.after(1, self.icon_label.destroy)
 
-        if not self.audio_manager.is_downloaded:
+        if not self.audio_manager.metadata.is_downloaded:
             icon_ctk_image = customtkinter.CTkImage(self.red_image, size=(15, 15))
             tip = "Music not downloaded, click to download."
-        elif not self.audio_manager.metadata_updated:
+        elif not self.audio_manager.metadata.metadata_updated:
             icon_ctk_image = customtkinter.CTkImage(self.orange_image, size=(15, 15))
             tip = "Metadata not downloaded, click to download."
         else:
@@ -50,13 +50,13 @@ class SongFrame:
         self.icon_label.image = icon_ctk_image
         self.icon_label.grid(row=0, column=2, sticky="e", padx=(10, 10))
         ToolTip(self.icon_label, tip)
-        if not self.audio_manager.is_downloaded or not self.audio_manager.metadata_updated:
+        if not self.audio_manager.metadata.is_downloaded or not self.audio_manager.metadata.metadata_updated:
             self.icon_label.bind("<Button-1>", lambda event: self.download_music())
 
     def download_music(self):
         if self.on_progress:
             self.notification_manager.show_notification(
-                f"{self.audio_manager.video_title} is already in progress!",
+                f"{self.audio_manager.metadata.video_title} is already in progress!",
                 duration=NOTIFICATION_DURATION,
                 text_color=WHITE_TEXT_COLOR
             )
@@ -71,13 +71,13 @@ class SongFrame:
     def _download(self):
         self.on_progress = True
         self.notification_manager.show_notification(
-            f"Downloading {self.audio_manager.video_title}...",
+            f"Downloading {self.audio_manager.metadata.video_title}...",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )
         self.download()
         self.notification_manager.show_notification(
-            f"{self.audio_manager.video_title} is downloaded!",
+            f"{self.audio_manager.metadata.video_title} is downloaded!",
             duration=NOTIFICATION_DURATION,
             text_color=WHITE_TEXT_COLOR
         )

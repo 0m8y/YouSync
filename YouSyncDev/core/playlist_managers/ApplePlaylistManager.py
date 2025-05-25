@@ -16,6 +16,7 @@ import re
 class ApplePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
+        self.playlist_url = playlist_url
         self.soup = None
         if not is_valid_apple_music_url(playlist_url):
             raise ValueError("Lien Apple Music invalide ou non partageable.")

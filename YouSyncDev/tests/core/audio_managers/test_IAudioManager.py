@@ -44,7 +44,7 @@ def test_delete_audio_manager(dummy_audio_manager):
 
             dummy_audio_manager.delete()
 
-            mock_remove.assert_called_once_with(dummy_audio_manager.path_to_save_audio_with_title)
+            mock_remove.assert_called_once_with(dummy_audio_manager.metadata.path_to_save_audio_with_title)
 
             handle = mock_file()
             written_content = "".join(call.args[0] for call in handle.write.call_args_list)
@@ -83,7 +83,7 @@ def test_delete_audio_manager_file_exists_but_no_json_entry(dummy_audio_manager)
 
             dummy_audio_manager.delete()
 
-            mock_remove.assert_called_once_with(dummy_audio_manager.path_to_save_audio_with_title)
+            mock_remove.assert_called_once_with(dummy_audio_manager.metadata.path_to_save_audio_with_title)
 
             handle = mock_file()
             written = "".join(call.args[0] for call in handle.write.call_args_list)
@@ -113,16 +113,15 @@ def test_delete_audio_manager_nothing_to_delete(dummy_audio_manager):
 
 def test_update_data(dummy_audio_manager):
     try:
-        # Simuler une entrée JSON existante avec valeurs initiales
-        initial_data = {"audios": [dummy_audio_manager.to_dict()]}
+        initial_data = {"audios": [dummy_audio_manager.metadata.to_dict()]}
 
-        # On modifie les attributs de l'instance
-        dummy_audio_manager.title = "Titre mis à jour"
-        dummy_audio_manager.artist = "Artiste mis à jour"
-        dummy_audio_manager.album = "Album mis à jour"
-        dummy_audio_manager.image_url = "https://example.com/image.jpg"
-        dummy_audio_manager.is_downloaded = True
-        dummy_audio_manager.metadata_updated = True
+        # Mise à jour des attributs dans self.metadata
+        dummy_audio_manager.metadata.title = "Titre mis à jour"
+        dummy_audio_manager.metadata.artist = "Artiste mis à jour"
+        dummy_audio_manager.metadata.album = "Album mis à jour"
+        dummy_audio_manager.metadata.image_url = "https://example.com/image.jpg"
+        dummy_audio_manager.metadata.is_downloaded = True
+        dummy_audio_manager.metadata.metadata_updated = True
 
         mocked_open = mock_open(read_data=json.dumps(initial_data))
 

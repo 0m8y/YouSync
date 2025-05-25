@@ -73,13 +73,13 @@ class SpotifyAudioManager(IAudioManager):
         downloaded_file = audio_stream.download(output_path=temp_dir)
 
         audio_clip = AudioFileClip(downloaded_file)
-        audio_clip.write_audiofile(self.path_to_save_audio_with_title)
+        audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
         audio_clip.close()
         os.remove(downloaded_file)
 
     #Override Function
     def add_metadata(self) -> None:
-        if not self.is_downloaded or self.metadata_updated:
+        if not self.metadata.is_downloaded or self.metadata.metadata_updated:
             print("Audio is not downloaded")
             return
 

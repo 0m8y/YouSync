@@ -30,8 +30,8 @@ def test_download_normal(temp_path):
 
         manager.download()
 
-        assert os.path.exists(manager.path_to_save_audio_with_title)
-        audio = eyed3.load(manager.path_to_save_audio_with_title)
+        assert os.path.exists(manager.metadata.path_to_save_audio_with_title)
+        audio = eyed3.load(manager.metadata.path_to_save_audio_with_title)
         assert audio is not None
         assert audio.tag is not None
 
@@ -56,13 +56,13 @@ def test_download_title_special_chars(temp_path):
 
         manager.download()
 
-        assert os.path.exists(manager.path_to_save_audio_with_title)
-        audio = eyed3.load(manager.path_to_save_audio_with_title)
+        assert os.path.exists(manager.metadata.path_to_save_audio_with_title)
+        audio = eyed3.load(manager.metadata.path_to_save_audio_with_title)
         assert audio is not None
         assert audio.tag is not None
 
-        assert manager.title == "* * * * *"
-        assert manager.video_title == "track_0Lm01zD4ApfOubhJhd8nOo"
+        assert manager.metadata.title == "* * * * *"
+        assert manager.metadata.video_title == "track_0Lm01zD4ApfOubhJhd8nOo"
         assert audio.tag.title == "* * * * *"
     finally:
         if manager:
@@ -82,13 +82,13 @@ def test_download_album_special_chars(temp_path):
 
         manager.download()
 
-        assert os.path.exists(manager.path_to_save_audio_with_title)
-        audio = eyed3.load(manager.path_to_save_audio_with_title)
+        assert os.path.exists(manager.metadata.path_to_save_audio_with_title)
+        audio = eyed3.load(manager.metadata.path_to_save_audio_with_title)
         assert audio is not None
         assert audio.tag is not None
 
-        assert manager.title == "L'apprentie sorcière !"
-        assert manager.video_title == "L'apprentie sorcière !"
+        assert manager.metadata.title == "L'apprentie sorcière !"
+        assert manager.metadata.video_title == "L'apprentie sorcière !"
         assert audio.tag.title == "L'apprentie sorcière !"
         assert audio.tag.album == "!"
 
@@ -112,8 +112,8 @@ def test_download_artist_special_chars(temp_path):
 
         manager.download()
 
-        assert os.path.exists(manager.path_to_save_audio_with_title)
-        audio = eyed3.load(manager.path_to_save_audio_with_title)
+        assert os.path.exists(manager.metadata.path_to_save_audio_with_title)
+        audio = eyed3.load(manager.metadata.path_to_save_audio_with_title)
         assert audio is not None
         assert audio.tag is not None
 

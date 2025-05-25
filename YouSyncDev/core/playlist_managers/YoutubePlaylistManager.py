@@ -18,6 +18,7 @@ from pytubefix.exceptions import VideoUnavailable
 class YoutubePlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
+        self.playlist_url = playlist_url
         self.soup = None
         logging.debug("Initializing YoutubePlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_youtube_playlist_id(playlist_url))

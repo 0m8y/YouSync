@@ -29,12 +29,12 @@ def test_spotify_playlist_manager_real(temp_path):
 
         for am in audio_managers:
             # Vérifie que le fichier existe
-            assert os.path.exists(am.path_to_save_audio_with_title)
+            assert os.path.exists(am.metadata.path_to_save_audio_with_title)
 
-            assert am.is_downloaded == True
-            assert am.metadata_updated == True
+            assert am.metadata.is_downloaded == True
+            assert am.metadata.metadata_updated == True
             # Vérifie que l'audio contient bien un tag
-            audio = eyed3.load(am.path_to_save_audio_with_title)
+            audio = eyed3.load(am.metadata.path_to_save_audio_with_title)
             assert audio is not None
             assert audio.tag is not None
 
@@ -68,14 +68,14 @@ def test_spotify_playlist_manager_300_songs(temp_path):
 
         for am in audio_managers:
             # Vérifie que le fichier existe
-            if not am.is_downloaded:
+            if not am.metadata.is_downloaded:
                 print(f"⚠️ video unavailable {am.get_url()}")
                 continue
-            assert os.path.exists(am.path_to_save_audio_with_title)
+            assert os.path.exists(am.metadata.path_to_save_audio_with_title)
 
-            assert am.metadata_updated == True
+            assert am.metadata.metadata_updated == True
             # Vérifie que l'audio contient bien un tag
-            audio = eyed3.load(am.path_to_save_audio_with_title)
+            audio = eyed3.load(am.metadata.path_to_save_audio_with_title)
             assert audio is not None
             assert audio.tag is not None
 

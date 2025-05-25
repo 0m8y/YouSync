@@ -58,7 +58,7 @@ class AppleAudioManager(IAudioManager):
         downloaded_file = audio_stream.download(output_path=temp_dir)
 
         audio_clip = AudioFileClip(downloaded_file)
-        audio_clip.write_audiofile(self.path_to_save_audio_with_title)
+        audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
         audio_clip.close()
 
         # Attempt to remove the file with a retry mechanism
@@ -79,7 +79,7 @@ class AppleAudioManager(IAudioManager):
 
     #Override Function
     def add_metadata(self):
-        if self.is_downloaded is False or self.metadata_updated is True:
+        if self.metadata.is_downloaded is False or self.metadata.metadata_updated is True:
             print("Audio is not downloaded")
             return
 

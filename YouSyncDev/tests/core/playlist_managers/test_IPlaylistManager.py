@@ -1,16 +1,19 @@
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from core.audio_managers.IAudioManager import IAudioManager
+from core.storage.AudioMetadata import AudioMetadata
+from core.storage.AudioDataStore import AudioDataStore
 
 import os
 import json
 import shutil
 import pytest
 from typing import List
+from threading import Lock
 from unittest.mock import patch
 
 def cleanup_dirs(*dirs):
     for path in dirs:
-        if os.path.isdir(path):  # vérifie que c’est un dossier
+        if os.path.isdir(path):
             try:
                 shutil.rmtree(path)
             except Exception as e:
@@ -18,26 +21,26 @@ def cleanup_dirs(*dirs):
 
 class DummyAudioManager(IAudioManager):
     def __init__(self, url, path_to_save_audio, data_filepath, lock, id, video_title):
-        self.url = url
-        self.path_to_save_audio = path_to_save_audio
-        self.data_filepath = data_filepath
         self.lock = lock
+        self.url = url
         self.id = id
         self.video_title = video_title
-        self.path_to_save_audio_with_title = os.path.join(path_to_save_audio, video_title + ".mp3")
-        self.is_downloaded = False
-        self.metadata_updated = False
-        self.title = video_title
-        self.artist = ""
-        self.album = ""
-        self.image_url = ""
+        self.path_to_save_audio = path_to_save_audio
+        self.data_store = AudioDataStore(data_filepath, lock)
+        self.metadata = AudioMetadata(
+            url=url,
+            path_to_save_audio_with_title=os.path.join(self.path_to_save_audio, f"{self.video_title}.mp3"),
+            video_title=video_title,
+            title=video_title, artist="", album="", image_url=""
+        )
+        self.data_store.update_audio(self.metadata)
 
     def download_audio(self): pass
     def add_metadata(self): pass
     def update_path(self, new_path, old_path): self.path_to_save_audio = new_path
-    def update_data(self): pass
+    def update_data(self): self.data_store.update_audio(self.metadata)
     def get_url(self): return self.url
-    def delete(self): pass
+    def delete(self): self.data_store.remove_audio(self.url)
 
 class DummyPlaylistManager(IPlaylistManager):
     def new_audio_manager(self, url: str) -> IAudioManager:
@@ -71,8 +74,8 @@ def temp_path():
     os.makedirs(path, exist_ok=True)
     return path
 
-
 # Tests
+
 def test_playlist_json_created(temp_path):
     try:
         manager = DummyPlaylistManager("https://playlist.test", temp_path, "dummy_playlist_id")

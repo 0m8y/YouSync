@@ -40,7 +40,7 @@ class YoutubeAudioManager(IAudioManager):
         downloaded_file = audio_stream.download(output_path=temp_dir)
 
         audio_clip = AudioFileClip(downloaded_file)
-        audio_clip.write_audiofile(self.path_to_save_audio_with_title)
+        audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
         audio_clip.close()
         os.remove(downloaded_file)
 
@@ -50,7 +50,7 @@ class YoutubeAudioManager(IAudioManager):
 
         print("Adding Metada...")
 
-        if not self.is_downloaded or self.metadata_updated:
+        if not self.metadata.is_downloaded or self.metadata.metadata_updated:
             print("Audio is not downloaded or already updated")
             return
 
@@ -98,7 +98,7 @@ class YoutubeAudioManager(IAudioManager):
             print(f"**Image**   : {image_url}")
 
             self.register_metadata(self.video_title, title, artist, album, image_url)
-            print(f"[{self.video_title}] Metadata updated? {self.metadata_updated}")
+            print(f"[{self.video_title}] Metadata updated? {self.metadata.metadata_updated}")
 
         except (KeyError, json.JSONDecodeError) as e:
             print(f"⚠️ Erreur lors de l'extraction des métadonnées pour {self.url}: {e}")
