@@ -1,10 +1,11 @@
 import os
-import json
 import requests
 import eyed3.id3
 from threading import Lock
-from typing import Dict, List, Any
+from typing import Dict, Any
 from abc import ABC, abstractmethod
+
+from core.storage.AudioDataStore import AudioDataStore
 
 
 class IAudioManager(ABC):
@@ -12,11 +13,12 @@ class IAudioManager(ABC):
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, id: str, video_title: str, lock: Lock) -> None:
         self.lock = lock
         self.url = url
-        self.path_to_save_audio = path_to_save_audio
-        self.data_filepath = data_filepath
         self.id = id
         self.video_title = video_title
-        self.path_to_save_audio_with_title = f"{self.path_to_save_audio}\\{self.video_title}.mp3"
+        self.path_to_save_audio = path_to_save_audio
+        self.path_to_save_audio_with_title = os.path.join(self.path_to_save_audio, f"{self.video_title}.mp3")
+
+        self.data_store = AudioDataStore(data_filepath, lock)
 
         self.is_downloaded = False
         self.metadata_updated = False
@@ -25,22 +27,12 @@ class IAudioManager(ABC):
         self.album: str = ""
         self.image_url: str = ""
 
-        data = self.load_data()
-        if not any(item['url'] == self.url for item in data):
-            data.append(self.to_dict())
-            self.save_data_to_file(data)
+        data = self.data_store.load_all()
+        audio_data = next((item for item in data if item['url'] == self.url), None)
+        if audio_data:
+            self.__from_dict(audio_data)
         else:
-            for item in data:
-                if item['url'] == self.url:
-                    self.__from_dict(item)
-
-    def load_data(self) -> List[Dict[str, Any]]:
-        try:
-            with open(self.data_filepath, 'r') as file:
-                data = json.load(file)
-            return data.get("audios", [])
-        except FileNotFoundError:
-            return []
+            self.data_store.update_audio(self.to_dict())
 
     def download(self) -> None:
         if self.is_downloaded:
@@ -93,81 +85,18 @@ class IAudioManager(ABC):
 #----------------------------------------UPDATE-----------------------------------------#
 
     def update_data(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['is_downloaded'] = self.is_downloaded
-                item['metadata_updated'] = self.metadata_updated
-                item['video_title'] = self.video_title
-                item['title'] = self.title
-                item['artist'] = self.artist
-                item['album'] = self.album
-                item['image_url'] = self.image_url
-                break
-        self.save_data_to_file(data)
+        self.data_store.update_audio(self.to_dict())
 
     def __update_is_downloaded(self) -> None:
-        data = self.load_data()
-        updated = False
-        for item in data:
-            if item['url'] == self.url and not item['is_downloaded']:
-                item['is_downloaded'] = self.is_downloaded
-                updated = True
-                break
-        if updated:
-            self.save_data_to_file(data)
-
-    def __update_metadata_updated(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['metadata_updated'] = self.metadata_updated
-
-    def __update_video_title(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['video_title'] = self.video_title
-
-    def __update_title(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['title'] = self.title
-
-    def __update_artist(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['artist'] = self.artist
-
-    def __update_album(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['album'] = self.album
-
-    def __update_image_url(self) -> None:
-        data = self.load_data()
-        for item in data:
-            if item['url'] == self.url:
-                item['image_url'] = self.image_url
-
-    def __delete_audio_file(self) -> None:
-        if os.path.exists(self.path_to_save_audio_with_title):
-            os.remove(self.path_to_save_audio_with_title)
-            print(f"Fichier audio supprimé : {self.path_to_save_audio_with_title}")
-
-    def __delete_audio_info(self) -> None:
-        audios_data = self.load_data()
-        audios_data = [audio for audio in audios_data if audio['url'] != self.url]
-        self.save_data_to_file(audios_data)
-        print("Informations audio supprimées du fichier JSON.")
+        self.is_downloaded = True
+        self.data_store.update_audio(self.to_dict())
 
     def delete(self) -> None:
         try:
-            self.__delete_audio_file()
-            self.__delete_audio_info()
+            if os.path.exists(self.path_to_save_audio_with_title):
+                os.remove(self.path_to_save_audio_with_title)
+                print(f"Fichier audio supprimé : {self.path_to_save_audio_with_title}")
+            self.data_store.remove_audio(self.url)
         except Exception as e:
             print(f"Erreur lors de la suppression de l'audio : {e}")
 
@@ -177,40 +106,22 @@ class IAudioManager(ABC):
             new_path_to_save_audio_with_title = os.path.join(new_path, f"{self.video_title}.mp3")
             self.path_to_save_audio = new_path
             self.path_to_save_audio_with_title = new_path_to_save_audio_with_title
-
-            data = self.load_data()
-            for item in data:
-                if item['url'] == self.url:
-                    item['path_to_save_audio_with_title'] = self.path_to_save_audio_with_title
-                    break
-            self.save_data_to_file(data)
-
-#-------------------------------------Load & Save--------------------------------------#
-
-    def save_data_to_file(self, audios_data: List[Dict[str, Any]]) -> None:
-        with self.lock:
-            try:
-                with open(self.data_filepath, 'r') as file:
-                    data = json.load(file)
-            except FileNotFoundError:
-                data = {}
-
-            data["audios"] = audios_data
-
-            with open(self.data_filepath, 'w') as file:
-                json.dump(data, file, indent=4)
+            updated_dict = self.to_dict()
+            updated_dict["path_to_save_audio_with_title"] = self.path_to_save_audio_with_title
+            self.data_store.update_audio(updated_dict)
 
 #-----------------------------------------DICT------------------------------------------#
 
+
     def __from_dict(self, data: Dict[str, Any]) -> None:
-        self.path_to_save_audio_with_title = data["path_to_save_audio_with_title"]
-        self.is_downloaded = data["is_downloaded"]
-        self.metadata_updated = data["metadata_updated"]
-        self.video_title = data["video_title"]
-        self.title = data["title"]
-        self.artist = data["artist"]
-        self.album = data["album"]
-        self.image_url = data["image_url"]
+        self.path_to_save_audio_with_title = data.get("path_to_save_audio_with_title", self.path_to_save_audio_with_title)
+        self.is_downloaded = data.get("is_downloaded", False)
+        self.metadata_updated = data.get("metadata_updated", False)
+        self.video_title = data.get("video_title", self.video_title)
+        self.title = data.get("title", "")
+        self.artist = data.get("artist", "")
+        self.album = data.get("album", "")
+        self.image_url = data.get("image_url", "")
 
     def to_dict(self) -> Dict[str, Any]:
         return {

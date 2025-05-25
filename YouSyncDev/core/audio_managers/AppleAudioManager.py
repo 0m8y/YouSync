@@ -1,4 +1,3 @@
-import json
 from core.utils import get_cached_video_title
 from core.audio_managers.IAudioManager import IAudioManager
 
