@@ -88,7 +88,7 @@ class SpotifyAudioManager(IAudioManager):
         album = self.__extract_album()
         image_url = self.extract_image()
         print("Image URL: " + image_url)
-        self.register_metadata(self.video_title, title, artist, album, image_url)
+        self.register_metadata(title, artist, album, image_url)
 
     def __extract_title(self, url, file_mode: bool = False) -> str:
         self.__ensure_soup_loaded()
@@ -111,19 +111,13 @@ class SpotifyAudioManager(IAudioManager):
         self.__ensure_soup_loaded()
 
         try:
-            album_link_meta = self.soup.find('meta', attrs={'name': 'music:album'})
-            if not album_link_meta:
+            info_block = self.soup.find("div", {"data-testid": "entity-bottom-section"})
+            spans = [s.text for s in info_block.find_all("span")]
+            album = spans[0]
+
+            if not album:
                 return ""
-
-            album_link = album_link_meta['content']
-            html_page = requests.get(album_link)
-            soup = BeautifulSoup(html_page.text, 'lxml')
-
-            title_meta = soup.find('meta', property='og:title')
-            if not title_meta:
-                return ""
-
-            return title_meta['content'].strip()
+            return album
         except Exception as e:
             print(f"An error occurred: {e}")
             return ""

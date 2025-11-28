@@ -54,29 +54,40 @@ class YoutubeAudioManager(IAudioManager):
             print("Audio is not downloaded or already updated")
             return
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-
-        response = requests.get(self.url, headers=headers)
-        if response.status_code != 200:
-            print("❌ Erreur lors de la récupération de la page.")
-            return
-
-        response.encoding = 'utf-8'
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # Chercher le script contenant "horizontalCardListRenderer"
-        script_tags = soup.find_all("script")
         json_data = None
-        for script in script_tags:
-            if script.string and "horizontalCardListRenderer" in script.string and "videoAttributeViewModel" in script.string:
-                json_data = extract_json_object(script.string, "horizontalCardListRenderer")
-                if json_data:
-                    break
+
+        for attempt in range(10):
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+
+            response = requests.get(self.url, headers=headers)
+            if response.status_code != 200:
+                print("❌ Erreur lors de la récupération de la page.")
+                continue
+
+            response.encoding = 'utf-8'
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            # Chercher le script contenant "horizontalCardListRenderer"
+            script_tags = soup.find_all("script")
+            for script in script_tags:
+                if script.string and "horizontalCardListRenderer" in script.string and "videoAttributeViewModel" in script.string:
+                    json_data = extract_json_object(script.string, "horizontalCardListRenderer")
+                    if json_data:
+                        break
+
+            if not json_data:
+                break
+            data = json.loads(json_data)
+            cards = data.get("horizontalCardListRenderer", {}).get("cards", [])
+            if cards:
+                break
+
+            print("⚠️ No JSON found, retrying...")
 
         if not json_data:
-            self.register_metadata(self.video_title, "", "", "", self.yt.thumbnail_url)
+            self.register_metadata("", "", "", self.yt.thumbnail_url)
             return
 
         try:
@@ -97,12 +108,12 @@ class YoutubeAudioManager(IAudioManager):
             print(f"**Album**   : {album}")
             print(f"**Image**   : {image_url}")
 
-            self.register_metadata(self.video_title, title, artist, album, image_url)
-            print(f"[{self.video_title}] Metadata updated? {self.metadata.metadata_updated}")
+            self.register_metadata(title, artist, album, image_url)
+            print(f"[{self.metadata.video_title}] Metadata updated? {self.metadata.metadata_updated}")
 
         except (KeyError, json.JSONDecodeError) as e:
             print(f"⚠️ Erreur lors de l'extraction des métadonnées pour {self.url}: {e}")
-            self.register_metadata(self.video_title, "", "", "", self.yt.thumbnail_url)
+            self.register_metadata("", "", "", self.yt.thumbnail_url)
 
     def __extract_title(self, file_mode: bool = False):
         self.__ensure_youtube_loaded()

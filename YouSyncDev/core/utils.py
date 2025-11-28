@@ -105,7 +105,7 @@ def get_soundloud_song_link(html_content: str) -> Optional[str]:
     return None
 
 
-def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
+def get_spotify_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
     print("searching songs...")
     song_list = []
     if iterator == 30:
@@ -117,15 +117,15 @@ def get_soundcloud_url_list(driver: webdriver.Chrome, total_songs: int, iterator
         song_list.append(get_soundloud_song_link(song.get_attribute('innerHTML')))
         if song_count >= total_songs:
             return song_list
-    return get_soundcloud_url_list(driver, total_songs, iterator + 1)
+    return get_spotify_url_list(driver, total_songs, iterator + 1)
 
 
-def get_soundcloud_total_songs(driver: webdriver.Chrome) -> int:
+def get_spotify_total_songs(driver: webdriver.Chrome) -> int:
     time.sleep(0.5)
 
     try:
         elements = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.GI8QLntnaSCh2ONX_y2c > span[data-encore-id="text"]'))
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.eJbkaBhDfq9NfV5_QS8V > span[data-encore-id="text"]'))
         )
 
         print(elements.text)  # Devrait afficher "143 titres"

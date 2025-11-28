@@ -47,7 +47,7 @@ class DummyPlaylistManager(IPlaylistManager):
         return DummyAudioManager(
             url=url,
             path_to_save_audio=self.path_to_save_audio,
-            data_filepath=self.playlist_data_filepath,
+            data_filepath=self.store.filepath,
             lock=self.lock,
             id="dummy_id",
             video_title="dummy_video"
@@ -79,8 +79,8 @@ def temp_path():
 def test_playlist_json_created(temp_path):
     try:
         manager = DummyPlaylistManager("https://playlist.test", temp_path, "dummy_playlist_id")
-        assert os.path.exists(manager.playlist_data_filepath)
-        with open(manager.playlist_data_filepath) as f:
+        assert os.path.exists(manager.store.filepath)
+        with open(manager.store.filepath) as f:
             data = json.load(f)
             assert data["title"] == "Dummy Playlist"
     finally:
@@ -95,24 +95,10 @@ def test_update_path(temp_path):
         manager = DummyPlaylistManager("https://playlist.test", old_path, "dummy_id")
         manager.update_path(new_path)
         assert manager.path_to_save_audio == new_path
-        assert new_path in manager.playlist_data_filepath
-        assert os.path.exists(manager.playlist_data_filepath)
+        assert new_path in manager.store.filepath
+        assert os.path.exists(manager.store.filepath)
     finally:
         cleanup_dirs(old_path, new_path)
-
-def test_save_playlist_data(temp_path):
-    try:
-        manager = DummyPlaylistManager("https://playlist.test", temp_path, "dummy_id")
-        manager.save_playlist_data({
-            "playlist_url": manager.playlist_url,
-            "path_to_save_audio": manager.path_to_save_audio,
-            "title": "Updated Title"
-        })
-        with open(manager.playlist_data_filepath) as f:
-            data = json.load(f)
-            assert data["title"] == "Updated Title"
-    finally:
-        cleanup_dirs(temp_path)
 
 def test_get_audio_managers(temp_path):
     try:

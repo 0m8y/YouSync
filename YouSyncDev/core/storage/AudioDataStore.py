@@ -27,8 +27,16 @@ class AudioDataStore:
 
     def save_all(self, audios: List[AudioMetadata]) -> None:
         with self.lock:
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+            data["audios"] = [a.to_dict() for a in audios]
+
             with open(self.filepath, "w", encoding="utf-8") as f:
-                json.dump({"audios": [a.to_dict() for a in audios]}, f, indent=4)
+                json.dump(data, f, indent=4)
 
     def get_audio(self, url: str) -> Optional[AudioMetadata]:
         return next((a for a in self.load_all() if a.url == url), None)

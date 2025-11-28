@@ -15,14 +15,13 @@ class IAudioManager(ABC):
         self.lock = lock
         self.url = url
         self.id = id
-        self.video_title = video_title
         self.path_to_save_audio = path_to_save_audio
 
         self.data_store = AudioDataStore(data_filepath, lock)
 
         self.metadata = AudioMetadata(
             url=url,
-            path_to_save_audio_with_title=os.path.join(self.path_to_save_audio, f"{self.video_title}.mp3"),
+            path_to_save_audio_with_title=os.path.join(self.path_to_save_audio, f"{video_title}.mp3"),
             video_title=video_title,
             title="", artist="", album="", image_url=""
         )
@@ -53,8 +52,7 @@ class IAudioManager(ABC):
     def download_audio(self) -> None:
         pass
 
-    def register_metadata(self, video_title: str, title: str, artist: str, album: str, image_url: str) -> None:
-        self.video_title = video_title
+    def register_metadata(self, title: str, artist: str, album: str, image_url: str) -> None:
         self.metadata.title = title
         self.metadata.artist = artist
         self.metadata.album = album
@@ -104,7 +102,7 @@ class IAudioManager(ABC):
         current_path = os.path.dirname(self.metadata.path_to_save_audio_with_title)
         if current_path == old_path:
             self.path_to_save_audio = new_path
-            self.metadata.path_to_save_audio_with_title = os.path.join(new_path, f"{self.video_title}.mp3")
+            self.metadata.path_to_save_audio_with_title = os.path.join(new_path, f"{self.metadata.video_title}.mp3")
             self.data_store.update_audio(self.metadata)
 
 #-----------------------------------------DICT------------------------------------------#

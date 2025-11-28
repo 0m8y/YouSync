@@ -1,7 +1,7 @@
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from concurrent.futures import ThreadPoolExecutor
 from core.audio_managers.SpotifyAudioManager import SpotifyAudioManager
-from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_soundcloud_total_songs, get_soundcloud_url_list
+from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_spotify_total_songs, get_spotify_url_list
 import logging
 import requests
 from typing import List, Optional
@@ -52,8 +52,8 @@ class SpotifyPlaylistManager(IPlaylistManager):
     def get_video_urls(self) -> List[str]:
         driver = get_selenium_driver_for_spotify(self.playlist_url)
         driver.execute_script("document.body.style.zoom = '0.001'")
-        total_songs = get_soundcloud_total_songs(driver)
-        urls = get_soundcloud_url_list(driver, total_songs)
+        total_songs = get_spotify_total_songs(driver)
+        urls = get_spotify_url_list(driver, total_songs)
         print(f"{len(urls)} songs found.")
         driver.quit()
         return urls

@@ -88,7 +88,7 @@ class AppleAudioManager(IAudioManager):
         album = self.__extract_album()
         image_url = self.extract_image()
         print("Image URL: " + image_url)
-        self.register_metadata(self.video_title, title, artist, album, image_url)
+        self.register_metadata(title, artist, album, image_url)
 
     def __extract_title(self, url, file_mode: bool = False):
         self.__ensure_soup_loaded()

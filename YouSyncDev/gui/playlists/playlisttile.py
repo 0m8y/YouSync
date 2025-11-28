@@ -129,6 +129,8 @@ class PlaylistTile:
             )
             self.update_cover()
             if self.playlist_page is not None:
+                self.playlist_page.audio_managers = self.playlists_page.central_manager.get_audio_managers(self.playlist_data.id)
+
                 self.playlist_page.update_cover(self.cover_filename)
                 self.playlist_page.sync_completed()
                 self.playlist_page.update_tracklist()
