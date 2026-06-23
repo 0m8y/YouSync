@@ -187,7 +187,7 @@ def extract_json_object(text, key):
     """
     Extrait un JSON complet contenant une clé donnée.
     """
-    start_index = text.find(key)
+    start_index = text.rfind(key)
     if start_index == -1:
         return None
 
@@ -258,4 +258,3 @@ def get_cached_playlist_id(playlist_url: str, data_filepath: str) -> Optional[st
     except Exception as e:
         print(f"⚠️ Erreur lecture JSON pour playlist id : {e}")
         return None
-

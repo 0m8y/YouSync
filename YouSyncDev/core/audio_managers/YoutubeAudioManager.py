@@ -57,34 +57,132 @@ class YoutubeAudioManager(IAudioManager):
         json_data = None
 
         for attempt in range(10):
+            print(f"\n========== METADATA DEBUG ATTEMPT {attempt + 1} ==========")
+
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             }
 
             response = requests.get(self.url, headers=headers)
+            print("[DEBUG] status_code:", response.status_code)
+
             if response.status_code != 200:
                 print("❌ Erreur lors de la récupération de la page.")
                 continue
 
-            response.encoding = 'utf-8'
+            response.encoding = "utf-8"
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Chercher le script contenant "horizontalCardListRenderer"
             script_tags = soup.find_all("script")
-            for script in script_tags:
-                if script.string and "horizontalCardListRenderer" in script.string and "videoAttributeViewModel" in script.string:
+            print("[DEBUG] script count:", len(script_tags))
+
+            for index, script in enumerate(script_tags):
+                if not script.string:
+                    continue
+
+                has_horizontal = "horizontalCardListRenderer" in script.string
+                has_attribute = "videoAttributeViewModel" in script.string
+
+                if has_horizontal or has_attribute:
+                    print(f"\n[DEBUG] matching script index: {index}")
+                    print("[DEBUG] has horizontalCardListRenderer:", has_horizontal)
+                    print("[DEBUG] has videoAttributeViewModel:", has_attribute)
+                    print("[DEBUG] script length:", len(script.string))
+
+                if has_horizontal and has_attribute:
+                    key_index = script.string.find("horizontalCardListRenderer")
+                    attr_index = script.string.find("videoAttributeViewModel")
+
+                    print("[DEBUG] horizontalCardListRenderer index:", key_index)
+                    print("[DEBUG] videoAttributeViewModel index:", attr_index)
+
+                    print("\n[DEBUG] around horizontalCardListRenderer:")
+                    print(script.string[max(0, key_index - 500):key_index + 1500])
+
+                    print("\n[DEBUG] around videoAttributeViewModel:")
+                    print(script.string[max(0, attr_index - 500):attr_index + 1500])
+
+                    key_index = script.string.find("horizontalCardListRenderer")
+
+                    print("\n========== RAW AROUND REAL KEY ==========")
+                    print(
+                        script.string[
+                            max(0, key_index - 2000):
+                            key_index + 5000
+                        ]
+                    )
+
+                    all_indexes = []
+
+                    start = 0
+                    while True:
+                        idx = script.string.find("horizontalCardListRenderer", start)
+
+                        if idx == -1:
+                            break
+
+                        all_indexes.append(idx)
+                        start = idx + 1
+
+                    print("\n========== ALL OCCURRENCES ==========")
+                    print("count =", len(all_indexes))
+
+                    for i, idx in enumerate(all_indexes[:20]):
+                        print(f"\n--- occurrence {i} @ {idx} ---")
+                        print(script.string[max(0, idx - 100):idx + 300])
+
                     json_data = extract_json_object(script.string, "horizontalCardListRenderer")
+
+                    print("\n[DEBUG] extract_json_object result is None:", json_data is None)
+
+                    if json_data:
+                        print("[DEBUG] extracted json length:", len(json_data))
+                        print("[DEBUG] extracted json start:")
+                        print(json_data[:1000])
+                        print("[DEBUG] extracted json end:")
+                        print(json_data[-1000:])
+
+                        try:
+                            data = json.loads(json_data)
+                            print("[DEBUG] json.loads OK")
+                            print("[DEBUG] top-level type:", type(data))
+                            print("[DEBUG] top-level keys:", list(data.keys()) if isinstance(data, dict) else None)
+                            print(
+                                "[DEBUG] horizontalCardListRenderer at root:",
+                                isinstance(data, dict) and "horizontalCardListRenderer" in data
+                            )
+
+                            cards = data.get("horizontalCardListRenderer", {}).get("cards", []) if isinstance(data, dict) else []
+                            print("[DEBUG] cards type:", type(cards))
+                            print("[DEBUG] cards length:", len(cards) if isinstance(cards, list) else None)
+
+                            if cards:
+                                print("[DEBUG] first card keys:", list(cards[0].keys()))
+                                print("[DEBUG] first card preview:")
+                                print(json.dumps(cards[0], ensure_ascii=False)[:2000])
+
+                        except json.JSONDecodeError as e:
+                            print("[DEBUG] json.loads FAILED:", e)
+
                     if json_data:
                         break
 
             if not json_data:
-                break
-            data = json.loads(json_data)
-            cards = data.get("horizontalCardListRenderer", {}).get("cards", [])
-            if cards:
-                break
+                print("⚠️ No JSON found, retrying...")
+                continue
 
-            print("⚠️ No JSON found, retrying...")
+            try:
+                data = json.loads(json_data)
+                cards = data.get("horizontalCardListRenderer", {}).get("cards", [])
+                if cards:
+                    print("[DEBUG] valid cards found, leaving retry loop")
+                    break
+
+                print("⚠️ JSON found but no cards, retrying...")
+
+            except json.JSONDecodeError as e:
+                print("[DEBUG] JSON decode failed after extraction:", e)
+                json_data = None
 
         if not json_data:
             self.register_metadata("", "", "", self.yt.thumbnail_url)
@@ -93,10 +191,15 @@ class YoutubeAudioManager(IAudioManager):
         try:
             data = json.loads(json_data)
             cards = data.get("horizontalCardListRenderer", {}).get("cards", [])
+
             if not cards:
                 raise KeyError("cards")
 
             music_data = cards[0].get("videoAttributeViewModel", {})
+
+            print("\n[DEBUG] final music_data:")
+            print(json.dumps(music_data, ensure_ascii=False, indent=2)[:3000])
+
             title = music_data.get("title", "")
             artist = music_data.get("subtitle", "")
             album = music_data.get("secondarySubtitle", {}).get("content", "")
