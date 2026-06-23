@@ -2,9 +2,22 @@ from gui.app import App
 import logging
 import sys
 import os
+import platform
+from pathlib import Path
 
-local_appdata = os.getenv('LOCALAPPDATA')
-log_file = os.path.join(local_appdata, 'yousync.log')
+def get_log_file() -> Path:
+    if platform.system() == "Windows":
+        local_appdata = os.getenv('LOCALAPPDATA')
+        log_dir = Path(local_appdata) if local_appdata else Path.home()
+    elif platform.system() == "Darwin":
+        log_dir = Path.home() / "Library" / "Logs" / "YouSync"
+    else:
+        log_dir = Path.home() / ".cache" / "yousync"
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "yousync.log"
+
+log_file = get_log_file()
 
 if os.path.exists(log_file):
     os.remove(log_file)

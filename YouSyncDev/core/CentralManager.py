@@ -146,7 +146,7 @@ class CentralManager:
             id=playlist_manager.id,
             url=playlist_url,
             path=playlist_manager.playlist_data_filepath,
-            title=playlist_manager.title,
+            title=playlist_manager.playlist_data.title,
         )
         self.data["playlists"].append(playlist_info)
         self.playlist_managers.append(playlist_manager)
@@ -200,8 +200,8 @@ class CentralManager:
                             playlist_info = PlaylistData(
                                 id=playlist_manager.id,
                                 url=playlist_url,
-                                path=filepath,
-                                title=playlist_manager.title,
+                                path=playlist_manager.playlist_data_filepath,
+                                title=playlist_manager.playlist_data.title,
                             )
                             self.data["playlists"].append(playlist_info)
                             self.playlist_managers.append(playlist_manager)

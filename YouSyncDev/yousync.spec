@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import platform
 
+app_icon = 'gui/assets/images/yousync.ico' if platform.system() == 'Windows' else None
 
 a = Analysis(
     ['yousync.py'],
@@ -35,5 +37,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='gui/assets/images/yousync.ico'
+    icon=app_icon
 )

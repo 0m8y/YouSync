@@ -13,3 +13,7 @@ build/
 txt.Txt
 temp_files/
 __pycache__/
+
+.DS_Store
+
+.venv/
