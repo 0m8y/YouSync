@@ -181,6 +181,16 @@ fn get_sync_status(state: State<'_, WorkerState>, playlist_id: String) -> Result
     )
 }
 
+#[tauri::command]
+fn sync_all_playlists(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker(state.inner(), "sync_all", json!({}))
+}
+
+#[tauri::command]
+fn get_sync_all_status(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker(state.inner(), "sync_all_status", json!({}))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -192,7 +202,9 @@ pub fn run() {
             add_playlist,
             list_playlists,
             sync_playlist,
-            get_sync_status
+            get_sync_status,
+            sync_all_playlists,
+            get_sync_all_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

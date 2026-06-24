@@ -37,9 +37,21 @@ export type SyncStartResult = {
   message?: string;
 };
 
+export type SyncAllStartResult = {
+  started: boolean;
+  playlistIds: string[];
+  message?: string;
+};
+
 export type SyncStatus = {
   playlistId: string;
   status: "idle" | "syncing" | "completed" | "error";
+  message?: string;
+};
+
+export type SyncAllStatus = {
+  status: "idle" | "syncing" | "completed" | "error";
+  playlistIds: string[];
   message?: string;
 };
 
@@ -68,11 +80,11 @@ function bridgeError(error: unknown) {
 export async function detectPlaylist(url: string): Promise<PlaylistDetection> {
   try {
     return await invoke<PlaylistDetection>("detect_playlist", { url });
-  } catch {
+  } catch (error) {
     return {
       platform: "unknown",
       supported: false,
-      reason: "unknown",
+      reason: "unknown"
     };
   }
 }
@@ -105,7 +117,7 @@ export async function addPlaylist(
   } catch (error) {
     return {
       ok: false,
-      message: bridgeError(error),
+      message: bridgeError(error)
     };
   }
 }
@@ -147,6 +159,32 @@ export async function getSyncStatus(playlistId: string): Promise<SyncStatus> {
     return {
       playlistId,
       status: "error",
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function syncAllPlaylists(): Promise<SyncAllStartResult> {
+  try {
+    return await invoke<SyncAllStartResult>("sync_all_playlists");
+  } catch (error) {
+    console.warn("[YouSync] bridge sync_all_playlists failed", bridgeError(error));
+    return {
+      started: false,
+      playlistIds: [],
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function getSyncAllStatus(): Promise<SyncAllStatus> {
+  try {
+    return await invoke<SyncAllStatus>("get_sync_all_status");
+  } catch (error) {
+    console.warn("[YouSync] bridge get_sync_all_status failed", bridgeError(error));
+    return {
+      status: "error",
+      playlistIds: [],
       message: bridgeError(error),
     };
   }

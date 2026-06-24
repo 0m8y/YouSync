@@ -3,8 +3,10 @@ import PlaylistRow from "../components/PlaylistRow";
 import Toast from "../components/Toast";
 import {
   PLAYLISTS_UPDATED_EVENT,
+  getSyncAllStatus,
   getSyncStatus,
   listPlaylists,
+  syncAllPlaylists,
   syncPlaylist
 } from "../services/playlistService";
 import type { PlaylistSummary } from "../services/playlistService";
@@ -14,6 +16,7 @@ const SYNC_STATUS_POLL_MS = 1500;
 function PlaylistsPage() {
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [toast, setToast] = useState("");
 
   const reloadPlaylists = useCallback(async () => {
@@ -35,6 +38,15 @@ function PlaylistsPage() {
   }, []);
 
   const recoverActiveSync = useCallback(async (playlistsToCheck: PlaylistSummary[]) => {
+    const syncAllStatus = await getSyncAllStatus();
+
+    if (syncAllStatus.status === "syncing") {
+      setIsSyncingAll(true);
+      setSyncingId(null);
+      return;
+    }
+
+    setIsSyncingAll(false);
     const activeSyncId = await findActiveSyncId(playlistsToCheck);
     setSyncingId(activeSyncId);
   }, [findActiveSyncId]);
@@ -58,6 +70,19 @@ function PlaylistsPage() {
       })));
       setPlaylists(nextPlaylists);
 
+      const syncAllStatus = await getSyncAllStatus();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (syncAllStatus.status === "syncing") {
+        setIsSyncingAll(true);
+        setSyncingId(null);
+        return;
+      }
+
+      setIsSyncingAll(false);
       const activeSyncId = await findActiveSyncId(nextPlaylists);
 
       if (!cancelled) {
@@ -103,7 +128,72 @@ function PlaylistsPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!syncingId) {
+    if (!isSyncingAll) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    async function pollSyncAllStatus() {
+      const status = await getSyncAllStatus();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (status.status === "syncing") {
+        timeoutId = window.setTimeout(pollSyncAllStatus, SYNC_STATUS_POLL_MS);
+        return;
+      }
+
+      if (status.status === "completed") {
+        await reloadPlaylists();
+
+        if (!cancelled) {
+          setIsSyncingAll(false);
+          setSyncingId(null);
+        }
+        return;
+      }
+
+      if (status.status === "error") {
+        setToast(status.message || "Sync all could not be completed.");
+
+        if (!cancelled) {
+          setIsSyncingAll(false);
+          setSyncingId(null);
+        }
+        return;
+      }
+
+      await reloadPlaylists();
+
+      if (!cancelled) {
+        setIsSyncingAll(false);
+        setSyncingId(null);
+      }
+    }
+
+    void pollSyncAllStatus().catch((error) => {
+      if (!cancelled) {
+        setToast(error instanceof Error ? error.message : String(error));
+        setIsSyncingAll(false);
+        setSyncingId(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [isSyncingAll, reloadPlaylists]);
+
+  useEffect(() => {
+    if (!syncingId || isSyncingAll) {
       return;
     }
 
@@ -162,10 +252,10 @@ function PlaylistsPage() {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [reloadPlaylists, syncingId]);
+  }, [isSyncingAll, reloadPlaylists, syncingId]);
 
   async function handleSyncPlaylist(playlistId: string) {
-    if (syncingId) {
+    if (syncingId || isSyncingAll) {
       return;
     }
 
@@ -175,15 +265,35 @@ function PlaylistsPage() {
 
     if (!startResult.started) {
       setToast(startResult.message ?? "A sync is already running.");
-      const activeSyncId = await findActiveSyncId(playlists);
-      setSyncingId(activeSyncId);
+      await recoverActiveSync(playlists);
       return;
     }
 
+    setIsSyncingAll(false);
     setSyncingId(playlistId);
   }
 
+  async function handleSyncAll() {
+    if (syncingId || isSyncingAll || playlists.length === 0) {
+      return;
+    }
+
+    setToast("");
+
+    const startResult = await syncAllPlaylists();
+
+    if (!startResult.started) {
+      setToast(startResult.message ?? "A sync is already running.");
+      await recoverActiveSync(playlists);
+      return;
+    }
+
+    setSyncingId(null);
+    setIsSyncingAll(true);
+  }
+
   const syncedCount = playlists.filter((playlist) => playlist.status.type === "synced").length;
+  const syncAllDisabled = Boolean(syncingId) || isSyncingAll || playlists.length === 0;
 
   return (
     <section className="playlists-page" aria-labelledby="playlists-title">
@@ -192,7 +302,9 @@ function PlaylistsPage() {
         <p>{playlists.length} playlists · {syncedCount} synced</p>
 
         <div className="topbar-actions">
-          <button type="button">↻ Sync all</button>
+          <button type="button" disabled={syncAllDisabled} onClick={handleSyncAll}>
+            {isSyncingAll ? "↻ Syncing..." : "↻ Sync all"}
+          </button>
           <button type="button">＋ Add playlist</button>
         </div>
       </header>
@@ -213,7 +325,7 @@ function PlaylistsPage() {
             <PlaylistRow
               key={playlist.id}
               playlist={playlist}
-              isSyncing={syncingId === playlist.id}
+              isSyncing={isSyncingAll || syncingId === playlist.id}
               onSync={handleSyncPlaylist}
             />
           ))}
