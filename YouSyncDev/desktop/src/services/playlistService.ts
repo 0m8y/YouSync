@@ -1,0 +1,153 @@
+import { invoke } from "@tauri-apps/api/core";
+
+export type Platform = "youtube" | "spotify" | "apple" | "soundcloud" | "unknown";
+
+export const PLAYLISTS_UPDATED_EVENT = "yousync:playlists-updated";
+
+export type PlaylistDetection = {
+  platform: Platform;
+  supported: boolean;
+  reason?: "empty" | "unsupported" | "unknown";
+};
+
+export type PlaylistPreview = {
+  title: string;
+  tracks: number | null;
+  platform: Platform;
+  coverUrl?: string | null;
+  coverPath?: string | null;
+  supported?: boolean;
+  message?: string;
+};
+
+export type AddPlaylistRequest = {
+  url: string;
+  folder: string;
+};
+
+export type AddPlaylistResult = {
+  ok: boolean;
+  message: string;
+  playlist?: PlaylistSummary;
+};
+
+export type SyncStartResult = {
+  started: boolean;
+  playlistId: string;
+  message?: string;
+};
+
+export type SyncStatus = {
+  playlistId: string;
+  status: "idle" | "syncing" | "completed" | "error";
+  message?: string;
+};
+
+export type PlaylistStatus =
+  | { type: "synced"; label: string }
+  | { type: "syncing"; label: string; progress: number }
+  | { type: "error"; label: string }
+  | { type: "stale"; label: string }
+  | { type: "empty"; label: string };
+
+export type PlaylistSummary = {
+  id: string;
+  title: string;
+  path: string;
+  platform: Exclude<Platform, "unknown">;
+  tracks: number;
+  coverPath?: string | null;
+  status: PlaylistStatus;
+  lastSynced: string;
+};
+
+function bridgeError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function detectPlaylist(url: string): Promise<PlaylistDetection> {
+  try {
+    return await invoke<PlaylistDetection>("detect_playlist", { url });
+  } catch {
+    return {
+      platform: "unknown",
+      supported: false,
+      reason: "unknown",
+    };
+  }
+}
+
+export async function previewPlaylist(url: string): Promise<PlaylistPreview | null> {
+  try {
+    return await invoke<PlaylistPreview | null>("preview_playlist", { url });
+  } catch {
+    return null;
+  }
+}
+
+export async function addPlaylist(
+  urlOrRequest: string | AddPlaylistRequest,
+  folder?: string
+): Promise<AddPlaylistResult> {
+  const request =
+    typeof urlOrRequest === "string"
+      ? { url: urlOrRequest, folder: folder ?? "" }
+      : urlOrRequest;
+
+  try {
+    const result = await invoke<AddPlaylistResult>("add_playlist", request);
+    console.info("[YouSync] bridge add_playlist result", {
+      request,
+      result,
+      coverPath: result.playlist?.coverPath,
+    });
+    return result;
+  } catch (error) {
+    return {
+      ok: false,
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function listPlaylists(): Promise<PlaylistSummary[]> {
+  try {
+    const playlists = await invoke<PlaylistSummary[]>("list_playlists");
+    console.info("[YouSync] bridge list_playlists result", playlists.map((playlist) => ({
+      id: playlist.id,
+      title: playlist.title,
+      coverPath: playlist.coverPath,
+      tracks: playlist.tracks,
+      status: playlist.status,
+    })));
+    return playlists;
+  } catch {
+    return [];
+  }
+}
+
+export async function syncPlaylist(playlistId: string): Promise<SyncStartResult> {
+  try {
+    return await invoke<SyncStartResult>("sync_playlist", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge sync_playlist failed", bridgeError(error));
+    return {
+      started: false,
+      playlistId,
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function getSyncStatus(playlistId: string): Promise<SyncStatus> {
+  try {
+    return await invoke<SyncStatus>("get_sync_status", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge get_sync_status failed", bridgeError(error));
+    return {
+      playlistId,
+      status: "error",
+      message: bridgeError(error),
+    };
+  }
+}
