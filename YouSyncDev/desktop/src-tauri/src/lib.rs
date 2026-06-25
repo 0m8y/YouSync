@@ -198,6 +198,19 @@ fn recover_existing_playlist(
 }
 
 #[tauri::command]
+fn move_playlist_folder(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    folder: String,
+) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "move_playlist_folder",
+        json!({ "playlist_id": playlist_id, "folder": folder }),
+    )
+}
+
+#[tauri::command]
 fn get_playlist_details(
     state: State<'_, WorkerState>,
     playlist_id: String,
@@ -224,11 +237,15 @@ fn download_missing(state: State<'_, WorkerState>, playlist_id: String) -> Resul
 }
 
 #[tauri::command]
-fn delete_playlist(state: State<'_, WorkerState>, playlist_id: String) -> Result<Value, String> {
+fn delete_playlist(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    delete_local_files: Option<bool>,
+) -> Result<Value, String> {
     call_python_worker(
         state.inner(),
         "delete_playlist",
-        json!({ "playlist_id": playlist_id }),
+        json!({ "playlist_id": playlist_id, "delete_local_files": delete_local_files.unwrap_or(false) }),
     )
 }
 
@@ -385,6 +402,7 @@ pub fn run() {
             list_missing_playlists,
             update_playlist_folder,
             recover_existing_playlist,
+            move_playlist_folder,
             get_playlist_details,
             sync_playlist,
             download_missing,

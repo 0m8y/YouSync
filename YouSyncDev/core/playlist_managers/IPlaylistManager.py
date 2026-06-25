@@ -151,17 +151,42 @@ class IPlaylistManager(ABC):
 
     def update_path(self, new_path: str) -> None:
         old_path = self.path_to_save_audio
+        new_path = os.path.abspath(os.path.expanduser(new_path))
+
+        check_yousync_folder(os.path.join(new_path, ".yousync"))
+
         self.path_to_save_audio = new_path
-
-        for am in self.audio_managers:
-            am.update_path(new_path, old_path)
-
         self.playlist_data.path_to_save_audio = new_path
 
         new_json_path = os.path.join(new_path, ".yousync", f"{self.id}.json")
         self.playlist_data_filepath = new_json_path
         self.data_store.filepath = new_json_path
 
+        updated_audios_by_url = {}
+
+        for am in self.audio_managers:
+            if am is None:
+                continue
+
+            if hasattr(am, "data_store"):
+                am.data_store.filepath = new_json_path
+
+            am.update_path(new_path, old_path)
+            updated_audios_by_url[am.get_url()] = am.metadata
+
+        refreshed_audios = []
+        seen_urls = set()
+
+        for audio in self.playlist_data.audios:
+            updated_audio = updated_audios_by_url.get(audio.url, audio)
+            refreshed_audios.append(updated_audio)
+            seen_urls.add(updated_audio.url)
+
+        for url, metadata in updated_audios_by_url.items():
+            if url not in seen_urls:
+                refreshed_audios.append(metadata)
+
+        self.playlist_data.audios = refreshed_audios
         self.data_store.save(self.playlist_data)
 
     # ==================================================================================

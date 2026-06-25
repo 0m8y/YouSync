@@ -274,6 +274,47 @@ function PlaylistsPage() {
     setToast(result.message);
   }
 
+  async function handleRemovePlaylistWithLocalFiles(playlistId: string) {
+    if (isSyncingAll || hasActiveIndividualSyncs) {
+      setToast("Cannot remove playlist while a sync or download is running.");
+      return;
+    }
+
+    const playlist = playlists.find((item) => item.id === playlistId);
+
+    if (!playlist) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove "${playlist.title}" and delete its local files?\n\nThis removes the playlist from YouSync and deletes the local audio files referenced by this playlist. This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setToast("Removing playlist and local files...");
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      setPlaylists((currentPlaylists) => currentPlaylists.filter((playlist) => playlist.id !== playlistId));
+      return;
+    }
+
+    const result = await deletePlaylist(playlistId, true);
+
+    if (!result.ok) {
+      setToast(result.message);
+      await refreshSyncStatuses();
+      return;
+    }
+
+    await reloadPlaylists();
+    await refreshBrokenPlaylists();
+    await refreshSyncStatuses();
+    setToast(result.message);
+  }
+
   async function handleRecoverExistingPlaylist() {
     if (isSyncingAll || hasActiveIndividualSyncs) {
       setToast("Cannot recover a playlist while a sync or download is running.");
@@ -539,6 +580,7 @@ function PlaylistsPage() {
                 onOpenFolder={handleOpenPlaylistFolder}
                 onOpenSource={handleOpenPlaylistSource}
                 onRemove={handleRemovePlaylist}
+                onRemoveWithLocalFiles={handleRemovePlaylistWithLocalFiles}
               />
             );
           })}

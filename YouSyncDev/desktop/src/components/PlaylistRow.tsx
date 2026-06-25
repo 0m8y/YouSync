@@ -15,6 +15,7 @@ type PlaylistRowProps = {
   onOpenFolder?: (playlistId: string) => void;
   onOpenSource?: (playlistId: string) => void;
   onRemove?: (playlistId: string) => void;
+  onRemoveWithLocalFiles?: (playlistId: string) => void;
 };
 
 function syncLabel(progress?: LongTaskProgress | null) {
@@ -54,6 +55,7 @@ function PlaylistRow({
   onOpenFolder,
   onOpenSource,
   onRemove,
+  onRemoveWithLocalFiles,
 }: PlaylistRowProps) {
   const platform = getPlatform(playlist.platform);
   const status = playlist.status;
@@ -259,6 +261,18 @@ function PlaylistRow({
                   }}
                 >
                   Remove playlist
+                </button>
+                <button
+                  className="menu-danger menu-danger-strong"
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onRemoveWithLocalFiles?.(playlist.id);
+                  }}
+                >
+                  Remove playlist + local files
                 </button>
               </div>
             ) : null}

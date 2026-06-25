@@ -1,4 +1,5 @@
 import os
+import shutil
 import requests
 import eyed3.id3
 from threading import Lock
@@ -99,11 +100,42 @@ class IAudioManager(ABC):
             print(f"Erreur lors de la suppression de l'audio : {e}")
 
     def update_path(self, new_path: str, old_path: str) -> None:
-        current_path = os.path.dirname(self.metadata.path_to_save_audio_with_title)
-        if current_path == old_path:
-            self.path_to_save_audio = new_path
-            self.metadata.path_to_save_audio_with_title = os.path.join(new_path, f"{self.metadata.video_title}.mp3")
-            self.data_store.update_audio(self.metadata)
+        old_audio_path = os.path.expanduser(self.metadata.path_to_save_audio_with_title)
+        old_root = os.path.abspath(os.path.expanduser(old_path))
+        new_root = os.path.abspath(os.path.expanduser(new_path))
+        old_audio_abs = os.path.abspath(old_audio_path)
+
+        try:
+            is_playlist_file = os.path.commonpath([old_audio_abs, old_root]) == old_root
+        except ValueError:
+            is_playlist_file = False
+
+        if not is_playlist_file:
+            return
+
+        relative_audio_path = os.path.relpath(old_audio_abs, old_root)
+        new_audio_path = os.path.join(new_root, relative_audio_path)
+
+        if old_audio_abs != new_audio_path and os.path.exists(old_audio_abs):
+            try:
+                os.makedirs(os.path.dirname(new_audio_path), exist_ok=True)
+
+                if os.path.exists(new_audio_path):
+                    try:
+                        same_size = os.path.getsize(old_audio_abs) == os.path.getsize(new_audio_path)
+                    except OSError:
+                        same_size = False
+
+                    if same_size:
+                        os.remove(old_audio_abs)
+                else:
+                    shutil.move(old_audio_abs, new_audio_path)
+            except Exception as e:
+                print(f"Erreur lors du déplacement de l'audio : {e}")
+
+        self.path_to_save_audio = new_root
+        self.metadata.path_to_save_audio_with_title = new_audio_path
+        self.data_store.update_audio(self.metadata)
 
 #-----------------------------------------DICT------------------------------------------#
 

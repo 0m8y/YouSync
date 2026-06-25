@@ -305,6 +305,43 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     onBack();
   }
 
+  async function handleRemovePlaylistWithLocalFiles() {
+    setMenuOpen(false);
+
+    if (isSyncing) {
+      setToast("Cannot remove playlist while a sync or download is running.");
+      return;
+    }
+
+    if (!playlist) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove "${playlist.title}" and delete its local files?\n\nThis removes the playlist from YouSync and deletes the local audio files referenced by this playlist. This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setToast("Removing playlist and local files...");
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      onBack();
+      return;
+    }
+
+    const result = await deletePlaylist(playlistId, true);
+
+    if (!result.ok) {
+      setToast(result.message);
+      return;
+    }
+
+    onBack();
+  }
+
   async function handleOpenFolder() {
     if (!playlist) {
       return;
@@ -500,6 +537,15 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
                     onClick={handleRemovePlaylist}
                   >
                     Remove playlist
+                  </button>
+                  <button
+                    className="menu-danger menu-danger-strong"
+                    type="button"
+                    role="menuitem"
+                    disabled={isSyncing}
+                    onClick={handleRemovePlaylistWithLocalFiles}
+                  >
+                    Remove playlist + local files
                   </button>
                 </div>
               ) : null}

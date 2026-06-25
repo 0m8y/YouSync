@@ -992,6 +992,7 @@ p {
 .playlist-menu {
   top: calc(100% + 6px);
   right: 0;
+  min-width: 220px;
 }
 
 .menu-separator {
@@ -1007,6 +1008,15 @@ p {
 .detail-menu .menu-danger:hover:not(:disabled) {
   background: rgba(138, 58, 58, 0.16);
   color: #f0a3a3;
+}
+
+.detail-menu .menu-danger-strong {
+  color: #f0a3a3;
+}
+
+.detail-menu .menu-danger-strong:hover:not(:disabled) {
+  background: rgba(138, 58, 58, 0.24);
+  color: #ffd0d0;
 }
 
 .playlist-detail-page {

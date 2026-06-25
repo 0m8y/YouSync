@@ -40,6 +40,13 @@ export type RecoverExistingPlaylistResult = {
 export type DeletePlaylistResult = {
   ok: boolean;
   message: string;
+  deletedLocalFiles?: number;
+};
+
+export type MovePlaylistFolderResult = {
+  ok: boolean;
+  message: string;
+  playlist?: PlaylistSummary;
 };
 
 export type RedownloadTrackResult = {
@@ -246,6 +253,22 @@ export async function listMissingPlaylists(): Promise<BrokenPlaylist[]> {
   }
 }
 
+
+export async function movePlaylistFolder(
+  playlistId: string,
+  folder: string
+): Promise<MovePlaylistFolderResult> {
+  try {
+    return await invoke<MovePlaylistFolderResult>("move_playlist_folder", { playlistId, folder });
+  } catch (error) {
+    console.warn("[YouSync] bridge move_playlist_folder failed", bridgeError(error));
+    return {
+      ok: false,
+      message: bridgeError(error),
+    };
+  }
+}
+
 export async function updatePlaylistFolder(
   playlistId: string,
   folder: string
@@ -312,9 +335,9 @@ export async function redownloadTrack(playlistId: string, trackIndex: number): P
   }
 }
 
-export async function deletePlaylist(playlistId: string): Promise<DeletePlaylistResult> {
+export async function deletePlaylist(playlistId: string, deleteLocalFiles = false): Promise<DeletePlaylistResult> {
   try {
-    return await invoke<DeletePlaylistResult>("delete_playlist", { playlistId });
+    return await invoke<DeletePlaylistResult>("delete_playlist", { playlistId, deleteLocalFiles });
   } catch (error) {
     console.warn("[YouSync] bridge delete_playlist failed", bridgeError(error));
     return {
