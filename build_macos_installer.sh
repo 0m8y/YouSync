@@ -1,6 +1,47 @@
 #!/usr/bin/env sh
 set -eu
 
+print_help() {
+  echo "YouSync macOS installer builder"
+  echo ""
+  echo "Usage:"
+  echo "  ./build-macos-installer.sh              Clean then build"
+  echo "  ./build-macos-installer.sh --clean      Clean only"
+  echo "  ./build-macos-installer.sh -c           Clean only"
+  echo "  ./build-macos-installer.sh --no-clean   Build without cleaning"
+  echo "  ./build-macos-installer.sh --help       Show help"
+  echo ""
+}
+
+CLEAN_ONLY=false
+SKIP_CLEAN=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --clean|-c)
+      CLEAN_ONLY=true
+      ;;
+    --no-clean)
+      SKIP_CLEAN=true
+      ;;
+    --help|-h)
+      print_help
+      exit 0
+      ;;
+    *)
+      echo "❌ Unknown option: $arg" >&2
+      echo ""
+      print_help
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$CLEAN_ONLY" = true ] && [ "$SKIP_CLEAN" = true ]; then
+  echo "❌ You cannot use --clean and --no-clean together." >&2
+  exit 1
+fi
+
 echo "=============================="
 echo " YouSync macOS installer build"
 echo "=============================="
@@ -25,6 +66,32 @@ if [ ! -d "$DESKTOP_DIR" ]; then
   exit 1
 fi
 
+clean_outputs() {
+  echo ""
+  echo "🧹 Cleaning previous frontend build..."
+  rm -rf "$DESKTOP_DIR/dist"
+
+  echo "🧹 Cleaning previous Tauri bundles..."
+  rm -rf "$TAURI_DIR/target/release/bundle"
+
+  echo "🧹 Cleaning previous macOS installer output..."
+  rm -rf "$MACOS_INSTALLER_DIR"
+
+  echo "🧹 Cleaning previous PyInstaller worker build cache..."
+  rm -rf "$DESKTOP_DIR/build/yousync_worker_macos"
+
+  echo ""
+  echo "✅ Clean completed."
+}
+
+if [ "$SKIP_CLEAN" = false ]; then
+  clean_outputs
+fi
+
+if [ "$CLEAN_ONLY" = true ]; then
+  exit 0
+fi
+
 if [ ! -x "$WORKER_BUILD_SCRIPT" ]; then
   echo "❌ Worker build script not found or not executable:"
   echo "$WORKER_BUILD_SCRIPT"
@@ -33,6 +100,8 @@ if [ ! -x "$WORKER_BUILD_SCRIPT" ]; then
   echo "chmod +x \"$WORKER_BUILD_SCRIPT\""
   exit 1
 fi
+
+mkdir -p "$MACOS_INSTALLER_DIR"
 
 cd "$DESKTOP_DIR"
 
@@ -53,17 +122,6 @@ echo "Version: $VERSION"
 echo "Architecture: $ARCH_NAME"
 echo ""
 
-echo "🧹 Cleaning previous frontend build..."
-rm -rf "$DESKTOP_DIR/dist"
-
-echo "🧹 Cleaning previous Tauri bundles..."
-rm -rf "$TAURI_DIR/target/release/bundle"
-
-echo "🧹 Cleaning previous macOS installer output..."
-rm -rf "$MACOS_INSTALLER_DIR"
-mkdir -p "$MACOS_INSTALLER_DIR"
-
-echo ""
 echo "🔨 Building Python worker sidecar..."
 "$WORKER_BUILD_SCRIPT"
 

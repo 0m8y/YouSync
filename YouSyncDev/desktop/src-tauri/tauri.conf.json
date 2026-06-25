@@ -11,11 +11,13 @@
   },
   "app": {
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost https://asset.localhost",
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost https://asset.localhost https: data:",
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$HOME/**/*"],
+          "allow": [
+            "$HOME/**/*"
+          ],
           "requireLiteralLeadingDot": false
         }
       }
