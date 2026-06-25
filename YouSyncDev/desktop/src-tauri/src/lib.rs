@@ -233,6 +233,16 @@ fn get_sync_all_status(state: State<'_, WorkerState>) -> Result<Value, String> {
     call_python_worker(state.inner(), "sync_all_status", json!({}))
 }
 
+#[tauri::command]
+fn get_sync_tasks_status(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker(state.inner(), "sync_tasks_status", json!({}))
+}
+
+#[tauri::command]
+fn cancel_sync_all(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker(state.inner(), "cancel_sync_all", json!({}))
+}
+
 fn open_target(target: &str) -> Result<(), String> {
     let status = if cfg!(target_os = "macos") {
         Command::new("open").arg(target).status()
@@ -278,6 +288,8 @@ pub fn run() {
             get_sync_status,
             sync_all_playlists,
             get_sync_all_status,
+            get_sync_tasks_status,
+            cancel_sync_all,
             open_folder,
             open_url
         ])

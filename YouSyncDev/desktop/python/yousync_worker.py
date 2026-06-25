@@ -1141,6 +1141,44 @@ class YouSyncWorker:
             and process is not None
         )
 
+    def start_playlist_sync_task_locked(self, playlist_id: str, job_type: str = "single") -> bool:
+        self.poll_playlist_task_locked(playlist_id)
+
+        if self.is_playlist_task_running_locked(playlist_id):
+            return False
+
+        progress_path = str(create_progress_path())
+        playlist_title = self.playlist_title(playlist_id)
+        process = self.start_sync_process(["--sync-child", playlist_id, progress_path])
+        message = "Syncing playlist..."
+        task_state = {
+            "jobType": job_type,
+            "playlistId": playlist_id,
+            "playlistIds": [playlist_id],
+            "playlistTitle": playlist_title,
+            "status": "syncing",
+            "phase": "syncing",
+            "current": 0,
+            "total": 0,
+            "currentTrack": "",
+            "failedCount": 0,
+            "message": message,
+            "progressPath": progress_path,
+            "playlists": {
+                playlist_id: playlist_progress(
+                    "syncing",
+                    "syncing",
+                    message=message,
+                )
+            },
+        }
+        self.sync_tasks[playlist_id] = {
+            "process": process,
+            "state": task_state,
+            "refreshed": False,
+        }
+        return True
+
     def sync(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(
             payload.get("playlist_id") or payload.get("playlistId") or ""
@@ -1159,44 +1197,12 @@ class YouSyncWorker:
                     "message": "Sync all is already running.",
                 }
 
-            self.poll_playlist_task_locked(playlist_id)
-
-            if self.is_playlist_task_running_locked(playlist_id):
+            if not self.start_playlist_sync_task_locked(playlist_id):
                 return {
                     "started": False,
                     "playlistId": playlist_id,
                     "message": "This playlist is already syncing.",
                 }
-
-            progress_path = str(create_progress_path())
-            playlist_title = self.playlist_title(playlist_id)
-            process = self.start_sync_process(["--sync-child", playlist_id, progress_path])
-            task_state = {
-                "jobType": "single",
-                "playlistId": playlist_id,
-                "playlistIds": [playlist_id],
-                "playlistTitle": playlist_title,
-                "status": "syncing",
-                "phase": "syncing",
-                "current": 0,
-                "total": 0,
-                "currentTrack": "",
-                "failedCount": 0,
-                "message": "Syncing playlist...",
-                "progressPath": progress_path,
-                "playlists": {
-                    playlist_id: playlist_progress(
-                        "syncing",
-                        "syncing",
-                        message="Syncing playlist...",
-                    )
-                },
-            }
-            self.sync_tasks[playlist_id] = {
-                "process": process,
-                "state": task_state,
-                "refreshed": False,
-            }
 
             # Keep the global Sync All state idle if no global job is running.
             if global_state.get("jobType") == "all" and global_state.get("status") != "syncing":
@@ -1331,6 +1337,70 @@ class YouSyncWorker:
             "message": "Sync cancelled.",
         }
 
+    def cancel_sync_all(self, _payload: Dict[str, Any]) -> Dict[str, Any]:
+        with self.sync_lock:
+            state = self.aggregate_sync_all_state_locked()
+            running_playlist_ids = [
+                playlist_id
+                for playlist_id in state.get("playlistIds", [])
+                if self.is_playlist_task_running_locked(playlist_id)
+            ]
+
+            if state.get("jobType") != "all" or not running_playlist_ids:
+                return {
+                    "ok": False,
+                    "message": "No sync all is running.",
+                }
+
+            for playlist_id in running_playlist_ids:
+                task = self.sync_tasks.get(playlist_id)
+                if task is None:
+                    continue
+
+                task_state = self.merge_playlist_task_progress_locked(playlist_id) or {}
+                process = task.get("process")
+
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=2)
+
+                playlists = task_state.get("playlists") if isinstance(task_state.get("playlists"), dict) else {}
+                playlists[playlist_id] = {
+                    **(playlists.get(playlist_id) if isinstance(playlists.get(playlist_id), dict) else {}),
+                    "status": "cancelled",
+                    "phase": "cancelled",
+                    "currentTrack": "",
+                    "message": "Sync all cancelled.",
+                }
+                task_state = {
+                    **task_state,
+                    "status": "cancelled",
+                    "phase": "cancelled",
+                    "currentTrack": "",
+                    "message": "Sync all cancelled.",
+                    "playlists": playlists,
+                }
+                task["process"] = None
+                task["state"] = task_state
+                task["refreshed"] = False
+                write_progress(task_state.get("progressPath"), task_state)
+
+            self.sync_state = {
+                **self.aggregate_sync_all_state_locked(),
+                "status": "cancelled",
+                "phase": "cancelled",
+                "message": "Sync all cancelled.",
+            }
+
+        return {
+            "ok": True,
+            "message": "Sync all cancelled.",
+        }
+
     def delete_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(
             payload.get("playlist_id") or payload.get("playlistId") or ""
@@ -1371,6 +1441,93 @@ class YouSyncWorker:
             "message": "Playlist removed.",
         }
 
+    def aggregate_sync_all_state_locked(self) -> Dict[str, Any]:
+        playlist_ids = (
+            self.sync_state.get("playlistIds")
+            if isinstance(self.sync_state.get("playlistIds"), list)
+            else []
+        )
+
+        if self.sync_state.get("jobType") != "all" or not playlist_ids:
+            return {
+                "jobType": None,
+                "status": "idle",
+                "phase": "idle",
+                "playlistIds": [],
+                "message": "",
+                "playlists": {},
+            }
+
+        playlists: Dict[str, Any] = {}
+
+        for playlist_id in playlist_ids:
+            task_state = self.merge_playlist_task_progress_locked(playlist_id) or {}
+            task_playlists = (
+                task_state.get("playlists")
+                if isinstance(task_state.get("playlists"), dict)
+                else {}
+            )
+            playlist_state = (
+                task_playlists.get(playlist_id)
+                if isinstance(task_playlists.get(playlist_id), dict)
+                else {}
+            )
+            playlists[playlist_id] = {
+                "status": playlist_state.get("status", task_state.get("status", "idle")),
+                "phase": playlist_state.get("phase", task_state.get("phase", "idle")),
+                "current": playlist_state.get("current", task_state.get("current", 0)),
+                "total": playlist_state.get("total", task_state.get("total", 0)),
+                "currentTrack": playlist_state.get("currentTrack", task_state.get("currentTrack", "")),
+                "failedCount": playlist_state.get("failedCount", task_state.get("failedCount", 0)),
+                "message": playlist_state.get("message", task_state.get("message", "")),
+            }
+
+        statuses = [playlist.get("status") for playlist in playlists.values()]
+        active_count = sum(
+            1
+            for playlist in playlists.values()
+            if playlist.get("status") == "syncing"
+            or playlist.get("phase") in {"syncing", "downloading"}
+        )
+        completed_count = sum(1 for status in statuses if status == "completed")
+        cancelled_count = sum(1 for status in statuses if status == "cancelled")
+        error_count = sum(1 for status in statuses if status == "error")
+
+        if active_count:
+            status = "syncing"
+            phase = "syncing"
+            message = "Syncing playlists..."
+        elif cancelled_count == len(playlist_ids):
+            status = "cancelled"
+            phase = "cancelled"
+            message = "Sync all cancelled."
+        elif error_count == len(playlist_ids):
+            status = "error"
+            phase = "error"
+            message = "Sync all failed."
+        else:
+            status = "completed"
+            phase = "completed"
+            message = "Sync all completed."
+
+        return {
+            **self.sync_state,
+            "jobType": "all",
+            "status": status,
+            "phase": phase,
+            "playlistIds": playlist_ids,
+            "playlistId": None,
+            "playlistTitle": "",
+            "current": completed_count + cancelled_count + error_count,
+            "total": len(playlist_ids),
+            "currentTrack": "",
+            "failedCount": error_count,
+            "message": message,
+            "playlistCurrent": completed_count + cancelled_count + error_count,
+            "playlistTotal": len(playlist_ids),
+            "playlists": playlists,
+        }
+
     def sync_all(self, _payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_ids = self.playlist_ids()
 
@@ -1382,55 +1539,46 @@ class YouSyncWorker:
             }
 
         with self.sync_lock:
-            state, _should_refresh_manager = self.poll_sync_process_locked()
+            started_playlist_ids = []
 
-            if self.sync_process is not None and self.sync_process.poll() is None:
+            for playlist_id in playlist_ids:
+                if self.start_playlist_sync_task_locked(playlist_id, job_type="all"):
+                    started_playlist_ids.append(playlist_id)
+
+            if not started_playlist_ids:
                 return {
                     "started": False,
-                    "playlistIds": playlist_ids,
-                    "message": "A sync all is already running.",
+                    "playlistIds": [],
+                    "message": "No playlist sync was started.",
                 }
 
-            if self.has_running_playlist_tasks_locked():
-                return {
-                    "started": False,
-                    "playlistIds": playlist_ids,
-                    "message": "Playlist syncs or downloads are already running.",
-                }
-
-            progress_path = str(create_progress_path())
-            self.sync_process = self.start_sync_process(["--sync-all-child", progress_path])
-            queued_playlists = {
-                playlist_id: playlist_progress(
-                    "queued",
-                    "queued",
-                    message="Queued",
-                )
-                for playlist_id in playlist_ids
-            }
-
-            self.manager_refreshed_for_sync = False
             self.sync_state = {
                 "jobType": "all",
                 "playlistId": None,
-                "playlistIds": playlist_ids,
+                "playlistIds": started_playlist_ids,
                 "playlistTitle": "",
                 "status": "syncing",
                 "phase": "syncing",
                 "current": 0,
-                "total": len(playlist_ids),
+                "total": len(started_playlist_ids),
                 "currentTrack": "",
                 "failedCount": 0,
                 "message": "Syncing playlists...",
                 "playlistCurrent": 0,
-                "playlistTotal": len(playlist_ids),
-                "progressPath": progress_path,
-                "playlists": queued_playlists,
+                "playlistTotal": len(started_playlist_ids),
+                "progressPath": None,
+                "playlists": {
+                    playlist_id: (self.sync_tasks[playlist_id]["state"].get("playlists") or {}).get(
+                        playlist_id,
+                        playlist_progress("syncing", "syncing", message="Syncing playlist..."),
+                    )
+                    for playlist_id in started_playlist_ids
+                },
             }
 
         return {
             "started": True,
-            "playlistIds": playlist_ids,
+            "playlistIds": started_playlist_ids,
         }
 
     def sync_status(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1488,7 +1636,9 @@ class YouSyncWorker:
 
     def sync_all_status(self, _payload: Dict[str, Any]) -> Dict[str, Any]:
         with self.sync_lock:
-            state, should_refresh_manager = self.poll_sync_process_locked()
+            should_refresh_manager = self.poll_playlist_tasks_locked()
+            state = self.aggregate_sync_all_state_locked()
+            self.sync_state = state
 
             if state.get("jobType") != "all":
                 return {
@@ -1497,7 +1647,7 @@ class YouSyncWorker:
                     "message": "",
                 }
 
-        self.refresh_after_completed_sync(should_refresh_manager)
+        self.refresh_after_completed_playlist_tasks(should_refresh_manager)
 
         playlist_ids = state.get("playlistIds") if isinstance(state.get("playlistIds"), list) else []
         return {
@@ -1515,6 +1665,45 @@ class YouSyncWorker:
             "playlistCurrent": state.get("playlistCurrent"),
             "playlistTotal": state.get("playlistTotal"),
             "playlists": state.get("playlists") if isinstance(state.get("playlists"), dict) else {},
+        }
+
+    def sync_tasks_status(self, _payload: Dict[str, Any]) -> Dict[str, Any]:
+        with self.sync_lock:
+            should_refresh_manager = self.poll_playlist_tasks_locked()
+            sync_all_state = self.aggregate_sync_all_state_locked()
+            self.sync_state = sync_all_state if sync_all_state.get("jobType") == "all" else self.sync_state
+            playlists: Dict[str, Any] = {}
+
+            for playlist_id in list(self.sync_tasks.keys()):
+                task_state = self.merge_playlist_task_progress_locked(playlist_id) or {}
+                task_playlists = (
+                    task_state.get("playlists")
+                    if isinstance(task_state.get("playlists"), dict)
+                    else {}
+                )
+                playlist_state = (
+                    task_playlists.get(playlist_id)
+                    if isinstance(task_playlists.get(playlist_id), dict)
+                    else {}
+                )
+                playlists[playlist_id] = {
+                    "playlistId": playlist_id,
+                    "jobType": task_state.get("jobType"),
+                    "playlistTitle": task_state.get("playlistTitle", ""),
+                    "status": playlist_state.get("status", task_state.get("status", "idle")),
+                    "phase": playlist_state.get("phase", task_state.get("phase", "idle")),
+                    "current": playlist_state.get("current", task_state.get("current", 0)),
+                    "total": playlist_state.get("total", task_state.get("total", 0)),
+                    "currentTrack": playlist_state.get("currentTrack", task_state.get("currentTrack", "")),
+                    "failedCount": playlist_state.get("failedCount", task_state.get("failedCount", 0)),
+                    "message": playlist_state.get("message", task_state.get("message", "")),
+                }
+
+        self.refresh_after_completed_playlist_tasks(should_refresh_manager)
+
+        return {
+            "playlists": playlists,
+            "syncAll": sync_all_state if sync_all_state.get("jobType") == "all" else None,
         }
 
     def handle(self, command: str, payload: Dict[str, Any]) -> Any:
@@ -1542,6 +1731,9 @@ class YouSyncWorker:
         if command == "cancel_playlist_sync":
             return self.cancel_playlist_sync(payload)
 
+        if command == "cancel_sync_all":
+            return self.cancel_sync_all(payload)
+
         if command == "delete_playlist":
             return self.delete_playlist(payload)
 
@@ -1553,6 +1745,9 @@ class YouSyncWorker:
 
         if command == "sync_all_status":
             return self.sync_all_status(payload)
+
+        if command == "sync_tasks_status":
+            return self.sync_tasks_status(payload)
 
         raise ValueError(f"Unknown command: {command}")
 

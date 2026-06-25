@@ -42,6 +42,11 @@ export type CancelPlaylistSyncResult = {
   message: string;
 };
 
+export type CancelSyncAllResult = {
+  ok: boolean;
+  message: string;
+};
+
 export type SyncStartResult = {
   started: boolean;
   playlistId: string;
@@ -82,6 +87,11 @@ export type SyncStatus = LongTaskProgress & {
 
 export type SyncAllStatus = LongTaskProgress & {
   playlistIds: string[];
+};
+
+export type SyncTasksStatus = {
+  playlists: Record<string, SyncStatus>;
+  syncAll?: SyncAllStatus | null;
 };
 
 export type PlaylistStatus =
@@ -245,6 +255,18 @@ export async function cancelPlaylistSync(playlistId: string): Promise<CancelPlay
   }
 }
 
+export async function cancelSyncAll(): Promise<CancelSyncAllResult> {
+  try {
+    return await invoke<CancelSyncAllResult>("cancel_sync_all");
+  } catch (error) {
+    console.warn("[YouSync] bridge cancel_sync_all failed", bridgeError(error));
+    return {
+      ok: false,
+      message: bridgeError(error),
+    };
+  }
+}
+
 export async function openFolder(path: string): Promise<boolean> {
   try {
     await invoke("open_folder", { path });
@@ -300,6 +322,18 @@ export async function getSyncAllStatus(): Promise<SyncAllStatus> {
       status: "error",
       playlistIds: [],
       message: bridgeError(error),
+    };
+  }
+}
+
+export async function getSyncTasksStatus(): Promise<SyncTasksStatus> {
+  try {
+    return await invoke<SyncTasksStatus>("get_sync_tasks_status");
+  } catch (error) {
+    console.warn("[YouSync] bridge get_sync_tasks_status failed", bridgeError(error));
+    return {
+      playlists: {},
+      syncAll: null,
     };
   }
 }

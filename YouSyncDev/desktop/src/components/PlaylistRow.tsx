@@ -173,71 +173,71 @@ function PlaylistRow({
             ⏹
           </button>
         ) : null}
-        <div
-          className="playlist-menu-wrap"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            aria-label={`More actions for ${playlist.title}`}
-            aria-expanded={menuOpen}
-            onClick={(event) => {
-              event.stopPropagation();
-              setMenuOpen((open) => !open);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.stopPropagation();
-                setMenuOpen(false);
-              }
-            }}
+        {!isSyncing ? (
+          <div
+            className="playlist-menu-wrap"
+            onClick={(event) => event.stopPropagation()}
           >
-            ⋮
-          </button>
-          {menuOpen ? (
-            <div className="detail-menu playlist-menu" role="menu">
-              {isErrorProgress ? (
+            <button
+              type="button"
+              aria-label={`More actions for ${playlist.title}`}
+              aria-expanded={menuOpen}
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setMenuOpen(false);
+                }
+              }}
+            >
+              ⋮
+            </button>
+            {menuOpen ? (
+              <div className="detail-menu playlist-menu" role="menu">
+                {isErrorProgress ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setMenuOpen(false);
+                      onSync?.(playlist.id);
+                    }}
+                  >
+                    Retry sync
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   role="menuitem"
                   onClick={(event) => {
                     event.stopPropagation();
                     setMenuOpen(false);
-                    onSync?.(playlist.id);
+                    onDownloadMissing?.(playlist.id);
                   }}
                 >
-                  Retry sync
+                  Download missing
                 </button>
-              ) : null}
-              <button
-                type="button"
-                role="menuitem"
-                disabled={isSyncing}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setMenuOpen(false);
-                  onDownloadMissing?.(playlist.id);
-                }}
-              >
-                Download missing
-              </button>
-              <div className="menu-separator" role="separator" />
-              <button
-                className="menu-danger"
-                type="button"
-                role="menuitem"
-                disabled={isSyncing}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setMenuOpen(false);
-                  onRemove?.(playlist.id);
-                }}
-              >
-                Remove playlist
-              </button>
-            </div>
-          ) : null}
-        </div>
+                <div className="menu-separator" role="separator" />
+                <button
+                  className="menu-danger"
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onRemove?.(playlist.id);
+                  }}
+                >
+                  Remove playlist
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

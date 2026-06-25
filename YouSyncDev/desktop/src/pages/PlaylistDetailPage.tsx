@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import Toast from "../components/Toast";
+import { useSyncStatus } from "../context/SyncStatusContext";
 import { getPlatform } from "../data/mockData";
 import { USE_MOCK_PLAYLIST_STATUSES, getMockPlaylistDetail } from "../data/mockPlaylists";
 import {
-  cancelPlaylistSync,
   deletePlaylist,
-  downloadMissing,
   getPlaylistDetails,
-  getSyncStatus,
   openFolder,
   openSourceUrl,
-  syncPlaylist
 } from "../services/playlistService";
-import type { LongTaskProgress, PlaylistDetail, SyncStatus } from "../services/playlistService";
-
-const SYNC_STATUS_POLL_MS = 1500;
+import type { LongTaskProgress, PlaylistDetail } from "../services/playlistService";
 
 type PlaylistDetailPageProps = {
   playlistId: string;
@@ -52,11 +47,20 @@ function progressLabel(progress: LongTaskProgress | null) {
 function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [detail, setDetail] = useState<PlaylistDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncStatus | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [coverFailed, setCoverFailed] = useState(false);
+  const {
+    statusVersion,
+    isActiveProgress,
+    getPlaylistProgress,
+    syncPlaylist,
+    downloadMissing,
+    cancelPlaylistSync,
+  } = useSyncStatus();
+  const syncProgress = getPlaylistProgress(playlistId);
+  const isSyncing = isActiveProgress(syncProgress);
+  const showProgress = Boolean(syncProgress && (isSyncing || syncProgress.status === "cancelled"));
 
   async function loadDetail() {
     setIsLoading(true);
@@ -96,6 +100,12 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   }, [playlistId]);
 
   useEffect(() => {
+    if (statusVersion > 0) {
+      void loadDetail();
+    }
+  }, [statusVersion]);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -103,92 +113,6 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     const timeout = window.setTimeout(() => setToast(""), 3200);
     return () => window.clearTimeout(timeout);
   }, [toast]);
-
-  useEffect(() => {
-    if (!isSyncing) {
-      return;
-    }
-
-    let cancelled = false;
-    let timeoutId: number | null = null;
-
-    async function pollSyncStatus() {
-      const status = await getSyncStatus(playlistId);
-
-      if (cancelled) {
-        return;
-      }
-
-      setSyncProgress(status);
-
-      if (status.status === "syncing") {
-        timeoutId = window.setTimeout(pollSyncStatus, SYNC_STATUS_POLL_MS);
-        return;
-      }
-
-      if (status.status === "completed") {
-        await loadDetail();
-        if (!cancelled) {
-          if (status.message?.includes("failed")) {
-            setToast(status.message);
-          }
-          setIsSyncing(false);
-          setSyncProgress(null);
-        }
-        return;
-      }
-
-      if (status.status === "error") {
-        await loadDetail();
-        if (!cancelled) {
-          setToast(status.message || "Sync could not be completed.");
-          setIsSyncing(false);
-          setSyncProgress(null);
-        }
-        return;
-      }
-
-      if (status.status === "cancelled") {
-        await loadDetail();
-        if (!cancelled) {
-          setSyncProgress(status);
-        }
-        return;
-      }
-
-      setIsSyncing(false);
-      setSyncProgress(null);
-    }
-
-    void pollSyncStatus().catch((error) => {
-      if (!cancelled) {
-        setToast(error instanceof Error ? error.message : String(error));
-        setIsSyncing(false);
-        setSyncProgress(null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [isSyncing, playlistId]);
-
-  useEffect(() => {
-    if (syncProgress?.status !== "cancelled") {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setIsSyncing(false);
-      setSyncProgress(null);
-    }, 2200);
-
-    return () => window.clearTimeout(timeout);
-  }, [syncProgress]);
 
   const playlist = detail?.playlist ?? null;
   const platform = playlist ? getPlatform(playlist.platform) : null;
@@ -214,16 +138,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
     if (!result.started) {
       setToast(result.message ?? "A sync is already running.");
-      return;
     }
-
-    setIsSyncing(true);
-    setSyncProgress({
-      playlistId,
-      status: "syncing",
-      phase: "syncing",
-      message: "Syncing playlist...",
-    });
   }
 
   async function handleDownloadMissing() {
@@ -244,16 +159,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
     if (!result.started) {
       setToast(result.message ?? "A sync or download is already running.");
-      return;
     }
-
-    setIsSyncing(true);
-    setSyncProgress({
-      playlistId,
-      status: "syncing",
-      phase: "downloading",
-      message: "Preparing downloads...",
-    });
   }
 
   async function handleCancelSync() {
@@ -268,14 +174,6 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    setSyncProgress({
-      ...(syncProgress ?? { playlistId }),
-      playlistId,
-      status: "cancelled",
-      phase: "cancelled",
-      currentTrack: "",
-      message: result.message || "Sync cancelled.",
-    });
     await loadDetail();
   }
 
@@ -465,9 +363,9 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         </div>
       </div>
 
-      {isSyncing && syncProgress ? (
+      {showProgress && syncProgress ? (
         <div className="detail-progress" role="status">
-          <span className="sync-spinner" aria-hidden="true" />
+          {isSyncing ? <span className="sync-spinner" aria-hidden="true" /> : null}
           <span>{progressLabel(syncProgress)}</span>
         </div>
       ) : null}
