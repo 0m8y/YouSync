@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useConfirm } from "../components/ConfirmProvider";
 import PlaylistRow from "../components/PlaylistRow";
 import { PlaylistRowsSkeleton } from "../components/Skeleton";
@@ -65,6 +66,8 @@ function progressLabel(progress: LongTaskProgress | null) {
 }
 
 function PlaylistsPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,6 +157,17 @@ function PlaylistsPage() {
       window.removeEventListener(PLAYLISTS_UPDATED_EVENT, handlePlaylistsUpdated);
     };
   }, [refreshBrokenPlaylists, refreshSyncStatuses, reloadPlaylists]);
+
+  useEffect(() => {
+    const state = location.state as { selectedPlaylistId?: string } | null;
+
+    if (!state?.selectedPlaylistId) {
+      return;
+    }
+
+    setSelectedPlaylistId(state.selectedPlaylistId);
+    navigate("/playlists", { replace: true, state: null });
+  }, [location.state, navigate]);
 
   useEffect(() => {
     void reloadPlaylists();

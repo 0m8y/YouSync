@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { debugLog } from "./settingsService";
 
 export type Platform = "youtube" | "spotify" | "apple" | "soundcloud" | "unknown";
 
@@ -201,7 +202,7 @@ export async function addPlaylist(
 
   try {
     const result = await invoke<AddPlaylistResult>("add_playlist", request);
-    console.info("[YouSync] bridge add_playlist result", {
+    debugLog("[YouSync] bridge add_playlist result", {
       request,
       result,
       coverPath: result.playlist?.coverPath,
@@ -218,7 +219,7 @@ export async function addPlaylist(
 export async function listPlaylists(): Promise<PlaylistSummary[]> {
   try {
     const playlists = await invoke<PlaylistSummary[]>("list_playlists");
-    console.info("[YouSync] bridge list_playlists result", playlists.map((playlist) => ({
+    debugLog("[YouSync] bridge list_playlists result", playlists.map((playlist) => ({
       id: playlist.id,
       title: playlist.title,
       coverPath: playlist.coverPath,
@@ -438,6 +439,16 @@ export async function openLocalFile(path: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.warn("[YouSync] open_local_file failed", bridgeError(error));
+    return false;
+  }
+}
+
+export async function openPlaylistsJson(): Promise<boolean> {
+  try {
+    await invoke("open_playlists_json");
+    return true;
+  } catch (error) {
+    console.warn("[YouSync] open_playlists_json failed", bridgeError(error));
     return false;
   }
 }

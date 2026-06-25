@@ -5,6 +5,8 @@ import FolderSelector from "../components/FolderSelector";
 import PlaylistPreviewCard from "../components/PlaylistPreviewCard";
 import SmartPlaylistInput from "../components/SmartPlaylistInput";
 import { useToast } from "../components/ToastProvider";
+import { useSettings } from "../context/SettingsContext";
+import { useSyncStatus } from "../context/SyncStatusContext";
 import {
   PLAYLISTS_UPDATED_EVENT,
   addPlaylist,
@@ -12,6 +14,7 @@ import {
   listPlaylists,
   previewPlaylist
 } from "../services/playlistService";
+import { debugLog } from "../services/settingsService";
 import type { DetectionStatus, PlatformId, PlaylistPreview } from "../types/playlist";
 
 const LAST_FOLDER_KEY = "yousync:last-folder";
@@ -34,9 +37,17 @@ function HomePage() {
   const [folder, setFolder] = useState(readLastFolder);
   const previewRequestId = useRef(0);
   const { showToast } = useToast();
+  const { settings } = useSettings();
+  const { syncPlaylist, isActiveProgress, getPlaylistProgress } = useSyncStatus();
 
   const canAddPlaylist = status === "detected" && Boolean(folder.trim());
   const showForm = isPreviewLoading || status === "detected";
+
+  useEffect(() => {
+    if (!folder.trim() && settings.defaultPlaylistFolder) {
+      setFolder(settings.defaultPlaylistFolder);
+    }
+  }, [folder, settings.defaultPlaylistFolder]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +143,7 @@ function HomePage() {
 
     const result = await addPlaylist({ url, folder });
 
-    console.info("[YouSync] addPlaylist response", {
+    debugLog("[YouSync] addPlaylist response", {
       ok: result.ok,
       message: result.message,
       playlist: result.playlist,
@@ -147,7 +158,7 @@ function HomePage() {
       }
 
       const playlists = await listPlaylists();
-      console.info("[YouSync] listPlaylists response after add", {
+      debugLog("[YouSync] listPlaylists response after add", {
         playlists,
         addedPlaylistId: result.playlist?.id,
         addedCoverPathFromAdd: result.playlist?.coverPath,
@@ -173,8 +184,22 @@ function HomePage() {
         })
       );
 
+      const addedPlaylistId = result.playlist?.id
+        ?? mergedPlaylists.find((playlist) => playlist.sourceUrl === url)?.id;
+
       showToast(result.message, "success");
-      navigate("/playlists");
+
+      if (settings.autoSyncAfterAdd && addedPlaylistId && !isActiveProgress(getPlaylistProgress(addedPlaylistId))) {
+        const syncResult = await syncPlaylist(addedPlaylistId);
+
+        if (!syncResult.started) {
+          showToast(syncResult.message ?? "Auto sync could not be started.", "error");
+        }
+      }
+
+      navigate("/playlists", {
+        state: addedPlaylistId ? { selectedPlaylistId: addedPlaylistId } : undefined,
+      });
       return;
     }
 

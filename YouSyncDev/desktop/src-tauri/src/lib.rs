@@ -367,6 +367,24 @@ fn open_local_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_playlists_json() -> Result<(), String> {
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let playlists_json = project_root.join("core/playlists.json");
+
+    if playlists_json.is_file() {
+        return open_target(&playlists_json.to_string_lossy());
+    }
+
+    let core_folder = project_root.join("core");
+
+    if core_folder.is_dir() {
+        return open_target(&core_folder.to_string_lossy());
+    }
+
+    Err("playlists.json could not be found.".to_string())
+}
+
+#[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
     open_playlist_folder(path)
 }
@@ -417,6 +435,7 @@ pub fn run() {
             open_playlist_folder,
             open_external_url,
             open_local_file,
+            open_playlists_json,
             open_folder,
             open_url
         ])

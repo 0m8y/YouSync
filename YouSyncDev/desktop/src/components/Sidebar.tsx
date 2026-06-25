@@ -11,7 +11,6 @@ function Sidebar() {
     <aside className="ys-sidebar" aria-label="Main navigation">
 
       <div className="ys-logo">
-        <div className="ys-logo-icon" aria-hidden="true">♪</div>
         <span className="ys-logo-name">YouSync</span>
       </div>
 
@@ -32,7 +31,6 @@ function Sidebar() {
 
       <div className="ys-sidebar-footer">
         <div className="version-pill">
-          <span className="version-avatar" aria-hidden="true">•</span>
           <span>v1.0.0</span>
         </div>
       </div>

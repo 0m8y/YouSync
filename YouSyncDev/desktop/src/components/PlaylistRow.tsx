@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getPlatform } from "../data/mockData";
 import type { LongTaskProgress } from "../services/playlistService";
+import { debugLog } from "../services/settingsService";
 import type { PlaylistListItem } from "../types/playlist";
 
 type PlaylistRowProps = {
@@ -72,7 +73,7 @@ function PlaylistRow({
     setCoverFailed(false);
 
     if (playlist.coverPath && coverUrl) {
-      console.info("[YouSync] Playlist cover asset URL", {
+      debugLog("[YouSync] Playlist cover asset URL", {
         title: playlist.title,
         coverPath: playlist.coverPath,
         src: coverUrl,
