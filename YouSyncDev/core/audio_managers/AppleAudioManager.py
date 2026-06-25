@@ -5,7 +5,7 @@ from youtube_search import YoutubeSearch
 from pytubefix import YouTube
 import tempfile
 
-from moviepy import AudioFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 import requests
 from bs4 import BeautifulSoup
 import re

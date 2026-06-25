@@ -93,6 +93,14 @@ def install_core_import_stubs() -> None:
 
 
 def project_root() -> Path:
+    if getattr(sys, "frozen", False):
+        bundle_root = getattr(sys, "_MEIPASS", None)
+
+        if bundle_root:
+            return Path(bundle_root)
+
+        return Path(sys.executable).resolve().parent
+
     return Path(__file__).resolve().parents[2]
 
 

@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
+
+const WORKER_SIDECAR_NAME: &str = "yousync-worker";
 
 fn python_executable() -> PathBuf {
     let project_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -25,6 +27,70 @@ fn python_executable() -> PathBuf {
     }
 }
 
+fn worker_script_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../python/yousync_worker.py")
+}
+
+enum WorkerLaunch {
+    Python { python: PathBuf, script: PathBuf },
+    Sidecar { path: PathBuf },
+}
+
+fn sidecar_candidates(app_handle: &AppHandle) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        candidates.push(resource_dir.join(WORKER_SIDECAR_NAME));
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            candidates.push(exe_dir.join(WORKER_SIDECAR_NAME));
+
+            #[cfg(target_os = "macos")]
+            if let Some(contents_dir) = exe_dir.parent() {
+                candidates.push(contents_dir.join("Resources").join(WORKER_SIDECAR_NAME));
+            }
+        }
+    }
+
+    candidates
+}
+
+fn packaged_worker_sidecar(app_handle: &AppHandle) -> Option<PathBuf> {
+    sidecar_candidates(app_handle)
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
+fn worker_launch(app_handle: &AppHandle) -> Result<WorkerLaunch, String> {
+    let script = worker_script_path();
+
+    if cfg!(debug_assertions) && script.is_file() {
+        return Ok(WorkerLaunch::Python {
+            python: python_executable(),
+            script,
+        });
+    }
+
+    if let Some(path) = packaged_worker_sidecar(app_handle) {
+        return Ok(WorkerLaunch::Sidecar { path });
+    }
+
+    if script.is_file() {
+        return Ok(WorkerLaunch::Python {
+            python: python_executable(),
+            script,
+        });
+    }
+
+    Err(format!(
+        "Could not find YouSync worker sidecar '{}' or source worker '{}'.",
+        WORKER_SIDECAR_NAME,
+        script.display()
+    ))
+}
+
 struct WorkerProcess {
     child: Child,
     stdin: ChildStdin,
@@ -32,22 +98,34 @@ struct WorkerProcess {
 }
 
 impl WorkerProcess {
-    fn new() -> Result<Self, String> {
-        let script_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../python/yousync_worker.py");
-        let python = python_executable();
-        let mut child = Command::new(&python)
-            .arg("-u")
-            .arg(&script_path)
+    fn new(app_handle: &AppHandle) -> Result<Self, String> {
+        let launch = worker_launch(app_handle)?;
+        let mut command = match &launch {
+            WorkerLaunch::Python { python, script } => {
+                let mut command = Command::new(python);
+                command.arg("-u").arg(script);
+                command
+            }
+            WorkerLaunch::Sidecar { path } => Command::new(path),
+        };
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|error| {
-                format!(
-                    "Failed to start Python worker with '{}': {error}",
-                    python.display()
-                )
+            .map_err(|error| match launch {
+                WorkerLaunch::Python { python, .. } => {
+                    format!(
+                        "Failed to start Python worker with '{}': {error}",
+                        python.display()
+                    )
+                }
+                WorkerLaunch::Sidecar { path } => {
+                    format!(
+                        "Failed to start YouSync worker sidecar '{}': {error}",
+                        path.display()
+                    )
+                }
             })?;
 
         let stdin = child
@@ -80,9 +158,9 @@ struct WorkerState {
 }
 
 impl WorkerState {
-    fn new() -> Result<Self, String> {
+    fn new(app_handle: AppHandle) -> Result<Self, String> {
         Ok(Self {
-            process: Mutex::new(WorkerProcess::new()?),
+            process: Mutex::new(WorkerProcess::new(&app_handle)?),
             next_id: AtomicU64::new(1),
         })
     }
@@ -410,8 +488,17 @@ fn redownload_track(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(WorkerState::new().expect("failed to start Python worker"))
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let worker_state = WorkerState::new(app.handle().clone()).map_err(|error| {
+                Box::<dyn std::error::Error>::from(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    error,
+                ))
+            })?;
+            app.manage(worker_state);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             detect_playlist,
             preview_playlist,

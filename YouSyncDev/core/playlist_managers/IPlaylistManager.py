@@ -78,6 +78,8 @@ class IPlaylistManager(ABC):
             for future in as_completed(futures):
                 try:
                     am = future.result()
+                    if am is None:
+                        continue
                     self.audio_managers.append(am)
                 except Exception as e:
                     logging.error(f"Error while loading audio manager: {e}", exc_info=True)
@@ -128,19 +130,34 @@ class IPlaylistManager(ABC):
         new_urls = self.get_video_urls()
         old_urls = [audio.url for audio in self.playlist_data.audios]
 
-        # Add new videos
+        # Add new videos. A single unavailable/private/deleted video must not
+        # abort the whole playlist synchronization. Platform-specific
+        # new_audio_manager implementations may return None when the audio
+        # cannot be initialized, for example when YouTube/pytubefix reports
+        # that a video is unavailable.
         for url in new_urls:
             if url not in old_urls:
                 print("New video: " + url)
-                am = self.new_audio_manager(url)
-                am.update_data()
-                self.playlist_data.audios.append(am.metadata)
-                self.audio_managers.append(am)
+                try:
+                    am = self.new_audio_manager(url)
+                    if am is None:
+                        logging.warning(f"Skipping unavailable audio: {url}")
+                        continue
+
+                    am.update_data()
+                    self.playlist_data.audios.append(am.metadata)
+                    self.audio_managers.append(am)
+                except Exception as e:
+                    logging.error(f"Error while adding audio {url}: {e}", exc_info=True)
+                    continue
 
         # Remove deleted videos
         for old_url in list(old_urls):
             if old_url not in new_urls:
-                self.__remove_audio(old_url)
+                try:
+                    self.__remove_audio(old_url)
+                except Exception as e:
+                    logging.error(f"Error while removing audio {old_url}: {e}", exc_info=True)
 
         # Save playlist data
         self.data_store.save(self.playlist_data)

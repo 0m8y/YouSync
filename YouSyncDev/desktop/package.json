@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:worker:macos": "sh scripts/build-python-worker-macos.sh",
+    "build:macos": "npm run build:worker:macos && npm run tauri -- build",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -38,8 +38,7 @@ class YoutubePlaylistManager(IPlaylistManager):
             audio_manager = YoutubeAudioManager(url, self.path_to_save_audio, self.playlist_data_filepath, self.lock)
             return audio_manager
         except Exception as e:
-            logging.error(f"Error initializing YoutubeAudioManager: {e}")
-            print(f"Error initializing YoutubeAudioManager: {e}")
+            logging.error(f"Error initializing YoutubeAudioManager for {url}: {e}", exc_info=True)
             return None
 
     # Override Method
@@ -94,15 +93,22 @@ class YoutubePlaylistManager(IPlaylistManager):
     # Override Method
     def download(self) -> None:
         def download_audio(audio_manager: YoutubeAudioManager) -> None:
+            if audio_manager is None:
+                return
+
             try:
                 audio_manager.download()
             except VideoUnavailable as e:
-                print(f"❌ Vidéo non disponible : {e}")
+                logging.warning(f"YouTube video unavailable: {e}")
             except Exception as e:
-                print(f"❌ Erreur lors du téléchargement : {e}")
+                logging.error(f"Error while downloading YouTube audio: {e}", exc_info=True)
 
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(download_audio, audio_manager) for audio_manager in self.audio_managers]
+            futures = [
+                executor.submit(download_audio, audio_manager)
+                for audio_manager in self.audio_managers
+                if audio_manager is not None
+            ]
             for future in futures:
                 future.result()
 

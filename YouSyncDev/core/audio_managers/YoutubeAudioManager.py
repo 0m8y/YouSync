@@ -1,7 +1,7 @@
 from core.audio_managers.IAudioManager import IAudioManager
 from core.utils import extract_json_object, get_cached_video_title, get_cached_video_id
 
-from moviepy import AudioFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 from bs4 import BeautifulSoup
 from pytubefix import YouTube
 from threading import Lock

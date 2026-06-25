@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import tempfile
+import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
@@ -29,6 +30,24 @@ def write_response(payload: Dict[str, Any]) -> None:
 def write_child_result(payload: Dict[str, Any]) -> None:
     ORIGINAL_STDOUT.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n")
     ORIGINAL_STDOUT.flush()
+
+
+def is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def worker_child_command(args: List[str]) -> List[str]:
+    if is_frozen():
+        return [sys.executable, *args]
+
+    return [sys.executable, "-u", str(Path(__file__).resolve()), *args]
+
+
+def worker_child_cwd() -> str:
+    if is_frozen():
+        return str(Path(sys.executable).resolve().parent)
+
+    return str(bridge.project_root())
 
 
 def progress_jobs_dir() -> Path:
@@ -444,6 +463,7 @@ def run_sync_child(playlist_id: str, progress_path: Optional[str] = None) -> int
         )
         write_child_result(result)
         log(f"sync child crashed for {playlist_id}: {exc}")
+        traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -572,6 +592,7 @@ def run_sync_all_child(progress_path: Optional[str] = None) -> int:
             }
         )
         log(f"sync all child crashed: {exc}")
+        traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -682,6 +703,7 @@ def run_download_missing_child(playlist_id: str, progress_path: Optional[str] = 
             }
         )
         log(f"download missing child crashed for {playlist_id}: {exc}")
+        traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -690,6 +712,9 @@ class YouSyncWorker:
         bridge.ensure_project_root_on_path()
 
         with redirect_stdout(sys.stderr):
+            if is_frozen():
+                import numpy  # noqa: F401
+
             from core.CentralManager import CentralManager, Platform
 
             self.platform_enum = Platform
@@ -1493,10 +1518,9 @@ class YouSyncWorker:
             log(f"failed to refresh manager after sync: {exc}")
 
     def start_sync_process(self, args: List[str]) -> subprocess.Popen[Any]:
-        script_path = Path(__file__).resolve()
         return subprocess.Popen(
-            [sys.executable, "-u", str(script_path), *args],
-            cwd=str(bridge.project_root()),
+            worker_child_command(args),
+            cwd=worker_child_cwd(),
             stdin=subprocess.DEVNULL,
             # Never keep child stdout as a pipe: the core/downloader may print a
             # lot during sync. If the pipe fills, the child blocks forever and
@@ -2900,6 +2924,8 @@ def main() -> int:
         worker = YouSyncWorker()
     except Exception as exc:
         log(f"failed to start: {exc}")
+        if os.environ.get("YOUSYNC_WORKER_DEBUG_TRACEBACK") == "1":
+            traceback.print_exc(file=sys.stderr)
         return 1
 
     for line in sys.stdin:

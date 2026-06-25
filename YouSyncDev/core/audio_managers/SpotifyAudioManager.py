@@ -6,7 +6,7 @@ from pytubefix import YouTube
 import os
 import re
 
-from moviepy import AudioFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 import requests
 from bs4 import BeautifulSoup
 from typing import Optional

@@ -238,7 +238,6 @@ class CentralManager:
                 playlist.last_update = datetime.datetime.now().strftime("%B %d, %Y - %H:%M")
                 self.save_data_to_json()
         except Exception as e:
-            print(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
             logging.error(f"Error updating playlist with ID {playlist_id}: {e}", exc_info=True)
             return f"An error occurred while updating the playlist with ID {playlist_id}. Please check the logs for more details."
         return None

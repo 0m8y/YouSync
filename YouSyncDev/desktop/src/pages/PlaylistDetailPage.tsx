@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -92,6 +92,9 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [coverFailed, setCoverFailed] = useState(false);
   const [trackSearch, setTrackSearch] = useState("");
   const [trackStatusFilter, setTrackStatusFilter] = useState<TrackStatusFilter>("All");
+  const liveDetailRefreshInFlightRef = useRef(false);
+  const liveDetailRefreshPendingRef = useRef(false);
+  const lastLiveDetailProgressKeyRef = useRef("");
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const {
@@ -160,6 +163,65 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       void loadDetail(false);
     }
   }, [statusVersion]);
+
+  useEffect(() => {
+    const status = syncProgress?.status ?? "";
+    const phase = syncProgress?.phase ?? "";
+    const isTerminal = status === "completed" || status === "cancelled" || status === "error";
+
+    if (!isSyncing && !isTerminal) {
+      lastLiveDetailProgressKeyRef.current = "";
+      return;
+    }
+
+    const progressKey = [
+      playlistId,
+      status,
+      phase,
+      syncProgress?.current ?? "",
+      syncProgress?.total ?? "",
+      syncProgress?.failedCount ?? "",
+      syncProgress?.message ?? "",
+      syncProgress?.currentTrack ?? "",
+    ].join("|");
+
+    if (lastLiveDetailProgressKeyRef.current === progressKey) {
+      return;
+    }
+
+    lastLiveDetailProgressKeyRef.current = progressKey;
+
+    if (liveDetailRefreshInFlightRef.current) {
+      liveDetailRefreshPendingRef.current = true;
+      return;
+    }
+
+    liveDetailRefreshInFlightRef.current = true;
+
+    function refreshLiveDetail() {
+      void loadDetail(false).finally(() => {
+        if (liveDetailRefreshPendingRef.current) {
+          liveDetailRefreshPendingRef.current = false;
+          refreshLiveDetail();
+          return;
+        }
+
+        liveDetailRefreshInFlightRef.current = false;
+      });
+    }
+
+    refreshLiveDetail();
+  }, [
+    isSyncing,
+    playlistId,
+    syncProgress?.status,
+    syncProgress?.phase,
+    syncProgress?.current,
+    syncProgress?.total,
+    syncProgress?.failedCount,
+    syncProgress?.message,
+    syncProgress?.currentTrack,
+  ]);
 
   useEffect(() => {
     if (!menuOpen && trackMenuOpen === null) {
