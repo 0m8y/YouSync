@@ -1955,6 +1955,152 @@ class YouSyncWorker:
 
         return files
 
+    def playlist_audio_move_plan(
+        self,
+        playlist: Any,
+        cache: Dict[str, Any],
+        new_root: Path,
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        root_folder = self.playlist_root_folder(playlist)
+        audios = cache.get("audios", []) if isinstance(cache, dict) else []
+        moves: List[Dict[str, Any]] = []
+        seen_sources: set[str] = set()
+        seen_destinations: set[str] = set()
+
+        # The persisted source of truth for a downloaded MP3 is
+        # path_to_save_audio_with_title. Only fall back to
+        # path_to_save_audio_without_title when the main path is absent or the
+        # fallback is the only path that still exists on disk.
+        primary_path_key = "path_to_save_audio_with_title"
+        fallback_path_key = "path_to_save_audio_without_title"
+
+        if not isinstance(audios, list):
+            return moves, None
+
+        def normalized_key(path: Path) -> str:
+            try:
+                return str(path.expanduser().resolve(strict=False))
+            except OSError:
+                return str(path.expanduser())
+
+        def reserve_destination(source: Path) -> Path:
+            candidate = new_root / source.name
+            index = 1
+
+            while True:
+                destination_key = normalized_key(candidate)
+
+                if destination_key not in seen_destinations and not candidate.exists():
+                    seen_destinations.add(destination_key)
+                    return candidate
+
+                candidate = new_root / f"{source.stem} ({index}){source.suffix}"
+                index += 1
+
+        def path_from_audio(audio: Dict[str, Any], key: str) -> Optional[Path]:
+            value = audio.get(key)
+
+            if not isinstance(value, str) or not value.strip():
+                return None
+
+            candidate = self.normalize_file_path(value, root_folder)
+
+            if candidate is None or not candidate.name or not candidate.suffix:
+                return None
+
+            return candidate
+
+        for audio_index, audio in enumerate(audios):
+            if not isinstance(audio, dict):
+                continue
+
+            primary_source = path_from_audio(audio, primary_path_key)
+            fallback_source = path_from_audio(audio, fallback_path_key)
+
+            source = primary_source
+
+            # Keep path_to_save_audio_with_title as the source of truth. The only
+            # time we switch to the fallback is when the primary file is missing
+            # and the fallback file exists.
+            if (
+                primary_source is None
+                or (not primary_source.exists() and fallback_source is not None and fallback_source.exists())
+            ):
+                source = fallback_source or primary_source
+
+            if source is None:
+                continue
+
+            source_key = normalized_key(source)
+
+            if source_key in seen_sources:
+                continue
+
+            destination = reserve_destination(source)
+
+            if normalized_key(source) == normalized_key(destination):
+                seen_sources.add(source_key)
+                continue
+
+            seen_sources.add(source_key)
+            moves.append(
+                {
+                    "audioIndex": audio_index,
+                    "source": source,
+                    "destination": destination,
+                    "sourceKey": primary_path_key if source == primary_source else fallback_path_key,
+                }
+            )
+
+        return moves, None
+
+
+    def move_playlist_audio_files(self, moves: List[Dict[str, Any]]) -> int:
+        moved_count = 0
+
+        for move in moves:
+            source = move.get("source")
+            destination = move.get("destination")
+
+            if not isinstance(source, Path) or not isinstance(destination, Path):
+                continue
+
+            try:
+                log(f"Moving audio: {source} -> {destination}")
+
+                if not source.exists():
+                    if destination.exists():
+                        moved_count += 1
+                        log("Audio moved successfully")
+                    else:
+                        log(f"Audio source missing: {source}")
+                    continue
+
+                if destination.exists():
+                    destination = self.unique_destination_path(destination)
+                    move["destination"] = destination
+                    log(f"Audio destination exists, using: {destination}")
+
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source), str(destination))
+                moved_count += 1
+                log("Audio moved successfully")
+            except Exception as exc:
+                raise RuntimeError(f'Could not move "{source.name}".') from exc
+
+        return moved_count
+
+    def unique_destination_path(self, destination: Path) -> Path:
+        if not destination.exists():
+            return destination
+
+        index = 1
+        while True:
+            candidate = destination.parent / f"{destination.stem} ({index}){destination.suffix}"
+            if not candidate.exists():
+                return candidate
+            index += 1
+
     def relative_destination_for_file(
         self,
         file_path: Path,
@@ -2028,6 +2174,7 @@ class YouSyncWorker:
         old_root: Optional[Path],
         old_storage_folder: Optional[Path],
         new_root: Path,
+        audio_moves: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         replacements: List[Tuple[str, str]] = []
 
@@ -2050,14 +2197,38 @@ class YouSyncWorker:
             "filePath",
             "path",
         ]
+        file_path_keys = {
+            "path_to_save_audio_with_title",
+            "path_to_save_audio_without_title",
+            "local_path",
+            "localPath",
+            "file_path",
+            "filePath",
+            "path",
+        }
+        destination_by_audio_index: Dict[int, Path] = {}
 
-        def rewrite_audio_path(raw_value: Any) -> Any:
+        for move in audio_moves or []:
+            audio_index = move.get("audioIndex")
+            destination = move.get("destination")
+
+            if isinstance(audio_index, int) and isinstance(destination, Path):
+                destination_by_audio_index[audio_index] = destination
+
+        def rewrite_audio_path(raw_value: Any, key: str, audio_index: int) -> Any:
             if not isinstance(raw_value, str):
                 return raw_value
 
             value = raw_value.strip()
             if not value:
                 return raw_value
+
+            explicit_destination = destination_by_audio_index.get(audio_index)
+            if explicit_destination is not None:
+                if key in file_path_keys:
+                    return str(explicit_destination)
+
+                return str(new_root)
 
             replaced = self.replace_path_strings(value, replacements)
             if replaced != value:
@@ -2081,13 +2252,13 @@ class YouSyncWorker:
 
             audios = data.get("audios")
             if isinstance(audios, list):
-                for audio in audios:
+                for audio_index, audio in enumerate(audios):
                     if not isinstance(audio, dict):
                         continue
 
                     for key in audio_path_keys:
                         if key in audio:
-                            audio[key] = rewrite_audio_path(audio[key])
+                            audio[key] = rewrite_audio_path(audio[key], key, audio_index)
 
             tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
             with open(tmp_path, "w", encoding="utf-8") as file:
@@ -2148,20 +2319,18 @@ class YouSyncWorker:
         if destination_root.name == ".yousync":
             destination_root = destination_root.parent
 
-        if not destination_root.exists():
-            return {"ok": False, "message": "The selected folder does not exist."}
-
-        if not destination_root.is_dir():
+        if destination_root.exists() and not destination_root.is_dir():
             return {"ok": False, "message": "The selected path is not a folder."}
 
         with self.sync_lock:
             state, should_refresh_manager = self.poll_sync_process_locked()
             should_refresh_manager = self.poll_playlist_tasks_locked() or should_refresh_manager
 
-            if self.is_long_task_running_locked(state):
+            global_process_running = self.sync_process is not None and self.sync_process.poll() is None
+            if global_process_running or self.is_playlist_task_running_locked(playlist_id):
                 return {
                     "ok": False,
-                    "message": "Cannot change playlist folder while a sync or download is running.",
+                    "message": "Cannot change location while this playlist is syncing.",
                 }
 
         self.refresh_after_completed_sync(should_refresh_manager)
@@ -2177,15 +2346,13 @@ class YouSyncWorker:
                         "message": f"Playlist with ID {playlist_id} not found.",
                     }
 
-                if not hasattr(self.manager, "update_path"):
-                    return {
-                        "ok": False,
-                        "message": "Changing playlist folder is not available in this build.",
-                    }
-
                 old_root = self.playlist_root_folder(playlist)
                 old_storage_folder = self.playlist_storage_folder(playlist)
                 metadata_files = self.playlist_metadata_files(playlist)
+
+                # Important: read the old cache and compute every audio move
+                # before playlists.json or any .yousync path is changed.
+                playlist_cache = bridge.read_playlist_cache(getattr(playlist, "path", ""))
 
         if old_root is not None:
             try:
@@ -2204,42 +2371,75 @@ class YouSyncWorker:
                 pass
 
         target_storage_folder = destination_root / ".yousync"
+        target_cache_path = target_storage_folder / f"{playlist_id}.json"
         copied_sources: List[Path] = []
 
         try:
+            destination_root.mkdir(parents=True, exist_ok=True)
             target_storage_folder.mkdir(parents=True, exist_ok=True)
+
+            audio_moves, conflict_message = self.playlist_audio_move_plan(
+                playlist,
+                playlist_cache,
+                destination_root,
+            )
+
+            if conflict_message:
+                return {"ok": False, "message": conflict_message}
 
             for metadata_file in metadata_files:
                 destination_file = target_storage_folder / metadata_file.name
                 if self.copy_playlist_file(metadata_file, destination_file):
                     copied_sources.append(metadata_file)
 
-            # Audio files are moved by core IAudioManager.update_path().
-            # Do not copy the whole folder here: several playlists can share
-            # the same destination, so only this playlist's managers should
-            # move their own referenced files.
-
-            with redirect_stdout(sys.stderr):
-                with self.manager_lock:
-                    updated = self.manager.update_path(str(destination_root), playlist_id)
-                    playlists = self.manager.list_playlists()
-
-            if not bool(updated):
+            if not target_cache_path.exists():
                 return {
                     "ok": False,
-                    "message": "No matching YouSync data was found in the selected folder.",
+                    "message": "No matching YouSync data was found for this playlist.",
                 }
 
+            moved_audio_count = self.move_playlist_audio_files(audio_moves)
+
+            # Rewrite the copied cache after the real moves. This keeps the
+            # actual destination used by shutil.move, including generated unique
+            # names when a file already existed in the destination folder.
             self.rewrite_playlist_cache_paths(
-                target_storage_folder / f"{playlist_id}.json",
+                target_cache_path,
                 old_root,
                 old_storage_folder,
                 destination_root,
+                audio_moves,
             )
 
-            deleted_count = 0
+            # Do not call CentralManager.update_path here. That core method can
+            # rebuild audio paths from video_title and overwrite the exact
+            # destinations we just moved to. For this operation, only
+            # playlists.json needs to point to the copied playlist cache.
+            with redirect_stdout(sys.stderr):
+                with self.manager_lock:
+                    playlist_after_move = self.manager.get_playlist(playlist_id)
+
+                    if playlist_after_move is None:
+                        return {
+                            "ok": False,
+                            "message": f"Playlist with ID {playlist_id} not found.",
+                        }
+
+                    playlist_after_move.path = str(target_cache_path)
+
+                    if hasattr(self.manager, "save_data_to_json"):
+                        self.manager.save_data_to_json()
+                    else:
+                        return {
+                            "ok": False,
+                            "message": "Could not save playlists.json.",
+                        }
+
+            log("Playlist location changed")
+
+            moved_metadata_count = 0
             for source in copied_sources:
-                deleted_count += 1 if self.remove_file_if_exists(source) else 0
+                moved_metadata_count += 1 if self.remove_file_if_exists(source) else 0
 
             self.refresh_manager()
             with redirect_stdout(sys.stderr):
@@ -2259,7 +2459,8 @@ class YouSyncWorker:
                 "ok": True,
                 "message": "Playlist destination folder updated.",
                 "playlist": playlist_summary,
-                "movedFiles": deleted_count,
+                "movedFiles": moved_metadata_count,
+                "movedAudioFiles": moved_audio_count,
             }
         except Exception as exc:
             log(f"failed to move playlist folder for {playlist_id}: {exc}")
@@ -2267,6 +2468,7 @@ class YouSyncWorker:
                 "ok": False,
                 "message": "Playlist folder could not be changed.",
             }
+
 
     def delete_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(

@@ -14,6 +14,7 @@ type PlaylistRowProps = {
   onDownloadMissing?: (playlistId: string) => void;
   onOpenFolder?: (playlistId: string) => void;
   onOpenSource?: (playlistId: string) => void;
+  onChangeLocation?: (playlistId: string) => void;
   onRemove?: (playlistId: string) => void;
   onRemoveWithLocalFiles?: (playlistId: string) => void;
 };
@@ -54,6 +55,7 @@ function PlaylistRow({
   onDownloadMissing,
   onOpenFolder,
   onOpenSource,
+  onChangeLocation,
   onRemove,
   onRemoveWithLocalFiles,
 }: PlaylistRowProps) {
@@ -248,6 +250,17 @@ function PlaylistRow({
                   }}
                 >
                   Open source link
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onChangeLocation?.(playlist.id);
+                  }}
+                >
+                  Change playlist location
                 </button>
                 <div className="menu-separator" role="separator" />
                 <button

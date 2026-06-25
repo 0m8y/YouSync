@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import Toast from "../components/Toast";
 import { useSyncStatus } from "../context/SyncStatusContext";
 import { getPlatform } from "../data/mockData";
 import { USE_MOCK_PLAYLIST_STATUSES, getMockPlaylistDetail } from "../data/mockPlaylists";
 import {
+  PLAYLISTS_UPDATED_EVENT,
+  changePlaylistLocation,
   deletePlaylist,
   getPlaylistDetails,
   openFolder,
@@ -364,6 +367,52 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     }
   }
 
+  async function handleChangePlaylistLocation() {
+    setMenuOpen(false);
+
+    if (isSyncing) {
+      setToast("Cannot change location while this playlist is syncing.");
+      return;
+    }
+
+    let selectedFolder: string | string[] | null;
+
+    try {
+      selectedFolder = await open({
+        directory: true,
+        multiple: false,
+        title: "Change playlist location",
+      });
+    } catch {
+      setToast("Folder picker could not be opened.");
+      return;
+    }
+
+    const folder = Array.isArray(selectedFolder) ? selectedFolder[0] : selectedFolder;
+
+    if (!folder) {
+      return;
+    }
+
+    setToast("Changing playlist location...");
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      setToast("Mock status mode is enabled.");
+      return;
+    }
+
+    const result = await changePlaylistLocation(playlistId, folder);
+
+    if (!result.ok) {
+      setToast(result.message);
+      return;
+    }
+
+    await loadDetail();
+    window.dispatchEvent(new CustomEvent(PLAYLISTS_UPDATED_EVENT));
+    setToast(result.message);
+  }
+
   async function handlePlayTrack(track: PlaylistTrack) {
     if (!canOpenTrackLocalFile(track)) {
       return;
@@ -527,6 +576,14 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
                     onClick={handleDownloadMissing}
                   >
                     Download missing
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={isSyncing}
+                    onClick={handleChangePlaylistLocation}
+                  >
+                    Change playlist location
                   </button>
                   <div className="menu-separator" role="separator" />
                   <button

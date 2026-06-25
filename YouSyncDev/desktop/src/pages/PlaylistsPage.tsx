@@ -7,6 +7,7 @@ import PlaylistDetailPage from "./PlaylistDetailPage";
 import { USE_MOCK_PLAYLIST_STATUSES, mockPlaylists } from "../data/mockPlaylists";
 import {
   PLAYLISTS_UPDATED_EVENT,
+  changePlaylistLocation,
   deletePlaylist,
   listMissingPlaylists,
   listPlaylists,
@@ -239,6 +240,52 @@ function PlaylistsPage() {
     if (!opened) {
       setToast("Source could not be opened.");
     }
+  }
+
+  async function handleChangePlaylistLocation(playlistId: string) {
+    if (isActiveProgress(getPlaylistProgress(playlistId))) {
+      setToast("Cannot change location while this playlist is syncing.");
+      return;
+    }
+
+    let selectedFolder: string | string[] | null;
+
+    try {
+      selectedFolder = await open({
+        directory: true,
+        multiple: false,
+        title: "Change playlist location",
+      });
+    } catch {
+      setToast("Folder picker could not be opened.");
+      return;
+    }
+
+    const folder = Array.isArray(selectedFolder) ? selectedFolder[0] : selectedFolder;
+
+    if (!folder) {
+      return;
+    }
+
+    setToast("Changing playlist location...");
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      setToast("Mock status mode is enabled.");
+      return;
+    }
+
+    const result = await changePlaylistLocation(playlistId, folder);
+
+    if (!result.ok) {
+      setToast(result.message);
+      await refreshSyncStatuses();
+      return;
+    }
+
+    await reloadPlaylists();
+    await refreshBrokenPlaylists();
+    await refreshSyncStatuses();
+    setToast(result.message);
   }
 
   async function handleRemovePlaylist(playlistId: string) {
@@ -579,6 +626,7 @@ function PlaylistsPage() {
                 onDownloadMissing={handleDownloadMissing}
                 onOpenFolder={handleOpenPlaylistFolder}
                 onOpenSource={handleOpenPlaylistSource}
+                onChangeLocation={handleChangePlaylistLocation}
                 onRemove={handleRemovePlaylist}
                 onRemoveWithLocalFiles={handleRemovePlaylistWithLocalFiles}
               />

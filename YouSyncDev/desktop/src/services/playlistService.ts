@@ -269,6 +269,13 @@ export async function movePlaylistFolder(
   }
 }
 
+export async function changePlaylistLocation(
+  playlistId: string,
+  newFolder: string
+): Promise<MovePlaylistFolderResult> {
+  return movePlaylistFolder(playlistId, newFolder);
+}
+
 export async function updatePlaylistFolder(
   playlistId: string,
   folder: string
