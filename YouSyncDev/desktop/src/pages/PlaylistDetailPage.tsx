@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import Toast from "../components/Toast";
+import { useConfirm } from "../components/ConfirmProvider";
+import { useToast } from "../components/ToastProvider";
 import { useSyncStatus } from "../context/SyncStatusContext";
 import { getPlatform } from "../data/mockData";
 import { USE_MOCK_PLAYLIST_STATUSES, getMockPlaylistDetail } from "../data/mockPlaylists";
@@ -88,10 +89,11 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [trackMenuOpen, setTrackMenuOpen] = useState<number | null>(null);
-  const [toast, setToast] = useState("");
   const [coverFailed, setCoverFailed] = useState(false);
   const [trackSearch, setTrackSearch] = useState("");
   const [trackStatusFilter, setTrackStatusFilter] = useState<TrackStatusFilter>("All");
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const {
     statusVersion,
     isActiveProgress,
@@ -103,9 +105,17 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const syncProgress = getPlaylistProgress(playlistId);
   const isSyncing = isActiveProgress(syncProgress);
   const showProgress = Boolean(syncProgress && (isSyncing || syncProgress.status === "cancelled"));
+  const setToast = useCallback((message: string, variant: "success" | "error" | "info" = "info") => {
+    if (message) {
+      showToast(message, variant);
+    }
+  }, [showToast]);
 
-  async function loadDetail() {
-    setIsLoading(true);
+  async function loadDetail(showSkeleton = false) {
+    if (showSkeleton || !detail) {
+      setIsLoading(true);
+    }
+
     if (USE_MOCK_PLAYLIST_STATUSES) {
       const nextDetail = getMockPlaylistDetail(playlistId);
       setDetail(nextDetail);
@@ -121,6 +131,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
 
     async function load() {
       const nextDetail = USE_MOCK_PLAYLIST_STATUSES
@@ -146,18 +157,34 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
   useEffect(() => {
     if (statusVersion > 0) {
-      void loadDetail();
+      void loadDetail(false);
     }
   }, [statusVersion]);
 
   useEffect(() => {
-    if (!toast) {
+    if (!menuOpen && trackMenuOpen === null) {
       return;
     }
 
-    const timeout = window.setTimeout(() => setToast(""), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
+    function closeMenus() {
+      setMenuOpen(false);
+      setTrackMenuOpen(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeMenus();
+      }
+    }
+
+    document.addEventListener("mousedown", closeMenus);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", closeMenus);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen, trackMenuOpen]);
 
   const playlist = detail?.playlist ?? null;
   const platform = playlist ? getPlatform(playlist.platform) : null;
@@ -228,14 +255,14 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await syncPlaylist(playlistId);
 
     if (!result.started) {
-      setToast(result.message ?? "A sync is already running.");
+      setToast(result.message ?? "A sync is already running.", "error");
     }
   }
 
@@ -249,14 +276,14 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await downloadMissing(playlistId);
 
     if (!result.started) {
-      setToast(result.message ?? "A sync or download is already running.");
+      setToast(result.message ?? "A sync or download is already running.", "error");
     }
   }
 
@@ -268,24 +295,28 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     const result = await cancelPlaylistSync(playlistId);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
-    await loadDetail();
+    await loadDetail(false);
   }
 
   async function handleRemovePlaylist() {
     setMenuOpen(false);
 
     if (isSyncing) {
-      setToast("Cannot remove playlist while a sync or download is running.");
+      setToast("Cannot remove playlist while a sync or download is running.", "error");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Remove playlist?\n\nThis will remove the playlist from YouSync. Local audio files will not be deleted."
-    );
+    const confirmed = await confirm({
+      title: "Remove playlist?",
+      message: "This will remove the playlist from YouSync. Local audio files will not be deleted.",
+      confirmLabel: "Remove",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
@@ -301,10 +332,11 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     const result = await deletePlaylist(playlistId);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
+    setToast(result.message, "success");
     onBack();
   }
 
@@ -312,7 +344,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     setMenuOpen(false);
 
     if (isSyncing) {
-      setToast("Cannot remove playlist while a sync or download is running.");
+      setToast("Cannot remove playlist while a sync or download is running.", "error");
       return;
     }
 
@@ -320,15 +352,19 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove "${playlist.title}" and delete its local files?\n\nThis removes the playlist from YouSync and deletes the local audio files referenced by this playlist. This cannot be undone.`
-    );
+    const confirmed = await confirm({
+      title: "Remove playlist and local files?",
+      message: `Remove "${playlist.title}" from YouSync and delete its local audio files? This cannot be undone.`,
+      confirmLabel: "Remove",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
     }
 
-    setToast("Removing playlist and local files...");
+    setToast("Removing playlist and local files...", "info");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
       onBack();
@@ -338,10 +374,11 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     const result = await deletePlaylist(playlistId, true);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
+    setToast(result.message, "success");
     onBack();
   }
 
@@ -352,7 +389,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
     const opened = await openFolder(playlist.path);
     if (!opened) {
-      setToast("Folder could not be opened.");
+      setToast("Folder could not be opened.", "error");
     }
   }
 
@@ -363,7 +400,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
     const opened = await openSourceUrl(playlist.sourceUrl);
     if (!opened) {
-      setToast("Source could not be opened.");
+      setToast("Source could not be opened.", "error");
     }
   }
 
@@ -371,7 +408,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     setMenuOpen(false);
 
     if (isSyncing) {
-      setToast("Cannot change location while this playlist is syncing.");
+      setToast("Cannot change location while this playlist is syncing.", "error");
       return;
     }
 
@@ -384,7 +421,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         title: "Change playlist location",
       });
     } catch {
-      setToast("Folder picker could not be opened.");
+      setToast("Folder picker could not be opened.", "error");
       return;
     }
 
@@ -394,23 +431,23 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    setToast("Changing playlist location...");
+    setToast("Changing playlist location...", "info");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await changePlaylistLocation(playlistId, folder);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
-    await loadDetail();
+    await loadDetail(false);
     window.dispatchEvent(new CustomEvent(PLAYLISTS_UPDATED_EVENT));
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handlePlayTrack(track: PlaylistTrack) {
@@ -449,18 +486,18 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await redownloadTrack(playlistId, track.index);
 
     if (!result.ok) {
-      setToast("Track could not be redownloaded.");
+      setToast("Track could not be redownloaded.", "error");
       return;
     }
 
-    await loadDetail();
+    await loadDetail(false);
   }
 
   if (isLoading || !playlist || !detail) {
@@ -557,13 +594,19 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
               <span aria-hidden="true">↗</span>
               <span>Source</span>
             </button>
-            <div className="detail-menu-wrap" onMouseLeave={() => setMenuOpen(false)}>
+            <div
+              className="detail-menu-wrap"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
               <button
                 className="detail-btn detail-dots"
                 type="button"
                 aria-label="More actions"
                 aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((open) => !open)}
+                onClick={() => {
+                  setTrackMenuOpen(null);
+                  setMenuOpen((open) => !open);
+                }}
               >
                 ⋮
               </button>
@@ -675,7 +718,6 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
             <div
               className="detail-track-row"
               key={`${track.index}-${track.title}`}
-              onMouseLeave={() => setTrackMenuOpen((current) => (current === track.index ? null : current))}
             >
               <span className="detail-track-num">{track.index}</span>
               <span className="detail-track-title">{track.title}</span>
@@ -687,6 +729,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
               <span
                 className="detail-track-actions"
                 onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
               >
                 <button
                   className="track-play-btn"
@@ -702,7 +745,10 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
                     type="button"
                     aria-label={`More actions for ${track.title}`}
                     aria-expanded={isTrackMenuOpen}
-                    onClick={() => setTrackMenuOpen((current) => (current === track.index ? null : track.index))}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setTrackMenuOpen((current) => (current === track.index ? null : track.index));
+                    }}
                   >
                     ⋮
                   </button>
@@ -750,8 +796,6 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
           </div>
         )}
       </div>
-
-      {toast ? <Toast message={toast} /> : null}
     </section>
   );
 }

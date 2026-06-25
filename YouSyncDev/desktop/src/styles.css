@@ -586,17 +586,206 @@ p {
   height: 16px;
 }
 
-.toast {
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #1c1c1f;
+}
+
+.skeleton::after {
+  content: "";
   position: absolute;
-  right: 24px;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%);
+  animation: shim 1.35s infinite;
+}
+
+.skeleton-row {
+  pointer-events: none;
+}
+
+.skeleton-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+}
+
+.skeleton-cover {
+  border: 0.5px solid #202024;
+  background: #161618;
+}
+
+.skeleton-line {
+  height: 10px;
+}
+
+.skeleton-title {
+  width: min(360px, 80%);
+  height: 24px;
+}
+
+.skeleton-wide {
+  width: min(260px, 80%);
+}
+
+.skeleton-medium {
+  width: 140px;
+}
+
+.skeleton-short {
+  width: 78px;
+}
+
+.skeleton-tiny {
+  width: 18px;
+}
+
+.skeleton-pill {
+  width: 78px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.skeleton-button {
+  width: 86px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+.skeleton-actions {
+  width: 56px;
+  height: 26px;
+  justify-self: end;
+}
+
+.skeleton-track-row {
+  pointer-events: none;
+}
+
+.toast-stack {
+  position: fixed;
+  z-index: 80;
+  right: 22px;
   bottom: 22px;
+  display: flex;
+  width: min(360px, calc(100vw - 44px));
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px 12px;
   border: 0.5px solid #2c2c32;
   border-radius: 8px;
   background: #1c1c1f;
-  color: #8c8c96;
+  color: #d8d8dc;
   font-size: 12px;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+
+.toast span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast button {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: transparent;
+  color: #8c8c96;
+  cursor: pointer;
+}
+
+.toast button:hover {
+  background: #26262a;
+  color: #f2f2f3;
+}
+
+.toast-success {
+  border-color: rgba(58, 125, 90, 0.44);
+}
+
+.toast-error {
+  border-color: rgba(138, 58, 58, 0.5);
+}
+
+.toast-info {
+  border-color: #2c2c32;
+}
+
+.confirm-backdrop {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.46);
+}
+
+.confirm-modal {
+  width: min(360px, 100%);
+  padding: 18px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 10px;
+  background: #161618;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+}
+
+.confirm-modal h2 {
+  margin-bottom: 8px;
+  color: #f2f2f3;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.confirm-modal p {
+  color: #8c8c96;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.confirm-actions button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 7px;
+  background: #1c1c1f;
+  color: #c8c8cc;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.confirm-actions button:hover {
+  background: #26262a;
+  color: #f2f2f3;
+}
+
+.confirm-actions .danger {
+  border-color: rgba(138, 58, 58, 0.48);
+  background: rgba(138, 58, 58, 0.18);
+  color: #f0a3a3;
+}
+
+.confirm-actions .danger:hover {
+  background: rgba(138, 58, 58, 0.28);
+  color: #ffd0d0;
 }
 
 .playlists-page {

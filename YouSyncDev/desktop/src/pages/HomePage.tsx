@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DetectionBadge from "../components/DetectionBadge";
 import FolderSelector from "../components/FolderSelector";
 import PlaylistPreviewCard from "../components/PlaylistPreviewCard";
 import SmartPlaylistInput from "../components/SmartPlaylistInput";
-import Toast from "../components/Toast";
+import { useToast } from "../components/ToastProvider";
 import {
   PLAYLISTS_UPDATED_EVENT,
   addPlaylist,
@@ -24,63 +25,105 @@ function readLastFolder() {
 }
 
 function HomePage() {
+  const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<DetectionStatus>("empty");
   const [platform, setPlatform] = useState<PlatformId | null>(null);
   const [preview, setPreview] = useState<PlaylistPreview | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [folder, setFolder] = useState(readLastFolder);
-  const [toast, setToast] = useState("");
+  const previewRequestId = useRef(0);
+  const { showToast } = useToast();
 
   const canAddPlaylist = status === "detected" && Boolean(folder.trim());
-  const showForm = status === "loading" || status === "detected";
+  const showForm = isPreviewLoading || status === "detected";
 
   useEffect(() => {
     let cancelled = false;
+    const requestId = previewRequestId.current + 1;
+    previewRequestId.current = requestId;
+    const nextUrl = url.trim();
+
+    setPreview(null);
+    setIsPreviewLoading(false);
+
+    if (!nextUrl) {
+      setPlatform(null);
+      setStatus("empty");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    function isStale() {
+      return cancelled || previewRequestId.current !== requestId;
+    }
 
     async function updateDetection() {
-      const detection = await detectPlaylist(url);
+      try {
+        const detection = await detectPlaylist(nextUrl);
 
-      if (cancelled) {
-        return;
-      }
+        if (isStale()) {
+          return;
+        }
 
-      setPlatform(detection.platform === "unknown" ? null : detection.platform);
-      setPreview(null);
+        setPlatform(detection.platform === "unknown" ? null : detection.platform);
 
-      if (detection.reason === "empty" || detection.reason === "unknown") {
-        setStatus("empty");
-        return;
-      }
+        if (detection.reason === "empty" || detection.reason === "unknown") {
+          setStatus("empty");
+          return;
+        }
 
-      if (!detection.supported) {
-        setStatus("unsupported");
-        return;
-      }
+        if (!detection.supported) {
+          setStatus("unsupported");
+          return;
+        }
 
-      setStatus("loading");
-      const nextPreview = await previewPlaylist(url);
+        setStatus("loading");
+        setIsPreviewLoading(true);
 
-      if (!cancelled) {
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+        if (isStale()) {
+          return;
+        }
+
+        const nextPreview = await previewPlaylist(nextUrl);
+
+        if (isStale()) {
+          return;
+        }
+
+        setIsPreviewLoading(false);
+
+        if (!nextPreview || nextPreview.supported === false) {
+          setStatus("empty");
+          setPreview(null);
+          showToast(nextPreview?.message || "Playlist preview could not be loaded.", "error");
+          return;
+        }
+
         setPreview(nextPreview);
-        setStatus(nextPreview?.supported === false ? "empty" : "detected");
+        setStatus("detected");
+      } catch {
+        if (!isStale()) {
+          setIsPreviewLoading(false);
+          setStatus("empty");
+          setPreview(null);
+          showToast("Playlist preview could not be loaded.", "error");
+        }
       }
     }
 
-    void updateDetection();
+    const timeout = window.setTimeout(() => {
+      void updateDetection();
+    }, 250);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
-  }, [url]);
-
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setToast(""), 2600);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
+  }, [showToast, url]);
 
   async function handleAddPlaylist() {
     if (!canAddPlaylist) {
@@ -129,9 +172,13 @@ function HomePage() {
             : [...mergedPlaylists, result.playlist],
         })
       );
+
+      showToast(result.message, "success");
+      navigate("/playlists");
+      return;
     }
 
-    setToast(result.message);
+    showToast(result.message, "error");
   }
 
   return (
@@ -151,7 +198,7 @@ function HomePage() {
 
         {showForm ? (
           <>
-            <PlaylistPreviewCard loading={status === "loading"} preview={preview} />
+            <PlaylistPreviewCard loading={isPreviewLoading} preview={preview} />
             <FolderSelector onChange={setFolder} value={folder} />
             <button
               className="add-playlist-button"
@@ -164,8 +211,6 @@ function HomePage() {
           </>
         ) : null}
       </div>
-
-      {toast ? <Toast message={toast} /> : null}
     </section>
   );
 }

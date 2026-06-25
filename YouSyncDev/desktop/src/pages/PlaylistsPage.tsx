@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useConfirm } from "../components/ConfirmProvider";
 import PlaylistRow from "../components/PlaylistRow";
-import Toast from "../components/Toast";
+import { PlaylistRowsSkeleton } from "../components/Skeleton";
+import { useToast } from "../components/ToastProvider";
 import { useSyncStatus } from "../context/SyncStatusContext";
 import PlaylistDetailPage from "./PlaylistDetailPage";
 import { USE_MOCK_PLAYLIST_STATUSES, mockPlaylists } from "../data/mockPlaylists";
@@ -67,9 +69,11 @@ function PlaylistsPage() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
-  const [toast, setToast] = useState("");
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [brokenPlaylists, setBrokenPlaylists] = useState<BrokenPlaylist[]>([]);
   const [ignoredRecoveryIds, setIgnoredRecoveryIds] = useState<string[]>([]);
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const {
     syncAllProgress,
     isSyncingAll,
@@ -84,6 +88,11 @@ function PlaylistsPage() {
     syncAll,
     cancelSyncAll,
   } = useSyncStatus();
+  const setToast = useCallback((message: string, variant: "success" | "error" | "info" = "info") => {
+    if (message) {
+      showToast(message, variant);
+    }
+  }, [showToast]);
 
   const reloadPlaylists = useCallback(async () => {
     if (USE_MOCK_PLAYLIST_STATUSES) {
@@ -115,6 +124,7 @@ function PlaylistsPage() {
 
       if (!cancelled) {
         setPlaylists(nextPlaylists);
+        setIsInitialLoading(false);
         void refreshSyncStatuses();
         void refreshBrokenPlaylists();
       }
@@ -150,15 +160,6 @@ function PlaylistsPage() {
     void refreshBrokenPlaylists();
   }, [refreshBrokenPlaylists, reloadPlaylists, statusVersion]);
 
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setToast(""), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
-
   async function handleSyncPlaylist(playlistId: string) {
     if (isSyncingAll || isActiveProgress(getPlaylistProgress(playlistId))) {
       return;
@@ -167,14 +168,14 @@ function PlaylistsPage() {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await syncPlaylist(playlistId);
 
     if (!result.started) {
-      setToast(result.message ?? "A sync is already running.");
+      setToast(result.message ?? "A sync is already running.", "error");
       await refreshSyncStatuses();
     }
   }
@@ -187,14 +188,14 @@ function PlaylistsPage() {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await downloadMissing(playlistId);
 
     if (!result.started) {
-      setToast(result.message ?? "A sync or download is already running.");
+      setToast(result.message ?? "A sync or download is already running.", "error");
       await refreshSyncStatuses();
     }
   }
@@ -207,7 +208,7 @@ function PlaylistsPage() {
     const result = await cancelPlaylistSync(playlistId);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
@@ -223,7 +224,7 @@ function PlaylistsPage() {
 
     const opened = await openFolder(resolvePlaylistFolderPath(playlist.path));
     if (!opened) {
-      setToast("Folder could not be opened.");
+      setToast("Folder could not be opened.", "error");
     }
   }
 
@@ -232,19 +233,19 @@ function PlaylistsPage() {
     const sourceUrl = playlist?.sourceUrl;
 
     if (!sourceUrl) {
-      setToast("Source link is unavailable.");
+      setToast("Source link is unavailable.", "error");
       return;
     }
 
     const opened = await openSourceUrl(sourceUrl);
     if (!opened) {
-      setToast("Source could not be opened.");
+      setToast("Source could not be opened.", "error");
     }
   }
 
   async function handleChangePlaylistLocation(playlistId: string) {
     if (isActiveProgress(getPlaylistProgress(playlistId))) {
-      setToast("Cannot change location while this playlist is syncing.");
+      setToast("Cannot change location while this playlist is syncing.", "error");
       return;
     }
 
@@ -257,7 +258,7 @@ function PlaylistsPage() {
         title: "Change playlist location",
       });
     } catch {
-      setToast("Folder picker could not be opened.");
+      setToast("Folder picker could not be opened.", "error");
       return;
     }
 
@@ -267,17 +268,17 @@ function PlaylistsPage() {
       return;
     }
 
-    setToast("Changing playlist location...");
+    setToast("Changing playlist location...", "info");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await changePlaylistLocation(playlistId, folder);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshSyncStatuses();
       return;
     }
@@ -285,18 +286,22 @@ function PlaylistsPage() {
     await reloadPlaylists();
     await refreshBrokenPlaylists();
     await refreshSyncStatuses();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handleRemovePlaylist(playlistId: string) {
     if (isSyncingAll || hasActiveIndividualSyncs) {
-      setToast("Cannot remove playlist while a sync or download is running.");
+      setToast("Cannot remove playlist while a sync or download is running.", "error");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Remove playlist?\n\nThis will remove the playlist from YouSync. Local audio files will not be deleted."
-    );
+    const confirmed = await confirm({
+      title: "Remove playlist?",
+      message: "This will remove the playlist from YouSync. Local audio files will not be deleted.",
+      confirmLabel: "Remove",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
@@ -312,18 +317,18 @@ function PlaylistsPage() {
     const result = await deletePlaylist(playlistId);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshSyncStatuses();
       return;
     }
 
     await reloadPlaylists();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handleRemovePlaylistWithLocalFiles(playlistId: string) {
     if (isSyncingAll || hasActiveIndividualSyncs) {
-      setToast("Cannot remove playlist while a sync or download is running.");
+      setToast("Cannot remove playlist while a sync or download is running.", "error");
       return;
     }
 
@@ -333,15 +338,19 @@ function PlaylistsPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove "${playlist.title}" and delete its local files?\n\nThis removes the playlist from YouSync and deletes the local audio files referenced by this playlist. This cannot be undone.`
-    );
+    const confirmed = await confirm({
+      title: "Remove playlist and local files?",
+      message: `Remove "${playlist.title}" from YouSync and delete its local audio files? This cannot be undone.`,
+      confirmLabel: "Remove",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
     }
 
-    setToast("Removing playlist and local files...");
+    setToast("Removing playlist and local files...", "info");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
       setPlaylists((currentPlaylists) => currentPlaylists.filter((playlist) => playlist.id !== playlistId));
@@ -351,7 +360,7 @@ function PlaylistsPage() {
     const result = await deletePlaylist(playlistId, true);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshSyncStatuses();
       return;
     }
@@ -359,17 +368,17 @@ function PlaylistsPage() {
     await reloadPlaylists();
     await refreshBrokenPlaylists();
     await refreshSyncStatuses();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handleRecoverExistingPlaylist() {
     if (isSyncingAll || hasActiveIndividualSyncs) {
-      setToast("Cannot recover a playlist while a sync or download is running.");
+      setToast("Cannot recover a playlist while a sync or download is running.", "error");
       return;
     }
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
@@ -382,7 +391,7 @@ function PlaylistsPage() {
         title: "Recover existing YouSync playlist",
       });
     } catch {
-      setToast("Folder picker could not be opened.");
+      setToast("Folder picker could not be opened.", "error");
       return;
     }
 
@@ -392,12 +401,12 @@ function PlaylistsPage() {
       return;
     }
 
-    setToast("Recovering existing playlist...");
+    setToast("Recovering existing playlist...", "info");
 
     const result = await recoverExistingPlaylist(folder);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshSyncStatuses();
       return;
     }
@@ -405,12 +414,12 @@ function PlaylistsPage() {
     await reloadPlaylists();
     await refreshBrokenPlaylists();
     await refreshSyncStatuses();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handleLocateBrokenPlaylist(playlistId: string) {
     if (isSyncingAll || hasActiveIndividualSyncs) {
-      setToast("Cannot recover a playlist while a sync or download is running.");
+      setToast("Cannot recover a playlist while a sync or download is running.", "error");
       return;
     }
 
@@ -423,7 +432,7 @@ function PlaylistsPage() {
         title: "Find playlist folder",
       });
     } catch {
-      setToast("Folder picker could not be opened.");
+      setToast("Folder picker could not be opened.", "error");
       return;
     }
 
@@ -433,12 +442,12 @@ function PlaylistsPage() {
       return;
     }
 
-    setToast("Recovering playlist folder...");
+    setToast("Recovering playlist folder...", "info");
 
     const result = await updatePlaylistFolder(playlistId, folder);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshBrokenPlaylists();
       return;
     }
@@ -447,18 +456,22 @@ function PlaylistsPage() {
     await reloadPlaylists();
     await refreshBrokenPlaylists();
     await refreshSyncStatuses();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   async function handleRemoveBrokenPlaylist(playlistId: string) {
     if (isSyncingAll || hasActiveIndividualSyncs) {
-      setToast("Cannot remove playlist while a sync or download is running.");
+      setToast("Cannot remove playlist while a sync or download is running.", "error");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Remove playlist from YouSync?\n\nLocal files will not be deleted."
-    );
+    const confirmed = await confirm({
+      title: "Remove playlist?",
+      message: "This will remove the playlist from YouSync. Local audio files will not be deleted.",
+      confirmLabel: "Remove",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
@@ -467,7 +480,7 @@ function PlaylistsPage() {
     const result = await deletePlaylist(playlistId);
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       await refreshBrokenPlaylists();
       return;
     }
@@ -476,7 +489,7 @@ function PlaylistsPage() {
     setIgnoredRecoveryIds((current) => current.filter((id) => id !== playlistId));
     await reloadPlaylists();
     await refreshSyncStatuses();
-    setToast(result.message);
+    setToast(result.message, "success");
   }
 
   function handleIgnoreBrokenPlaylist(playlistId: string) {
@@ -491,14 +504,14 @@ function PlaylistsPage() {
     setToast("");
 
     if (USE_MOCK_PLAYLIST_STATUSES) {
-      setToast("Mock status mode is enabled.");
+      setToast("Mock status mode is enabled.", "info");
       return;
     }
 
     const result = await syncAll();
 
     if (!result.started) {
-      setToast(result.message ?? "A sync is already running.");
+      setToast(result.message ?? "A sync is already running.", "error");
       await refreshSyncStatuses();
     }
   }
@@ -511,7 +524,7 @@ function PlaylistsPage() {
     const result = await cancelSyncAll();
 
     if (!result.ok) {
-      setToast(result.message);
+      setToast(result.message, "error");
       return;
     }
 
@@ -611,7 +624,8 @@ function PlaylistsPage() {
         </div>
 
         <div className="playlist-list">
-          {filteredPlaylists.map((playlist) => {
+          {isInitialLoading ? <PlaylistRowsSkeleton /> : null}
+          {!isInitialLoading ? filteredPlaylists.map((playlist) => {
             const rowProgress = getPlaylistProgress(playlist.id);
 
             return (
@@ -631,8 +645,8 @@ function PlaylistsPage() {
                 onRemoveWithLocalFiles={handleRemovePlaylistWithLocalFiles}
               />
             );
-          })}
-          {filteredPlaylists.length === 0 ? (
+          }) : null}
+          {!isInitialLoading && filteredPlaylists.length === 0 ? (
             <div className="playlist-empty-filter">No playlist matches your filters.</div>
           ) : null}
         </div>
@@ -699,8 +713,6 @@ function PlaylistsPage() {
           </div>
         </div>
       ) : null}
-
-      {toast ? <Toast message={toast} /> : null}
     </section>
   );
 }
