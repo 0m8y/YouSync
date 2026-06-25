@@ -1134,10 +1134,14 @@ class YouSyncWorker:
                     }
 
                 old_root = self.playlist_root_folder(target_playlist)
+                old_roots_by_id: Dict[str, Optional[Path]] = {}
+                old_storage_folders_by_id: Dict[str, Optional[Path]] = {}
                 target_ids: List[str] = []
 
                 for playlist in playlists_before:
                     if playlist.id == playlist_id:
+                        old_roots_by_id[playlist.id] = self.playlist_root_folder(playlist)
+                        old_storage_folders_by_id[playlist.id] = self.playlist_storage_folder(playlist)
                         target_ids.append(playlist.id)
                         continue
 
@@ -1147,6 +1151,8 @@ class YouSyncWorker:
                     other_root = self.playlist_root_folder(playlist)
 
                     if other_root == old_root and self.is_playlist_path_missing(playlist):
+                        old_roots_by_id[playlist.id] = other_root
+                        old_storage_folders_by_id[playlist.id] = self.playlist_storage_folder(playlist)
                         target_ids.append(playlist.id)
 
                 updated_ids: List[str] = []
@@ -1159,12 +1165,21 @@ class YouSyncWorker:
                         updated = False
 
                     if bool(updated):
+                        cache_path = folder_path / ".yousync" / f"{target_id}.json"
+                        self.rewrite_playlist_cache_paths(
+                            cache_path,
+                            old_roots_by_id.get(target_id),
+                            old_storage_folders_by_id.get(target_id),
+                            folder_path,
+                        )
                         updated_ids.append(target_id)
 
-                playlists_after = self.manager.list_playlists()
-
         if updated_ids:
-            self.managers_loaded = False
+            self.refresh_manager()
+            with redirect_stdout(sys.stderr):
+                with self.manager_lock:
+                    playlists_after = self.manager.list_playlists()
+
             updated_playlists = [
                 self.safe_map_core_playlist(playlist, cover_wait_seconds=1.0)
                 for playlist in playlists_after
@@ -2007,6 +2022,81 @@ class YouSyncWorker:
 
         return value
 
+    def rewrite_playlist_cache_paths(
+        self,
+        cache_path: Path,
+        old_root: Optional[Path],
+        old_storage_folder: Optional[Path],
+        new_root: Path,
+    ) -> None:
+        replacements: List[Tuple[str, str]] = []
+
+        if old_root is not None:
+            replacements.append((str(old_root), str(new_root)))
+            replacements.append((old_root.as_posix(), new_root.as_posix()))
+
+        if old_storage_folder is not None:
+            new_storage_folder = new_root / ".yousync"
+            replacements.append((str(old_storage_folder), str(new_storage_folder)))
+            replacements.append((old_storage_folder.as_posix(), new_storage_folder.as_posix()))
+
+        audio_path_keys = [
+            "path_to_save_audio_with_title",
+            "path_to_save_audio_without_title",
+            "path_to_save_audio",
+            "local_path",
+            "localPath",
+            "file_path",
+            "filePath",
+            "path",
+        ]
+
+        def rewrite_audio_path(raw_value: Any) -> Any:
+            if not isinstance(raw_value, str):
+                return raw_value
+
+            value = raw_value.strip()
+            if not value:
+                return raw_value
+
+            replaced = self.replace_path_strings(value, replacements)
+            if replaced != value:
+                return replaced
+
+            path = Path(value)
+            if path.name and path.suffix:
+                return str(new_root / path.name)
+
+            return str(new_root)
+
+        try:
+            with open(cache_path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+
+            if not isinstance(data, dict):
+                return
+
+            data = self.replace_path_strings(data, replacements)
+            data["path_to_save_audio"] = str(new_root)
+
+            audios = data.get("audios")
+            if isinstance(audios, list):
+                for audio in audios:
+                    if not isinstance(audio, dict):
+                        continue
+
+                    for key in audio_path_keys:
+                        if key in audio:
+                            audio[key] = rewrite_audio_path(audio[key])
+
+            tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+            with open(tmp_path, "w", encoding="utf-8") as file:
+                json.dump(data, file, ensure_ascii=False, indent=4)
+
+            os.replace(tmp_path, cache_path)
+        except Exception as exc:
+            log(f"failed to rewrite playlist cache paths {cache_path}: {exc}")
+
     def rewrite_moved_playlist_cache(
         self,
         target_storage_folder: Path,
@@ -2140,11 +2230,22 @@ class YouSyncWorker:
                     "message": "No matching YouSync data was found in the selected folder.",
                 }
 
+            self.rewrite_playlist_cache_paths(
+                target_storage_folder / f"{playlist_id}.json",
+                old_root,
+                old_storage_folder,
+                destination_root,
+            )
+
             deleted_count = 0
             for source in copied_sources:
                 deleted_count += 1 if self.remove_file_if_exists(source) else 0
 
-            self.managers_loaded = False
+            self.refresh_manager()
+            with redirect_stdout(sys.stderr):
+                with self.manager_lock:
+                    playlists = self.manager.list_playlists()
+
             playlist_summary = next(
                 (
                     self.safe_map_core_playlist(playlist, cover_wait_seconds=1.0)
