@@ -11,7 +11,6 @@ import {
   openLocalFile,
   openSourceUrl,
   redownloadTrack,
-  resolvePlaylistFolderPath,
 } from "../services/playlistService";
 import type { LongTaskProgress, PlaylistDetail, PlaylistTrack } from "../services/playlistService";
 
@@ -20,8 +19,34 @@ type PlaylistDetailPageProps = {
   onBack: () => void;
 };
 
+type TrackStatusFilter = "All" | "Synced" | "Missing" | "Downloaded" | "Metadata" | "Error";
+
+const TRACK_STATUS_FILTERS: TrackStatusFilter[] = ["All", "Synced", "Missing", "Downloaded", "Metadata", "Error"];
+
+function normalizeTrackStatus(status: string): TrackStatusFilter {
+  const normalized = status.trim().toLowerCase();
+
+  if (normalized === "synced") {
+    return "Synced";
+  }
+
+  if (normalized === "downloaded") {
+    return "Downloaded";
+  }
+
+  if (normalized === "metadata") {
+    return "Metadata";
+  }
+
+  if (normalized === "error") {
+    return "Error";
+  }
+
+  return "Missing";
+}
+
 function statusClass(status: string) {
-  return status.toLowerCase();
+  return normalizeTrackStatus(status).toLowerCase();
 }
 
 function progressLabel(progress: LongTaskProgress | null) {
@@ -62,6 +87,8 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [trackMenuOpen, setTrackMenuOpen] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const [coverFailed, setCoverFailed] = useState(false);
+  const [trackSearch, setTrackSearch] = useState("");
+  const [trackStatusFilter, setTrackStatusFilter] = useState<TrackStatusFilter>("All");
   const {
     statusVersion,
     isActiveProgress,
@@ -102,6 +129,8 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         setIsLoading(false);
         setCoverFailed(false);
         setTrackMenuOpen(null);
+        setTrackSearch("");
+        setTrackStatusFilter("All");
       }
     }
 
@@ -134,6 +163,59 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     [playlist?.coverPath]
   );
   const showCover = Boolean(coverSrc && !coverFailed);
+  const trackStatusCounts = useMemo(() => {
+    const counts: Record<TrackStatusFilter, number> = {
+      All: detail?.tracks.length ?? 0,
+      Synced: 0,
+      Missing: 0,
+      Downloaded: 0,
+      Metadata: 0,
+      Error: 0,
+    };
+
+    for (const track of detail?.tracks ?? []) {
+      counts[normalizeTrackStatus(track.status)] += 1;
+    }
+
+    return counts;
+  }, [detail?.tracks]);
+
+  const visibleTrackStatusFilters = useMemo(
+    () => TRACK_STATUS_FILTERS.filter((filter) => filter === "All" || trackStatusCounts[filter] > 0),
+    [trackStatusCounts]
+  );
+
+  useEffect(() => {
+    if (trackStatusFilter !== "All" && trackStatusCounts[trackStatusFilter] === 0) {
+      setTrackStatusFilter("All");
+    }
+  }, [trackStatusCounts, trackStatusFilter]);
+
+  const filteredTracks = useMemo(() => {
+    const query = trackSearch.trim().toLowerCase();
+
+    return (detail?.tracks ?? []).filter((track) => {
+      const status = normalizeTrackStatus(track.status);
+
+      if (trackStatusFilter !== "All" && status !== trackStatusFilter) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [
+        track.title,
+        track.artist,
+        track.status,
+        trackSourceUrl(track),
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [detail?.tracks, trackSearch, trackStatusFilter]);
+
 
   async function handleSyncNow() {
     if (isSyncing) {
@@ -228,7 +310,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    const opened = await openFolder(resolvePlaylistFolderPath(playlist.path));
+    const opened = await openFolder(playlist.path);
     if (!opened) {
       setToast("Folder could not be opened.");
     }
@@ -433,6 +515,45 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         </div>
       ) : null}
 
+      <div className="detail-track-tools">
+        <label className="detail-track-search" htmlFor="track-search-input">
+          <span>Search tracks</span>
+          <input
+            id="track-search-input"
+            type="search"
+            value={trackSearch}
+            placeholder="Search by title or artist..."
+            onChange={(event) => {
+              setTrackSearch(event.target.value);
+              setTrackMenuOpen(null);
+            }}
+          />
+        </label>
+        <div className="detail-status-filters" aria-label="Filter tracks by status">
+          {visibleTrackStatusFilters.map((filter) => (
+            <button
+              className={trackStatusFilter === filter ? "active" : ""}
+              key={filter}
+              type="button"
+              aria-pressed={trackStatusFilter === filter}
+              onClick={() => {
+                setTrackStatusFilter(filter);
+                setTrackMenuOpen(null);
+              }}
+            >
+              <span>{filter}</span>
+              <strong>{trackStatusCounts[filter]}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="detail-track-result-count" aria-live="polite">
+        {filteredTracks.length === detail.tracks.length
+          ? `${detail.tracks.length} tracks`
+          : `${filteredTracks.length} / ${detail.tracks.length} tracks`}
+      </div>
+
       <div className="detail-track-header" aria-hidden="true">
         <span>#</span>
         <span>Title</span>
@@ -442,7 +563,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       </div>
 
       <div className="detail-track-table">
-        {detail.tracks.map((track) => {
+        {filteredTracks.length > 0 ? filteredTracks.map((track) => {
           const sourceUrl = trackSourceUrl(track);
           const canOpenLocal = canOpenTrackLocalFile(track);
           const isTrackMenuOpen = trackMenuOpen === track.index;
@@ -520,7 +641,11 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
               </span>
             </div>
           );
-        })}
+        }) : (
+          <div className="detail-track-empty">
+            No track matches this search or filter.
+          </div>
+        )}
       </div>
 
       {toast ? <Toast message={toast} /> : null}

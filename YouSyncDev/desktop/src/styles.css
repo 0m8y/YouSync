@@ -1273,6 +1273,118 @@ p {
   gap: 6px;
 }
 
+
+.detail-track-tools {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 20px 10px;
+  border-top: 0.5px solid #1d1d20;
+  border-bottom: 0.5px solid #1a1a1d;
+  background: #101011;
+}
+
+.detail-track-search {
+  display: flex;
+  min-width: 220px;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-track-search span {
+  color: #46464f;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.detail-track-search input {
+  width: 100%;
+  height: 34px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 8px;
+  outline: none;
+  background: #18181a;
+  color: #f2f2f3;
+  font-size: 12px;
+  padding: 0 12px;
+}
+
+.detail-track-search input::placeholder {
+  color: #46464f;
+}
+
+.detail-track-search input:focus {
+  border-color: #3a3a42;
+  background: #1c1c1f;
+}
+
+.detail-status-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-status-filters button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 999px;
+  background: #18181a;
+  color: #8c8c96;
+  font-size: 11px;
+  padding: 0 10px;
+}
+
+.detail-status-filters button:hover {
+  background: #202024;
+  color: #f2f2f3;
+}
+
+.detail-status-filters button.active {
+  border-color: #3a3a42;
+  background: #26262a;
+  color: #f2f2f3;
+}
+
+.detail-status-filters strong {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #101011;
+  color: #8c8c96;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.detail-status-filters button.active strong {
+  background: #111113;
+  color: #f2f2f3;
+}
+
+.detail-track-result-count {
+  padding: 0 20px 8px;
+  background: #101011;
+  color: #46464f;
+  font-size: 11px;
+}
+
+.detail-track-empty {
+  padding: 28px 20px;
+  color: #46464f;
+  font-size: 12px;
+  text-align: center;
+}
+
 .detail-track-header,
 .detail-track-row {
   display: grid;
@@ -1429,6 +1541,18 @@ p {
 .settings-panel p {
   color: #46464f;
   font-size: 12px;
+}
+
+
+@media (max-width: 1100px) {
+  .detail-track-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .detail-status-filters {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 920px) {
