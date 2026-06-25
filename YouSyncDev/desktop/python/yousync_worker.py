@@ -954,6 +954,83 @@ class YouSyncWorker:
 
         return response
 
+    def recover_existing_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        folder = str(payload.get("folder", "")).strip()
+
+        if not folder:
+            return {
+                "ok": False,
+                "message": "A folder is required.",
+            }
+
+        folder_path = Path(folder).expanduser()
+
+        if folder_path.name == ".yousync":
+            folder_path = folder_path.parent
+
+        if not folder_path.exists():
+            return {
+                "ok": False,
+                "message": "The selected folder does not exist.",
+            }
+
+        if not folder_path.is_dir():
+            return {
+                "ok": False,
+                "message": "The selected path is not a folder.",
+            }
+
+        with self.sync_lock:
+            state, should_refresh_manager = self.poll_sync_process_locked()
+            should_refresh_manager = self.poll_playlist_tasks_locked() or should_refresh_manager
+
+            if self.is_long_task_running_locked(state):
+                return {
+                    "ok": False,
+                    "message": "Cannot recover a playlist while a sync or download is running.",
+                }
+
+        self.refresh_after_completed_sync(should_refresh_manager)
+        self.refresh_after_completed_playlist_tasks(should_refresh_manager)
+
+        with redirect_stdout(sys.stderr):
+            with self.manager_lock:
+                if not hasattr(self.manager, "add_existing_playlists"):
+                    return {
+                        "ok": False,
+                        "message": "Playlist recovery is not available in this build.",
+                    }
+
+                before_playlists = self.manager.list_playlists()
+                before_ids = {playlist.id for playlist in before_playlists}
+
+                result = self.manager.add_existing_playlists(str(folder_path))
+                playlists = self.manager.list_playlists()
+
+        self.managers_loaded = False
+
+        recovered_playlists = [
+            bridge.map_core_playlist(playlist, cover_wait_seconds=1.0)
+            for playlist in playlists
+            if playlist.id not in before_ids
+        ]
+
+        if recovered_playlists:
+            count = len(recovered_playlists)
+            return {
+                "ok": True,
+                "message": "Recovered " + str(count) + " playlist" + ("s" if count > 1 else "") + ".",
+                "playlists": recovered_playlists,
+            }
+
+        message = result if isinstance(result, str) and result.strip() else "No existing YouSync playlist was found in the selected folder."
+
+        return {
+            "ok": False,
+            "message": message,
+            "playlists": [],
+        }
+
     def playlist_ids(self) -> List[str]:
         with redirect_stdout(sys.stderr):
             with self.manager_lock:
@@ -1855,6 +1932,9 @@ class YouSyncWorker:
 
         if command == "add":
             return self.add(payload)
+
+        if command == "recover_existing_playlist":
+            return self.recover_existing_playlist(payload)
 
         if command == "sync":
             return self.sync(payload)

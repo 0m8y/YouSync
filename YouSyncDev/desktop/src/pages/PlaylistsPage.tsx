@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import PlaylistRow from "../components/PlaylistRow";
 import Toast from "../components/Toast";
 import { useSyncStatus } from "../context/SyncStatusContext";
@@ -10,6 +11,7 @@ import {
   listPlaylists,
   openFolder,
   openSourceUrl,
+  recoverExistingPlaylist,
   resolvePlaylistFolderPath,
 } from "../services/playlistService";
 import type { LongTaskProgress, Platform, PlaylistSummary } from "../services/playlistService";
@@ -251,6 +253,51 @@ function PlaylistsPage() {
     setToast(result.message);
   }
 
+  async function handleRecoverExistingPlaylist() {
+    if (isSyncingAll || hasActiveIndividualSyncs) {
+      setToast("Cannot recover a playlist while a sync or download is running.");
+      return;
+    }
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      setToast("Mock status mode is enabled.");
+      return;
+    }
+
+    let selectedFolder: string | string[] | null;
+
+    try {
+      selectedFolder = await open({
+        directory: true,
+        multiple: false,
+        title: "Recover existing YouSync playlist",
+      });
+    } catch {
+      setToast("Folder picker could not be opened.");
+      return;
+    }
+
+    const folder = Array.isArray(selectedFolder) ? selectedFolder[0] : selectedFolder;
+
+    if (!folder) {
+      return;
+    }
+
+    setToast("Recovering existing playlist...");
+
+    const result = await recoverExistingPlaylist(folder);
+
+    if (!result.ok) {
+      setToast(result.message);
+      await refreshSyncStatuses();
+      return;
+    }
+
+    await reloadPlaylists();
+    await refreshSyncStatuses();
+    setToast(result.message);
+  }
+
   async function handleSyncAll() {
     if (hasActiveIndividualSyncs || isSyncingAll || playlists.length === 0) {
       return;
@@ -288,6 +335,7 @@ function PlaylistsPage() {
 
   const syncedCount = playlists.filter((playlist) => playlist.status.type === "synced").length;
   const syncAllDisabled = hasActiveIndividualSyncs || isSyncingAll || playlists.length === 0;
+  const recoverDisabled = hasActiveIndividualSyncs || isSyncingAll;
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredPlaylists = playlists.filter((playlist) => {
     const matchesPlatform = platformFilter === "all" || playlist.platform === platformFilter;
@@ -328,7 +376,9 @@ function PlaylistsPage() {
               ⏹
             </button>
           ) : null}
-          <button type="button">＋ Add playlist</button>
+          <button type="button" disabled={recoverDisabled} onClick={handleRecoverExistingPlaylist}>
+            Recover playlist
+          </button>
         </div>
 
         {syncAllProgress ? (

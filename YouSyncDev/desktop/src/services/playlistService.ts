@@ -31,6 +31,12 @@ export type AddPlaylistResult = {
   playlist?: PlaylistSummary;
 };
 
+export type RecoverExistingPlaylistResult = {
+  ok: boolean;
+  message: string;
+  playlists?: PlaylistSummary[];
+};
+
 export type DeletePlaylistResult = {
   ok: boolean;
   message: string;
@@ -203,6 +209,19 @@ export async function listPlaylists(): Promise<PlaylistSummary[]> {
     return playlists;
   } catch {
     return [];
+  }
+}
+
+export async function recoverExistingPlaylist(folder: string): Promise<RecoverExistingPlaylistResult> {
+  try {
+    return await invoke<RecoverExistingPlaylistResult>("recover_existing_playlist", { folder });
+  } catch (error) {
+    console.warn("[YouSync] bridge recover_existing_playlist failed", bridgeError(error));
+    return {
+      ok: false,
+      message: bridgeError(error),
+      playlists: [],
+    };
   }
 }
 
