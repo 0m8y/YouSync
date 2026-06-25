@@ -36,6 +36,13 @@ export type DeletePlaylistResult = {
   message: string;
 };
 
+export type RedownloadTrackResult = {
+  ok: boolean;
+  playlistId: string;
+  trackIndex: number;
+  message?: string;
+};
+
 export type CancelPlaylistSyncResult = {
   ok: boolean;
   playlistId: string;
@@ -110,6 +117,7 @@ export type PlaylistSummary = {
   platform: Exclude<Platform, "unknown">;
   tracks: number;
   coverPath?: string | null;
+  sourceUrl?: string | null;
   status: PlaylistStatus;
   lastSynced: string;
 };
@@ -121,6 +129,9 @@ export type PlaylistTrack = {
   status: "Synced" | "Downloaded" | "Metadata" | "Missing" | "Error";
   duration: string;
   url?: string | null;
+  sourceUrl?: string | null;
+  localPath?: string | null;
+  isDownloaded?: boolean;
 };
 
 export type PlaylistDetail = {
@@ -230,6 +241,20 @@ export async function downloadMissing(playlistId: string): Promise<SyncStartResu
   }
 }
 
+export async function redownloadTrack(playlistId: string, trackIndex: number): Promise<RedownloadTrackResult> {
+  try {
+    return await invoke<RedownloadTrackResult>("redownload_track", { playlistId, trackIndex });
+  } catch (error) {
+    console.warn("[YouSync] bridge redownload_track failed", bridgeError(error));
+    return {
+      ok: false,
+      playlistId,
+      trackIndex,
+      message: bridgeError(error),
+    };
+  }
+}
+
 export async function deletePlaylist(playlistId: string): Promise<DeletePlaylistResult> {
   try {
     return await invoke<DeletePlaylistResult>("delete_playlist", { playlistId });
@@ -267,6 +292,39 @@ export async function cancelSyncAll(): Promise<CancelSyncAllResult> {
   }
 }
 
+
+export function resolvePlaylistFolderPath(path: string): string {
+  const trimmedPath = path.trim();
+
+  if (!trimmedPath) {
+    return trimmedPath;
+  }
+
+  const unixMarker = "/.yousync/";
+  const windowsMarker = "\\.yousync\\";
+  const unixIndex = trimmedPath.lastIndexOf(unixMarker);
+
+  if (unixIndex >= 0) {
+    return trimmedPath.slice(0, unixIndex);
+  }
+
+  const windowsIndex = trimmedPath.lastIndexOf(windowsMarker);
+
+  if (windowsIndex >= 0) {
+    return trimmedPath.slice(0, windowsIndex);
+  }
+
+  if (trimmedPath.endsWith("/.yousync")) {
+    return trimmedPath.slice(0, -"/.yousync".length);
+  }
+
+  if (trimmedPath.endsWith("\\.yousync")) {
+    return trimmedPath.slice(0, -"\\.yousync".length);
+  }
+
+  return trimmedPath;
+}
+
 export async function openFolder(path: string): Promise<boolean> {
   try {
     await invoke("open_folder", { path });
@@ -283,6 +341,16 @@ export async function openSourceUrl(url: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.warn("[YouSync] open_url failed", bridgeError(error));
+    return false;
+  }
+}
+
+export async function openLocalFile(path: string): Promise<boolean> {
+  try {
+    await invoke("open_local_file", { path });
+    return true;
+  } catch (error) {
+    console.warn("[YouSync] open_local_file failed", bridgeError(error));
     return false;
   }
 }

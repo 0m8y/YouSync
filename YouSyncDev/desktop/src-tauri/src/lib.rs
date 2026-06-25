@@ -244,6 +244,10 @@ fn cancel_sync_all(state: State<'_, WorkerState>) -> Result<Value, String> {
 }
 
 fn open_target(target: &str) -> Result<(), String> {
+    if target.trim().is_empty() {
+        return Err("No target provided.".to_string());
+    }
+
     let status = if cfg!(target_os = "macos") {
         Command::new("open").arg(target).status()
     } else if cfg!(windows) {
@@ -260,14 +264,82 @@ fn open_target(target: &str) -> Result<(), String> {
     }
 }
 
+fn playlist_folder_from_path(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+
+    if trimmed.is_empty() {
+        return Err("No folder path provided.".to_string());
+    }
+
+    let input_path = PathBuf::from(trimmed);
+    let mut folder = if input_path.is_dir() {
+        input_path
+    } else if let Some(parent) = input_path.parent() {
+        parent.to_path_buf()
+    } else {
+        return Err("Invalid folder path.".to_string());
+    };
+
+    if folder.file_name().and_then(|name| name.to_str()) == Some(".yousync") {
+        if let Some(parent) = folder.parent() {
+            folder = parent.to_path_buf();
+        }
+    }
+
+    if !folder.exists() {
+        return Err("Folder does not exist.".to_string());
+    }
+
+    if !folder.is_dir() {
+        return Err("Target is not a folder.".to_string());
+    }
+
+    Ok(folder)
+}
+
+#[tauri::command]
+fn open_playlist_folder(path: String) -> Result<(), String> {
+    let folder = playlist_folder_from_path(&path)?;
+    open_target(&folder.to_string_lossy())
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    open_target(&url)
+}
+
+#[tauri::command]
+fn open_local_file(path: String) -> Result<(), String> {
+    let file_path = PathBuf::from(path.trim());
+
+    if !file_path.is_file() {
+        return Err("Local file does not exist.".to_string());
+    }
+
+    open_target(&file_path.to_string_lossy())
+}
+
 #[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
-    open_target(&path)
+    open_playlist_folder(path)
 }
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    open_target(&url)
+    open_external_url(url)
+}
+
+#[tauri::command]
+fn redownload_track(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    track_index: u64,
+) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "redownload_track",
+        json!({ "playlist_id": playlist_id, "track_index": track_index }),
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -290,6 +362,10 @@ pub fn run() {
             get_sync_all_status,
             get_sync_tasks_status,
             cancel_sync_all,
+            redownload_track,
+            open_playlist_folder,
+            open_external_url,
+            open_local_file,
             open_folder,
             open_url
         ])

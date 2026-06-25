@@ -8,6 +8,9 @@ import {
   PLAYLISTS_UPDATED_EVENT,
   deletePlaylist,
   listPlaylists,
+  openFolder,
+  openSourceUrl,
+  resolvePlaylistFolderPath,
 } from "../services/playlistService";
 import type { LongTaskProgress, Platform, PlaylistSummary } from "../services/playlistService";
 
@@ -187,6 +190,34 @@ function PlaylistsPage() {
     await reloadPlaylists();
   }
 
+  async function handleOpenPlaylistFolder(playlistId: string) {
+    const playlist = playlists.find((item) => item.id === playlistId);
+
+    if (!playlist) {
+      return;
+    }
+
+    const opened = await openFolder(resolvePlaylistFolderPath(playlist.path));
+    if (!opened) {
+      setToast("Folder could not be opened.");
+    }
+  }
+
+  async function handleOpenPlaylistSource(playlistId: string) {
+    const playlist = playlists.find((item) => item.id === playlistId);
+    const sourceUrl = playlist?.sourceUrl;
+
+    if (!sourceUrl) {
+      setToast("Source link is unavailable.");
+      return;
+    }
+
+    const opened = await openSourceUrl(sourceUrl);
+    if (!opened) {
+      setToast("Source could not be opened.");
+    }
+  }
+
   async function handleRemovePlaylist(playlistId: string) {
     if (isSyncingAll || hasActiveIndividualSyncs) {
       setToast("Cannot remove playlist while a sync or download is running.");
@@ -356,6 +387,8 @@ function PlaylistsPage() {
                 onSync={handleSyncPlaylist}
                 onCancelSync={handleCancelPlaylistSync}
                 onDownloadMissing={handleDownloadMissing}
+                onOpenFolder={handleOpenPlaylistFolder}
+                onOpenSource={handleOpenPlaylistSource}
                 onRemove={handleRemovePlaylist}
               />
             );

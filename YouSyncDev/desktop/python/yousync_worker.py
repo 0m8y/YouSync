@@ -741,7 +741,13 @@ class YouSyncWorker:
             with self.manager_lock:
                 playlists = self.manager.list_playlists()
 
-        return [bridge.map_core_playlist(playlist) for playlist in playlists]
+        mapped_playlists = []
+        for playlist in playlists:
+            mapped_playlist = bridge.map_core_playlist(playlist)
+            mapped_playlist["sourceUrl"] = playlist.url
+            mapped_playlists.append(mapped_playlist)
+
+        return mapped_playlists
 
     def playlist_details(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(
@@ -770,22 +776,72 @@ class YouSyncWorker:
         if not isinstance(audios, list):
             audios = []
 
+        def first_text(audio: Dict[str, Any], keys: List[str]) -> str:
+            for key in keys:
+                value = audio.get(key)
+                if value is None:
+                    continue
+
+                text = str(value).strip()
+                if text:
+                    return text
+
+            return ""
+
         def audio_title(audio: Dict[str, Any]) -> str:
-            title = str(audio.get("title") or audio.get("video_title") or "").strip()
+            title = first_text(audio, ["title", "video_title", "name"])
             if title:
                 return title
 
-            file_path = str(audio.get("path_to_save_audio_with_title") or "").strip()
+            file_path = audio_local_path(audio)
             if file_path:
                 return Path(file_path).stem
 
             return "—"
 
+        def audio_local_path(audio: Dict[str, Any]) -> str:
+            return first_text(
+                audio,
+                [
+                    "path_to_save_audio_with_title",
+                    "path_to_save_audio",
+                    "local_path",
+                    "localPath",
+                    "file_path",
+                    "filePath",
+                    "path",
+                ],
+            )
+
+        def audio_source_url(audio: Dict[str, Any]) -> str:
+            return first_text(
+                audio,
+                [
+                    "url",
+                    "source_url",
+                    "sourceUrl",
+                    "webpage_url",
+                    "webpageUrl",
+                    "video_url",
+                    "videoUrl",
+                ],
+            )
+
+        def audio_file_exists(file_path: str) -> bool:
+            try:
+                return bool(file_path) and Path(file_path).is_file()
+            except OSError:
+                return False
+
+        def audio_is_downloaded(audio: Dict[str, Any]) -> bool:
+            local_path = audio_local_path(audio)
+            return audio.get("is_downloaded") is True and audio_file_exists(local_path)
+
         def audio_status(audio: Dict[str, Any]) -> str:
             if bridge.audio_has_error(audio):
                 return "Error"
 
-            is_downloaded = audio.get("is_downloaded") is True
+            is_downloaded = audio_is_downloaded(audio)
             metadata_updated = audio.get("metadata_updated") is True
 
             if is_downloaded and metadata_updated:
@@ -802,6 +858,8 @@ class YouSyncWorker:
                 continue
 
             duration = raw_audio.get("duration") or raw_audio.get("duration_string")
+            source_url = audio_source_url(raw_audio)
+            local_path = audio_local_path(raw_audio)
             tracks.append(
                 {
                     "index": index,
@@ -809,7 +867,10 @@ class YouSyncWorker:
                     "artist": str(raw_audio.get("artist") or "").strip() or "—",
                     "duration": str(duration).strip() if duration else "—",
                     "status": audio_status(raw_audio),
-                    "url": raw_audio.get("url") or None,
+                    "url": source_url or None,
+                    "sourceUrl": source_url or None,
+                    "localPath": local_path or None,
+                    "isDownloaded": audio_is_downloaded(raw_audio),
                 }
             )
 
@@ -1401,6 +1462,79 @@ class YouSyncWorker:
             "message": "Sync all cancelled.",
         }
 
+    def redownload_track(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        playlist_id = str(
+            payload.get("playlist_id") or payload.get("playlistId") or ""
+        ).strip()
+
+        try:
+            track_index = int(payload.get("track_index") or payload.get("trackIndex") or 0)
+        except (TypeError, ValueError):
+            track_index = 0
+
+        if not playlist_id:
+            raise ValueError("A playlist id is required.")
+
+        if track_index < 1:
+            raise ValueError("A valid track index is required.")
+
+        with self.sync_lock:
+            state, should_refresh_manager = self.poll_sync_process_locked()
+            should_refresh_manager = self.poll_playlist_tasks_locked() or should_refresh_manager
+
+            if self.is_long_task_running_locked(state):
+                return {
+                    "ok": False,
+                    "playlistId": playlist_id,
+                    "trackIndex": track_index,
+                    "message": "Cannot redownload a track while a sync or download is running.",
+                }
+
+        self.refresh_after_completed_sync(should_refresh_manager)
+        self.refresh_after_completed_playlist_tasks(should_refresh_manager)
+
+        with redirect_stdout(sys.stderr):
+            with self.manager_lock:
+                playlist = self.manager.get_playlist(playlist_id)
+
+                if playlist is None:
+                    return {
+                        "ok": False,
+                        "playlistId": playlist_id,
+                        "trackIndex": track_index,
+                        "message": f"Playlist with ID {playlist_id} not found.",
+                    }
+
+                self.manager.instantiate_playlist_managers()
+                self.managers_loaded = True
+                audio_managers = self.manager.get_audio_managers(playlist_id) or []
+
+                if track_index > len(audio_managers):
+                    return {
+                        "ok": False,
+                        "playlistId": playlist_id,
+                        "trackIndex": track_index,
+                        "message": "Track not found.",
+                    }
+
+                audio_manager = audio_managers[track_index - 1]
+                metadata = getattr(audio_manager, "metadata", None)
+
+                if metadata is not None:
+                    if hasattr(metadata, "is_downloaded"):
+                        metadata.is_downloaded = False
+                    if hasattr(metadata, "metadata_updated"):
+                        metadata.metadata_updated = False
+
+                audio_manager.download()
+
+        return {
+            "ok": True,
+            "playlistId": playlist_id,
+            "trackIndex": track_index,
+            "message": "Track redownloaded.",
+        }
+
     def delete_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(
             payload.get("playlist_id") or payload.get("playlistId") or ""
@@ -1733,6 +1867,9 @@ class YouSyncWorker:
 
         if command == "cancel_sync_all":
             return self.cancel_sync_all(payload)
+
+        if command == "redownload_track":
+            return self.redownload_track(payload)
 
         if command == "delete_playlist":
             return self.delete_playlist(payload)

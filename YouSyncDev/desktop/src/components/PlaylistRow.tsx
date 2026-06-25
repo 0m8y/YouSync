@@ -12,6 +12,8 @@ type PlaylistRowProps = {
   onSync?: (playlistId: string) => void;
   onCancelSync?: (playlistId: string) => void;
   onDownloadMissing?: (playlistId: string) => void;
+  onOpenFolder?: (playlistId: string) => void;
+  onOpenSource?: (playlistId: string) => void;
   onRemove?: (playlistId: string) => void;
 };
 
@@ -49,6 +51,8 @@ function PlaylistRow({
   onSync,
   onCancelSync,
   onDownloadMissing,
+  onOpenFolder,
+  onOpenSource,
   onRemove,
 }: PlaylistRowProps) {
   const platform = getPlatform(playlist.platform);
@@ -220,6 +224,28 @@ function PlaylistRow({
                   }}
                 >
                   Download missing
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onOpenFolder?.(playlist.id);
+                  }}
+                >
+                  Open folder
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onOpenSource?.(playlist.id);
+                  }}
+                >
+                  Open source link
                 </button>
                 <div className="menu-separator" role="separator" />
                 <button

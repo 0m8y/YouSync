@@ -8,9 +8,12 @@ import {
   deletePlaylist,
   getPlaylistDetails,
   openFolder,
+  openLocalFile,
   openSourceUrl,
+  redownloadTrack,
+  resolvePlaylistFolderPath,
 } from "../services/playlistService";
-import type { LongTaskProgress, PlaylistDetail } from "../services/playlistService";
+import type { LongTaskProgress, PlaylistDetail, PlaylistTrack } from "../services/playlistService";
 
 type PlaylistDetailPageProps = {
   playlistId: string;
@@ -44,10 +47,19 @@ function progressLabel(progress: LongTaskProgress | null) {
   return parts.join(" · ");
 }
 
+function trackSourceUrl(track: PlaylistTrack) {
+  return track.sourceUrl || track.url || "";
+}
+
+function canOpenTrackLocalFile(track: PlaylistTrack) {
+  return Boolean(track.localPath && track.isDownloaded);
+}
+
 function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [detail, setDetail] = useState<PlaylistDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [trackMenuOpen, setTrackMenuOpen] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const [coverFailed, setCoverFailed] = useState(false);
   const {
@@ -89,6 +101,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         setDetail(nextDetail);
         setIsLoading(false);
         setCoverFailed(false);
+        setTrackMenuOpen(null);
       }
     }
 
@@ -215,7 +228,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    const opened = await openFolder(playlist.path);
+    const opened = await openFolder(resolvePlaylistFolderPath(playlist.path));
     if (!opened) {
       setToast("Folder could not be opened.");
     }
@@ -230,6 +243,56 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     if (!opened) {
       setToast("Source could not be opened.");
     }
+  }
+
+  async function handlePlayTrack(track: PlaylistTrack) {
+    if (!canOpenTrackLocalFile(track)) {
+      return;
+    }
+
+    await openLocalFile(track.localPath ?? "");
+  }
+
+  async function handleOpenTrackSource(track: PlaylistTrack) {
+    const sourceUrl = trackSourceUrl(track);
+
+    if (!sourceUrl) {
+      return;
+    }
+
+    await openSourceUrl(sourceUrl);
+  }
+
+  async function handleOpenTrackLocalFile(track: PlaylistTrack) {
+    if (!canOpenTrackLocalFile(track)) {
+      return;
+    }
+
+    await openLocalFile(track.localPath ?? "");
+  }
+
+  async function handleRedownloadTrack(track: PlaylistTrack) {
+    setTrackMenuOpen(null);
+
+    if (isSyncing) {
+      return;
+    }
+
+    setToast("");
+
+    if (USE_MOCK_PLAYLIST_STATUSES) {
+      setToast("Mock status mode is enabled.");
+      return;
+    }
+
+    const result = await redownloadTrack(playlistId, track.index);
+
+    if (!result.ok) {
+      setToast("Track could not be redownloaded.");
+      return;
+    }
+
+    await loadDetail();
   }
 
   if (isLoading || !playlist || !detail) {
@@ -375,22 +438,89 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
         <span>Title</span>
         <span>Artist</span>
         <span>Status</span>
-        <span>Duration</span>
+        <span />
       </div>
 
       <div className="detail-track-table">
-        {detail.tracks.map((track) => (
-          <div className="detail-track-row" key={`${track.index}-${track.title}`}>
-            <span className="detail-track-num">{track.index}</span>
-            <span className="detail-track-title">{track.title}</span>
-            <span className="detail-track-artist">{track.artist || "—"}</span>
-            <span className={`detail-track-status ${statusClass(track.status)}`}>
-              <span />
-              {track.status}
-            </span>
-            <span className="detail-track-duration">{track.duration || "—"}</span>
-          </div>
-        ))}
+        {detail.tracks.map((track) => {
+          const sourceUrl = trackSourceUrl(track);
+          const canOpenLocal = canOpenTrackLocalFile(track);
+          const isTrackMenuOpen = trackMenuOpen === track.index;
+
+          return (
+            <div
+              className="detail-track-row"
+              key={`${track.index}-${track.title}`}
+              onMouseLeave={() => setTrackMenuOpen((current) => (current === track.index ? null : current))}
+            >
+              <span className="detail-track-num">{track.index}</span>
+              <span className="detail-track-title">{track.title}</span>
+              <span className="detail-track-artist">{track.artist || "—"}</span>
+              <span className={`detail-track-status ${statusClass(track.status)}`}>
+                <span />
+                {track.status}
+              </span>
+              <span
+                className="detail-track-actions"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  className="track-play-btn"
+                  type="button"
+                  disabled={!canOpenLocal}
+                  onClick={() => handlePlayTrack(track)}
+                >
+                  Play
+                </button>
+                <span className="track-menu-wrap">
+                  <button
+                    className="track-more-btn"
+                    type="button"
+                    aria-label={`More actions for ${track.title}`}
+                    aria-expanded={isTrackMenuOpen}
+                    onClick={() => setTrackMenuOpen((current) => (current === track.index ? null : track.index))}
+                  >
+                    ⋮
+                  </button>
+                  {isTrackMenuOpen ? (
+                    <span className="detail-menu track-menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={isSyncing}
+                        onClick={() => handleRedownloadTrack(track)}
+                      >
+                        Redownload track
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!sourceUrl}
+                        onClick={() => {
+                          setTrackMenuOpen(null);
+                          void handleOpenTrackSource(track);
+                        }}
+                      >
+                        Open source link
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!canOpenLocal}
+                        onClick={() => {
+                          setTrackMenuOpen(null);
+                          void handleOpenTrackLocalFile(track);
+                        }}
+                      >
+                        Open local file
+                      </button>
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {toast ? <Toast message={toast} /> : null}
