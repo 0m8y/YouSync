@@ -104,6 +104,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     syncPlaylist,
     downloadMissing,
     cancelPlaylistSync,
+    refreshSyncStatuses,
   } = useSyncStatus();
   const syncProgress = getPlaylistProgress(playlistId);
   const isSyncing = isActiveProgress(syncProgress);
@@ -555,11 +556,12 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
     const result = await redownloadTrack(playlistId, track.index);
 
     if (!result.ok) {
-      setToast("Track could not be redownloaded.", "error");
+      setToast(result.message ?? "Track could not be redownloaded.", "error");
       return;
     }
 
-    await loadDetail(false);
+    setToast(result.message ?? "Track redownload started.", "info");
+    await refreshSyncStatuses();
   }
 
   if (isLoading || !playlist || !detail) {

@@ -6,7 +6,6 @@ import subprocess
 import sys
 import threading
 import tempfile
-import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
@@ -30,24 +29,6 @@ def write_response(payload: Dict[str, Any]) -> None:
 def write_child_result(payload: Dict[str, Any]) -> None:
     ORIGINAL_STDOUT.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n")
     ORIGINAL_STDOUT.flush()
-
-
-def is_frozen() -> bool:
-    return bool(getattr(sys, "frozen", False))
-
-
-def worker_child_command(args: List[str]) -> List[str]:
-    if is_frozen():
-        return [sys.executable, *args]
-
-    return [sys.executable, "-u", str(Path(__file__).resolve()), *args]
-
-
-def worker_child_cwd() -> str:
-    if is_frozen():
-        return str(Path(sys.executable).resolve().parent)
-
-    return str(bridge.project_root())
 
 
 def progress_jobs_dir() -> Path:
@@ -463,7 +444,6 @@ def run_sync_child(playlist_id: str, progress_path: Optional[str] = None) -> int
         )
         write_child_result(result)
         log(f"sync child crashed for {playlist_id}: {exc}")
-        traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -592,7 +572,6 @@ def run_sync_all_child(progress_path: Optional[str] = None) -> int:
             }
         )
         log(f"sync all child crashed: {exc}")
-        traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -703,7 +682,163 @@ def run_download_missing_child(playlist_id: str, progress_path: Optional[str] = 
             }
         )
         log(f"download missing child crashed for {playlist_id}: {exc}")
-        traceback.print_exc(file=sys.stderr)
+        return 1
+
+
+def run_redownload_track_child(playlist_id: str, track_index: int, progress_path: Optional[str] = None) -> int:
+    """Redownload one track in an isolated Python process."""
+    progress_state = {
+        "jobType": "redownload_track",
+        "playlistId": playlist_id,
+        "playlistTitle": "",
+        "status": "syncing",
+        "phase": "downloading",
+        "current": 0,
+        "total": 1,
+        "currentTrack": "",
+        "failedCount": 0,
+        "message": "Preparing track redownload...",
+        "playlists": {},
+    }
+
+    try:
+        bridge.ensure_project_root_on_path()
+
+        with redirect_stdout(sys.stderr):
+            from core.CentralManager import CentralManager
+
+            manager = CentralManager("playlists.json")
+            manager.instantiate_playlist_managers()
+            playlist = manager.get_playlist(playlist_id)
+            playlist_title = playlist.title if playlist else ""
+            progress_state["playlistTitle"] = playlist_title
+
+            if playlist is None:
+                result = {
+                    "ok": False,
+                    "playlistId": playlist_id,
+                    "trackIndex": track_index,
+                    "message": f"Playlist with ID {playlist_id} not found.",
+                }
+                write_playlist_progress(
+                    progress_path,
+                    progress_state,
+                    playlist_id,
+                    playlist_progress(
+                        "error",
+                        "error",
+                        current=0,
+                        total=1,
+                        failed_count=1,
+                        message=result["message"],
+                    ),
+                )
+                write_child_result(result)
+                return 1
+
+            audio_managers = manager.get_audio_managers(playlist_id) or []
+
+            if track_index < 1 or track_index > len(audio_managers):
+                result = {
+                    "ok": False,
+                    "playlistId": playlist_id,
+                    "trackIndex": track_index,
+                    "message": "Track not found.",
+                }
+                write_playlist_progress(
+                    progress_path,
+                    progress_state,
+                    playlist_id,
+                    playlist_progress(
+                        "error",
+                        "error",
+                        current=0,
+                        total=1,
+                        failed_count=1,
+                        message=result["message"],
+                    ),
+                )
+                write_child_result(result)
+                return 1
+
+            audio_manager = audio_managers[track_index - 1]
+            title = audio_title(audio_manager)
+            write_playlist_progress(
+                progress_path,
+                progress_state,
+                playlist_id,
+                playlist_progress(
+                    "syncing",
+                    "downloading",
+                    current=0,
+                    total=1,
+                    current_track=title,
+                    message="Redownloading track...",
+                ),
+            )
+
+            metadata = getattr(audio_manager, "metadata", None)
+
+            if metadata is not None:
+                if hasattr(metadata, "is_downloaded"):
+                    metadata.is_downloaded = False
+                if hasattr(metadata, "metadata_updated"):
+                    metadata.metadata_updated = False
+
+                try:
+                    audio_manager.update_data()
+                except Exception as exc:
+                    log(f"failed to persist redownload reset for {playlist_id} / {title}: {exc}")
+
+            audio_manager.download()
+
+        message = "Track redownloaded."
+        write_playlist_progress(
+            progress_path,
+            progress_state,
+            playlist_id,
+            playlist_progress(
+                "completed",
+                "completed",
+                current=1,
+                total=1,
+                current_track=title,
+                message=message,
+            ),
+        )
+        write_child_result(
+            {
+                "ok": True,
+                "playlistId": playlist_id,
+                "trackIndex": track_index,
+                "message": message,
+            }
+        )
+        return 0
+    except Exception as exc:
+        message = "Track redownload failed."
+        write_playlist_progress(
+            progress_path,
+            progress_state,
+            playlist_id,
+            playlist_progress(
+                "error",
+                "error",
+                current=0,
+                total=1,
+                failed_count=1,
+                message=message,
+            ),
+        )
+        write_child_result(
+            {
+                "ok": False,
+                "playlistId": playlist_id,
+                "trackIndex": track_index,
+                "message": message,
+            }
+        )
+        log(f"redownload track child crashed for {playlist_id} / {track_index}: {exc}")
         return 1
 
 
@@ -712,9 +847,6 @@ class YouSyncWorker:
         bridge.ensure_project_root_on_path()
 
         with redirect_stdout(sys.stderr):
-            if is_frozen():
-                import numpy  # noqa: F401
-
             from core.CentralManager import CentralManager, Platform
 
             self.platform_enum = Platform
@@ -1518,9 +1650,10 @@ class YouSyncWorker:
             log(f"failed to refresh manager after sync: {exc}")
 
     def start_sync_process(self, args: List[str]) -> subprocess.Popen[Any]:
+        script_path = Path(__file__).resolve()
         return subprocess.Popen(
-            worker_child_command(args),
-            cwd=worker_child_cwd(),
+            [sys.executable, "-u", str(script_path), *args],
+            cwd=str(bridge.project_root()),
             stdin=subprocess.DEVNULL,
             # Never keep child stdout as a pipe: the core/downloader may print a
             # lot during sync. If the pipe fills, the child blocks forever and
@@ -1829,12 +1962,14 @@ class YouSyncWorker:
             state, should_refresh_manager = self.poll_sync_process_locked()
             should_refresh_manager = self.poll_playlist_tasks_locked() or should_refresh_manager
 
-            if self.is_long_task_running_locked(state):
+            global_process_running = self.sync_process is not None and self.sync_process.poll() is None
+            if global_process_running or self.is_playlist_task_running_locked(playlist_id):
                 return {
                     "ok": False,
+                    "started": False,
                     "playlistId": playlist_id,
                     "trackIndex": track_index,
-                    "message": "Cannot redownload a track while a sync or download is running.",
+                    "message": "Cannot redownload this track while this playlist is syncing or downloading.",
                 }
 
         self.refresh_after_completed_sync(should_refresh_manager)
@@ -1847,39 +1982,78 @@ class YouSyncWorker:
                 if playlist is None:
                     return {
                         "ok": False,
+                        "started": False,
                         "playlistId": playlist_id,
                         "trackIndex": track_index,
                         "message": f"Playlist with ID {playlist_id} not found.",
                     }
 
-                self.manager.instantiate_playlist_managers()
-                self.managers_loaded = True
-                audio_managers = self.manager.get_audio_managers(playlist_id) or []
+                cache = bridge.read_playlist_cache(getattr(playlist, "path", ""))
+                audios = cache.get("audios", []) if isinstance(cache, dict) else []
 
-                if track_index > len(audio_managers):
+                if not isinstance(audios, list) or track_index > len(audios):
                     return {
                         "ok": False,
+                        "started": False,
                         "playlistId": playlist_id,
                         "trackIndex": track_index,
                         "message": "Track not found.",
                     }
 
-                audio_manager = audio_managers[track_index - 1]
-                metadata = getattr(audio_manager, "metadata", None)
+        with self.sync_lock:
+            global_process_running = self.sync_process is not None and self.sync_process.poll() is None
+            if global_process_running or self.is_playlist_task_running_locked(playlist_id):
+                return {
+                    "ok": False,
+                    "started": False,
+                    "playlistId": playlist_id,
+                    "trackIndex": track_index,
+                    "message": "This playlist is already syncing or downloading.",
+                }
 
-                if metadata is not None:
-                    if hasattr(metadata, "is_downloaded"):
-                        metadata.is_downloaded = False
-                    if hasattr(metadata, "metadata_updated"):
-                        metadata.metadata_updated = False
-
-                audio_manager.download()
+            progress_path = str(create_progress_path())
+            playlist_title = self.playlist_title(playlist_id)
+            process = self.start_sync_process([
+                "--redownload-track-child",
+                playlist_id,
+                str(track_index),
+                progress_path,
+            ])
+            task_state = {
+                "jobType": "redownload_track",
+                "playlistId": playlist_id,
+                "playlistIds": [playlist_id],
+                "playlistTitle": playlist_title,
+                "status": "syncing",
+                "phase": "downloading",
+                "current": 0,
+                "total": 1,
+                "currentTrack": "",
+                "failedCount": 0,
+                "message": "Preparing track redownload...",
+                "progressPath": progress_path,
+                "playlists": {
+                    playlist_id: playlist_progress(
+                        "syncing",
+                        "downloading",
+                        current=0,
+                        total=1,
+                        message="Preparing track redownload...",
+                    )
+                },
+            }
+            self.sync_tasks[playlist_id] = {
+                "process": process,
+                "state": task_state,
+                "refreshed": False,
+            }
 
         return {
             "ok": True,
+            "started": True,
             "playlistId": playlist_id,
             "trackIndex": track_index,
-            "message": "Track redownloaded.",
+            "message": "Track redownload started.",
         }
 
     def normalize_file_path(self, raw_path: str, root_folder: Optional[Path]) -> Optional[Path]:
@@ -1990,29 +2164,28 @@ class YouSyncWorker:
         moves: List[Dict[str, Any]] = []
         seen_sources: set[str] = set()
         seen_destinations: set[str] = set()
-
-        # The persisted source of truth for a downloaded MP3 is
-        # path_to_save_audio_with_title. Only fall back to
-        # path_to_save_audio_without_title when the main path is absent or the
-        # fallback is the only path that still exists on disk.
-        primary_path_key = "path_to_save_audio_with_title"
-        fallback_path_key = "path_to_save_audio_without_title"
+        path_keys = [
+            "path_to_save_audio_with_title",
+            "path_to_save_audio_without_title",
+            "local_path",
+            "localPath",
+            "file_path",
+            "filePath",
+            "path",
+        ]
 
         if not isinstance(audios, list):
             return moves, None
-
-        def normalized_key(path: Path) -> str:
-            try:
-                return str(path.expanduser().resolve(strict=False))
-            except OSError:
-                return str(path.expanduser())
 
         def reserve_destination(source: Path) -> Path:
             candidate = new_root / source.name
             index = 1
 
             while True:
-                destination_key = normalized_key(candidate)
+                try:
+                    destination_key = str(candidate.resolve(strict=False))
+                except OSError:
+                    destination_key = str(candidate)
 
                 if destination_key not in seen_destinations and not candidate.exists():
                     seen_destinations.add(destination_key)
@@ -2021,50 +2194,45 @@ class YouSyncWorker:
                 candidate = new_root / f"{source.stem} ({index}){source.suffix}"
                 index += 1
 
-        def path_from_audio(audio: Dict[str, Any], key: str) -> Optional[Path]:
-            value = audio.get(key)
-
-            if not isinstance(value, str) or not value.strip():
-                return None
-
-            candidate = self.normalize_file_path(value, root_folder)
-
-            if candidate is None or not candidate.name or not candidate.suffix:
-                return None
-
-            return candidate
-
         for audio_index, audio in enumerate(audios):
             if not isinstance(audio, dict):
                 continue
 
-            primary_source = path_from_audio(audio, primary_path_key)
-            fallback_source = path_from_audio(audio, fallback_path_key)
+            source: Optional[Path] = None
 
-            source = primary_source
+            for key in path_keys:
+                value = audio.get(key)
 
-            # Keep path_to_save_audio_with_title as the source of truth. The only
-            # time we switch to the fallback is when the primary file is missing
-            # and the fallback file exists.
-            if (
-                primary_source is None
-                or (not primary_source.exists() and fallback_source is not None and fallback_source.exists())
-            ):
-                source = fallback_source or primary_source
+                if not isinstance(value, str) or not value.strip():
+                    continue
+
+                candidate = self.normalize_file_path(value, root_folder)
+
+                if candidate is None or not candidate.name or not candidate.suffix:
+                    continue
+
+                source = candidate
+                break
 
             if source is None:
                 continue
 
-            source_key = normalized_key(source)
+            try:
+                source_key = str(source.resolve(strict=False))
+            except OSError:
+                source_key = str(source)
 
             if source_key in seen_sources:
                 continue
 
             destination = reserve_destination(source)
 
-            if normalized_key(source) == normalized_key(destination):
-                seen_sources.add(source_key)
-                continue
+            try:
+                if source.resolve(strict=False) == destination.resolve(strict=False):
+                    seen_sources.add(source_key)
+                    continue
+            except OSError:
+                pass
 
             seen_sources.add(source_key)
             moves.append(
@@ -2072,12 +2240,10 @@ class YouSyncWorker:
                     "audioIndex": audio_index,
                     "source": source,
                     "destination": destination,
-                    "sourceKey": primary_path_key if source == primary_source else fallback_path_key,
                 }
             )
 
         return moves, None
-
 
     def move_playlist_audio_files(self, moves: List[Dict[str, Any]]) -> int:
         moved_count = 0
@@ -2370,12 +2536,15 @@ class YouSyncWorker:
                         "message": f"Playlist with ID {playlist_id} not found.",
                     }
 
+                if not hasattr(self.manager, "update_path"):
+                    return {
+                        "ok": False,
+                        "message": "Changing playlist folder is not available in this build.",
+                    }
+
                 old_root = self.playlist_root_folder(playlist)
                 old_storage_folder = self.playlist_storage_folder(playlist)
                 metadata_files = self.playlist_metadata_files(playlist)
-
-                # Important: read the old cache and compute every audio move
-                # before playlists.json or any .yousync path is changed.
                 playlist_cache = bridge.read_playlist_cache(getattr(playlist, "path", ""))
 
         if old_root is not None:
@@ -2395,7 +2564,6 @@ class YouSyncWorker:
                 pass
 
         target_storage_folder = destination_root / ".yousync"
-        target_cache_path = target_storage_folder / f"{playlist_id}.json"
         copied_sources: List[Path] = []
 
         try:
@@ -2416,54 +2584,31 @@ class YouSyncWorker:
                 if self.copy_playlist_file(metadata_file, destination_file):
                     copied_sources.append(metadata_file)
 
-            if not target_cache_path.exists():
-                return {
-                    "ok": False,
-                    "message": "No matching YouSync data was found for this playlist.",
-                }
-
             moved_audio_count = self.move_playlist_audio_files(audio_moves)
 
-            # Rewrite the copied cache after the real moves. This keeps the
-            # actual destination used by shutil.move, including generated unique
-            # names when a file already existed in the destination folder.
+            with redirect_stdout(sys.stderr):
+                with self.manager_lock:
+                    updated = self.manager.update_path(str(destination_root), playlist_id)
+                    playlists = self.manager.list_playlists()
+
+            if not bool(updated):
+                return {
+                    "ok": False,
+                    "message": "No matching YouSync data was found in the selected folder.",
+                }
+
             self.rewrite_playlist_cache_paths(
-                target_cache_path,
+                target_storage_folder / f"{playlist_id}.json",
                 old_root,
                 old_storage_folder,
                 destination_root,
                 audio_moves,
             )
-
-            # Do not call CentralManager.update_path here. That core method can
-            # rebuild audio paths from video_title and overwrite the exact
-            # destinations we just moved to. For this operation, only
-            # playlists.json needs to point to the copied playlist cache.
-            with redirect_stdout(sys.stderr):
-                with self.manager_lock:
-                    playlist_after_move = self.manager.get_playlist(playlist_id)
-
-                    if playlist_after_move is None:
-                        return {
-                            "ok": False,
-                            "message": f"Playlist with ID {playlist_id} not found.",
-                        }
-
-                    playlist_after_move.path = str(target_cache_path)
-
-                    if hasattr(self.manager, "save_data_to_json"):
-                        self.manager.save_data_to_json()
-                    else:
-                        return {
-                            "ok": False,
-                            "message": "Could not save playlists.json.",
-                        }
-
             log("Playlist location changed")
 
-            moved_metadata_count = 0
+            deleted_count = 0
             for source in copied_sources:
-                moved_metadata_count += 1 if self.remove_file_if_exists(source) else 0
+                deleted_count += 1 if self.remove_file_if_exists(source) else 0
 
             self.refresh_manager()
             with redirect_stdout(sys.stderr):
@@ -2483,7 +2628,7 @@ class YouSyncWorker:
                 "ok": True,
                 "message": "Playlist destination folder updated.",
                 "playlist": playlist_summary,
-                "movedFiles": moved_metadata_count,
+                "movedFiles": deleted_count,
                 "movedAudioFiles": moved_audio_count,
             }
         except Exception as exc:
@@ -2492,7 +2637,6 @@ class YouSyncWorker:
                 "ok": False,
                 "message": "Playlist folder could not be changed.",
             }
-
 
     def delete_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(
@@ -2920,12 +3064,18 @@ def main() -> int:
         progress_path = sys.argv[3] if len(sys.argv) >= 4 else None
         return run_download_missing_child(sys.argv[2], progress_path)
 
+    if len(sys.argv) >= 4 and sys.argv[1] == "--redownload-track-child":
+        try:
+            track_index = int(sys.argv[3])
+        except (TypeError, ValueError):
+            track_index = 0
+        progress_path = sys.argv[4] if len(sys.argv) >= 5 else None
+        return run_redownload_track_child(sys.argv[2], track_index, progress_path)
+
     try:
         worker = YouSyncWorker()
     except Exception as exc:
         log(f"failed to start: {exc}")
-        if os.environ.get("YOUSYNC_WORKER_DEBUG_TRACEBACK") == "1":
-            traceback.print_exc(file=sys.stderr)
         return 1
 
     for line in sys.stdin:

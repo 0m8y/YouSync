@@ -52,6 +52,7 @@ export type MovePlaylistFolderResult = {
 
 export type RedownloadTrackResult = {
   ok: boolean;
+  started?: boolean;
   playlistId: string;
   trackIndex: number;
   message?: string;
