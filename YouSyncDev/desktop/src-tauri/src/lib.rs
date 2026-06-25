@@ -168,8 +168,50 @@ fn list_playlists(state: State<'_, WorkerState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn get_playlist_details(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "playlist_details",
+        json!({ "playlist_id": playlist_id }),
+    )
+}
+
+#[tauri::command]
 fn sync_playlist(state: State<'_, WorkerState>, playlist_id: String) -> Result<Value, String> {
     call_python_worker(state.inner(), "sync", json!({ "playlist_id": playlist_id }))
+}
+
+#[tauri::command]
+fn download_missing(state: State<'_, WorkerState>, playlist_id: String) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "download_missing",
+        json!({ "playlist_id": playlist_id }),
+    )
+}
+
+#[tauri::command]
+fn delete_playlist(state: State<'_, WorkerState>, playlist_id: String) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "delete_playlist",
+        json!({ "playlist_id": playlist_id }),
+    )
+}
+
+#[tauri::command]
+fn cancel_playlist_sync(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker(
+        state.inner(),
+        "cancel_playlist_sync",
+        json!({ "playlist_id": playlist_id }),
+    )
 }
 
 #[tauri::command]
@@ -191,6 +233,33 @@ fn get_sync_all_status(state: State<'_, WorkerState>) -> Result<Value, String> {
     call_python_worker(state.inner(), "sync_all_status", json!({}))
 }
 
+fn open_target(target: &str) -> Result<(), String> {
+    let status = if cfg!(target_os = "macos") {
+        Command::new("open").arg(target).status()
+    } else if cfg!(windows) {
+        Command::new("cmd").args(["/C", "start", "", target]).status()
+    } else {
+        Command::new("xdg-open").arg(target).status()
+    }
+    .map_err(|error| format!("Failed to open target: {error}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Open command failed".to_string())
+    }
+}
+
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    open_target(&path)
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    open_target(&url)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -201,10 +270,16 @@ pub fn run() {
             preview_playlist,
             add_playlist,
             list_playlists,
+            get_playlist_details,
             sync_playlist,
+            download_missing,
+            delete_playlist,
+            cancel_playlist_sync,
             get_sync_status,
             sync_all_playlists,
-            get_sync_all_status
+            get_sync_all_status,
+            open_folder,
+            open_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

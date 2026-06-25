@@ -31,6 +31,17 @@ export type AddPlaylistResult = {
   playlist?: PlaylistSummary;
 };
 
+export type DeletePlaylistResult = {
+  ok: boolean;
+  message: string;
+};
+
+export type CancelPlaylistSyncResult = {
+  ok: boolean;
+  playlistId: string;
+  message: string;
+};
+
 export type SyncStartResult = {
   started: boolean;
   playlistId: string;
@@ -43,22 +54,42 @@ export type SyncAllStartResult = {
   message?: string;
 };
 
-export type SyncStatus = {
-  playlistId: string;
-  status: "idle" | "syncing" | "completed" | "error";
+export type LongTaskPhase = "idle" | "queued" | "syncing" | "downloading" | "completed" | "error" | "cancelled";
+export type LongTaskJobType = "single" | "all" | "download_missing" | null;
+
+export type PlaylistTaskProgress = {
+  status: "idle" | "queued" | "syncing" | "completed" | "error" | "cancelled";
+  phase?: LongTaskPhase;
+  current?: number;
+  total?: number;
+  currentTrack?: string;
+  failedCount?: number;
   message?: string;
 };
 
-export type SyncAllStatus = {
-  status: "idle" | "syncing" | "completed" | "error";
+export type LongTaskProgress = PlaylistTaskProgress & {
+  jobType?: LongTaskJobType;
+  playlistId?: string | null;
+  playlistTitle?: string;
+  playlistCurrent?: number | null;
+  playlistTotal?: number | null;
+  playlists?: Record<string, PlaylistTaskProgress>;
+};
+
+export type SyncStatus = LongTaskProgress & {
+  playlistId: string;
+};
+
+export type SyncAllStatus = LongTaskProgress & {
   playlistIds: string[];
-  message?: string;
 };
 
 export type PlaylistStatus =
   | { type: "synced"; label: string }
   | { type: "syncing"; label: string; progress: number }
   | { type: "error"; label: string }
+  | { type: "missing"; label: string }
+  | { type: "partial"; label: string }
   | { type: "stale"; label: string }
   | { type: "empty"; label: string };
 
@@ -71,6 +102,22 @@ export type PlaylistSummary = {
   coverPath?: string | null;
   status: PlaylistStatus;
   lastSynced: string;
+};
+
+export type PlaylistTrack = {
+  index: number;
+  title: string;
+  artist: string;
+  status: "Synced" | "Downloaded" | "Metadata" | "Missing" | "Error";
+  duration: string;
+  url?: string | null;
+};
+
+export type PlaylistDetail = {
+  playlist: PlaylistSummary & {
+    sourceUrl: string;
+  };
+  tracks: PlaylistTrack[];
 };
 
 function bridgeError(error: unknown) {
@@ -138,6 +185,15 @@ export async function listPlaylists(): Promise<PlaylistSummary[]> {
   }
 }
 
+export async function getPlaylistDetails(playlistId: string): Promise<PlaylistDetail | null> {
+  try {
+    return await invoke<PlaylistDetail>("get_playlist_details", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge get_playlist_details failed", bridgeError(error));
+    return null;
+  }
+}
+
 export async function syncPlaylist(playlistId: string): Promise<SyncStartResult> {
   try {
     return await invoke<SyncStartResult>("sync_playlist", { playlistId });
@@ -148,6 +204,64 @@ export async function syncPlaylist(playlistId: string): Promise<SyncStartResult>
       playlistId,
       message: bridgeError(error),
     };
+  }
+}
+
+export async function downloadMissing(playlistId: string): Promise<SyncStartResult> {
+  try {
+    return await invoke<SyncStartResult>("download_missing", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge download_missing failed", bridgeError(error));
+    return {
+      started: false,
+      playlistId,
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function deletePlaylist(playlistId: string): Promise<DeletePlaylistResult> {
+  try {
+    return await invoke<DeletePlaylistResult>("delete_playlist", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge delete_playlist failed", bridgeError(error));
+    return {
+      ok: false,
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function cancelPlaylistSync(playlistId: string): Promise<CancelPlaylistSyncResult> {
+  try {
+    return await invoke<CancelPlaylistSyncResult>("cancel_playlist_sync", { playlistId });
+  } catch (error) {
+    console.warn("[YouSync] bridge cancel_playlist_sync failed", bridgeError(error));
+    return {
+      ok: false,
+      playlistId,
+      message: bridgeError(error),
+    };
+  }
+}
+
+export async function openFolder(path: string): Promise<boolean> {
+  try {
+    await invoke("open_folder", { path });
+    return true;
+  } catch (error) {
+    console.warn("[YouSync] open_folder failed", bridgeError(error));
+    return false;
+  }
+}
+
+export async function openSourceUrl(url: string): Promise<boolean> {
+  try {
+    await invoke("open_url", { url });
+    return true;
+  } catch (error) {
+    console.warn("[YouSync] open_url failed", bridgeError(error));
+    return false;
   }
 }
 

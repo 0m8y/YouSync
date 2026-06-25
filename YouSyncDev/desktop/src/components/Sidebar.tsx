@@ -9,11 +9,6 @@ const navItems = [
 function Sidebar() {
   return (
     <aside className="ys-sidebar" aria-label="Main navigation">
-      <div className="window-controls" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
 
       <div className="ys-logo">
         <div className="ys-logo-icon" aria-hidden="true">♪</div>

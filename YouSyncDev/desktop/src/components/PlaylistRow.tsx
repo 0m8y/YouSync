@@ -1,15 +1,56 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getPlatform } from "../data/mockData";
+import type { LongTaskProgress } from "../services/playlistService";
 import type { PlaylistListItem } from "../types/playlist";
 
 type PlaylistRowProps = {
   playlist: PlaylistListItem;
   isSyncing?: boolean;
+  progress?: LongTaskProgress | null;
+  onOpen?: (playlistId: string) => void;
   onSync?: (playlistId: string) => void;
+  onCancelSync?: (playlistId: string) => void;
+  onDownloadMissing?: (playlistId: string) => void;
+  onRemove?: (playlistId: string) => void;
 };
 
-function PlaylistRow({ playlist, isSyncing = false, onSync }: PlaylistRowProps) {
+function syncLabel(progress?: LongTaskProgress | null) {
+  if (progress?.status === "queued" || progress?.phase === "queued") {
+    return progress.message || "Queued";
+  }
+
+  if (progress?.status === "completed" || progress?.phase === "completed") {
+    return progress.message || "Completed";
+  }
+
+  if (progress?.status === "error" || progress?.phase === "error") {
+    return progress.message || "Error";
+  }
+
+  if (progress?.status === "cancelled" || progress?.phase === "cancelled") {
+    return progress.message || "Cancelled";
+  }
+
+  if (progress?.total && progress.total > 0) {
+    const current = progress.current ?? 0;
+    const verb = progress.phase === "downloading" ? "Downloading" : "Syncing";
+    return verb + " " + current + "/" + progress.total;
+  }
+
+  return progress?.message || "Syncing...";
+}
+
+function PlaylistRow({
+  playlist,
+  isSyncing = false,
+  progress = null,
+  onOpen,
+  onSync,
+  onCancelSync,
+  onDownloadMissing,
+  onRemove,
+}: PlaylistRowProps) {
   const platform = getPlatform(playlist.platform);
   const status = playlist.status;
   const coverUrl = useMemo(
@@ -17,6 +58,7 @@ function PlaylistRow({ playlist, isSyncing = false, onSync }: PlaylistRowProps) 
     [playlist.coverPath],
   );
   const [coverFailed, setCoverFailed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setCoverFailed(false);
@@ -31,9 +73,16 @@ function PlaylistRow({ playlist, isSyncing = false, onSync }: PlaylistRowProps) 
   }, [coverUrl, playlist.coverPath, playlist.title]);
 
   const showCover = Boolean(coverUrl && !coverFailed);
+  const hasProgress = Boolean(progress);
+  const isErrorProgress = progress?.status === "error";
+  const rowState = isSyncing ? "syncing" : isErrorProgress ? "error" : status.type;
 
   return (
-    <div className={`playlist-row ${isSyncing ? "syncing" : status.type}`}>
+    <div
+      className={`playlist-row ${rowState}`}
+      onClick={() => onOpen?.(playlist.id)}
+      onMouseLeave={() => setMenuOpen(false)}
+    >
       <div
         className={`playlist-thumb ${playlist.platform}`}
         aria-hidden="true"
@@ -74,10 +123,14 @@ function PlaylistRow({ playlist, isSyncing = false, onSync }: PlaylistRowProps) 
       <div className="playlist-tracks">{playlist.tracks} tracks</div>
 
       <div className="playlist-status">
-        {isSyncing ? (
+        {hasProgress ? (
           <>
-            <span className="sync-spinner" aria-hidden="true" />
-            <span>Syncing...</span>
+            {progress?.status === "syncing" ? (
+              <span className="sync-spinner" aria-hidden="true" />
+            ) : (
+              <span className="status-dot" />
+            )}
+            <span>{syncLabel(progress)}</span>
           </>
         ) : status.type === "syncing" ? (
           <>
@@ -106,7 +159,85 @@ function PlaylistRow({ playlist, isSyncing = false, onSync }: PlaylistRowProps) 
         >
           ↻
         </button>
-        <button type="button" aria-label={`More actions for ${playlist.title}`}>⋮</button>
+        {isSyncing ? (
+          <button
+            className="stop-btn"
+            type="button"
+            title="Stop sync"
+            aria-label={`Stop sync for ${playlist.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onCancelSync?.(playlist.id);
+            }}
+          >
+            ⏹
+          </button>
+        ) : null}
+        <div
+          className="playlist-menu-wrap"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            aria-label={`More actions for ${playlist.title}`}
+            aria-expanded={menuOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMenuOpen((open) => !open);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setMenuOpen(false);
+              }
+            }}
+          >
+            ⋮
+          </button>
+          {menuOpen ? (
+            <div className="detail-menu playlist-menu" role="menu">
+              {isErrorProgress ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onSync?.(playlist.id);
+                  }}
+                >
+                  Retry sync
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                disabled={isSyncing}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMenuOpen(false);
+                  onDownloadMissing?.(playlist.id);
+                }}
+              >
+                Download missing
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                className="menu-danger"
+                type="button"
+                role="menuitem"
+                disabled={isSyncing}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMenuOpen(false);
+                  onRemove?.(playlist.id);
+                }}
+              >
+                Remove playlist
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

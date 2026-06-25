@@ -187,25 +187,39 @@ def status_from_audios(
     has_cover: bool,
     playlist_exists: bool,
 ) -> Dict[str, Any]:
-    if not audios:
-        if playlist_exists and has_cover:
-            return {"type": "stale", "label": "Not synced yet"}
+    error_count = sum(1 for audio in audios if audio_has_error(audio))
 
-        return {"type": "empty", "label": "Empty"}
+    if error_count:
+        return {
+            "type": "error",
+            "label": f"{error_count} error{'s' if error_count != 1 else ''}",
+        }
+
+    if not audios:
+        return {"type": "missing", "label": "Missing" if playlist_exists or has_cover else "Empty"}
 
     completed = [
         audio
         for audio in audios
         if audio.get("is_downloaded") is True and audio.get("metadata_updated") is True
     ]
+    missing_count = len(audios) - len(completed)
 
     if len(completed) == len(audios):
         return {"type": "synced", "label": "Synced"}
 
-    return {
-        "type": "error",
-        "label": f"{len(audios) - len(completed)} missing",
-    }
+    if not completed or missing_count > len(completed):
+        return {"type": "missing", "label": f"{missing_count} missing"}
+
+    return {"type": "partial", "label": f"{missing_count} missing"}
+
+
+def audio_has_error(audio: Dict[str, Any]) -> bool:
+    return any(
+        value not in (None, "", False)
+        for key, value in audio.items()
+        if "error" in str(key).lower()
+    )
 
 
 def playlist_summary(
