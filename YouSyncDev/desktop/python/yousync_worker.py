@@ -736,6 +736,36 @@ class YouSyncWorker:
                 self.manager = CentralManager("playlists.json")
                 self.managers_loaded = False
 
+    def fallback_playlist_summary(self, playlist: Any, status_label: str = "Folder missing") -> Dict[str, Any]:
+        url = str(getattr(playlist, "url", "") or "")
+        detection = bridge.detect_platform(url)
+        platform = detection.get("platform") if isinstance(detection, dict) else "unknown"
+
+        if platform not in {"youtube", "spotify", "apple", "soundcloud"}:
+            platform = "unknown"
+
+        return {
+            "id": str(getattr(playlist, "id", "") or ""),
+            "title": str(getattr(playlist, "title", "") or "Untitled playlist"),
+            "path": str(getattr(playlist, "path", "") or ""),
+            "platform": platform,
+            "tracks": 0,
+            "coverPath": None,
+            "sourceUrl": url or None,
+            "status": {
+                "type": "missing",
+                "label": status_label,
+            },
+            "lastSynced": str(getattr(playlist, "last_update", "") or "Never"),
+        }
+
+    def safe_map_core_playlist(self, playlist: Any, cover_wait_seconds: float = 0.0) -> Dict[str, Any]:
+        try:
+            return bridge.map_core_playlist(playlist, cover_wait_seconds=cover_wait_seconds)
+        except Exception as exc:
+            log(f"failed to map playlist {getattr(playlist, 'id', '')}: {exc}")
+            return self.fallback_playlist_summary(playlist)
+
     def list(self) -> Any:
         with redirect_stdout(sys.stderr):
             with self.manager_lock:
@@ -743,8 +773,15 @@ class YouSyncWorker:
 
         mapped_playlists = []
         for playlist in playlists:
-            mapped_playlist = bridge.map_core_playlist(playlist)
-            mapped_playlist["sourceUrl"] = playlist.url
+            mapped_playlist = self.safe_map_core_playlist(playlist)
+            mapped_playlist["sourceUrl"] = getattr(playlist, "url", None)
+
+            if self.is_playlist_path_missing(playlist):
+                mapped_playlist["status"] = {
+                    "type": "missing",
+                    "label": "Folder missing",
+                }
+
             mapped_playlists.append(mapped_playlist)
 
         return mapped_playlists
@@ -874,7 +911,7 @@ class YouSyncWorker:
                 }
             )
 
-        summary = bridge.map_core_playlist(playlist)
+        summary = self.safe_map_core_playlist(playlist)
 
         return {
             "playlist": {
@@ -937,7 +974,7 @@ class YouSyncWorker:
 
         playlist = next(
             (
-                bridge.map_core_playlist(playlist, cover_wait_seconds=1.0)
+                self.safe_map_core_playlist(playlist, cover_wait_seconds=1.0)
                 for playlist in playlists
                 if playlist.url == url
             ),
@@ -953,6 +990,199 @@ class YouSyncWorker:
             response["playlist"] = playlist
 
         return response
+
+    def playlist_storage_folder(self, playlist: Any) -> Optional[Path]:
+        raw_path = str(getattr(playlist, "path", "") or "").strip()
+
+        if not raw_path:
+            return None
+
+        playlist_path = Path(raw_path).expanduser()
+
+        if playlist_path.name == ".yousync":
+            return playlist_path
+
+        parent = playlist_path.parent
+
+        if parent.name == ".yousync":
+            return parent
+
+        return parent / ".yousync"
+
+    def playlist_root_folder(self, playlist: Any) -> Optional[Path]:
+        storage_folder = self.playlist_storage_folder(playlist)
+
+        if storage_folder is None:
+            return None
+
+        if storage_folder.name == ".yousync" and storage_folder.parent != storage_folder:
+            return storage_folder.parent
+
+        return storage_folder
+
+    def is_playlist_path_missing(self, playlist: Any) -> bool:
+        storage_folder = self.playlist_storage_folder(playlist)
+
+        if storage_folder is None:
+            return False
+
+        try:
+            return not storage_folder.exists()
+        except OSError:
+            return True
+
+    def map_broken_playlist(self, playlist: Any) -> Dict[str, Any]:
+        summary = self.safe_map_core_playlist(playlist)
+        root_folder = self.playlist_root_folder(playlist)
+        storage_folder = self.playlist_storage_folder(playlist)
+
+        summary["sourceUrl"] = getattr(playlist, "url", None)
+        summary["missingPath"] = str(root_folder) if root_folder is not None else str(getattr(playlist, "path", "") or "")
+        summary["missingCachePath"] = str(storage_folder) if storage_folder is not None else str(getattr(playlist, "path", "") or "")
+        return summary
+
+    def list_missing_playlists(self, _payload: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        with redirect_stdout(sys.stderr):
+            with self.manager_lock:
+                playlists = self.manager.list_playlists()
+
+        return [
+            self.map_broken_playlist(playlist)
+            for playlist in playlists
+            if self.is_playlist_path_missing(playlist)
+        ]
+
+    def update_playlist_folder(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        playlist_id = str(payload.get("playlist_id") or payload.get("playlistId") or "").strip()
+        folder = str(payload.get("folder", "")).strip()
+
+        if not playlist_id:
+            return {
+                "ok": False,
+                "message": "A playlist id is required.",
+                "updatedPlaylistIds": [],
+                "playlists": [],
+            }
+
+        if not folder:
+            return {
+                "ok": False,
+                "message": "A folder is required.",
+                "updatedPlaylistIds": [],
+                "playlists": [],
+            }
+
+        folder_path = Path(folder).expanduser()
+
+        if folder_path.name == ".yousync":
+            folder_path = folder_path.parent
+
+        if not folder_path.exists():
+            return {
+                "ok": False,
+                "message": "The selected folder does not exist.",
+                "updatedPlaylistIds": [],
+                "playlists": [],
+            }
+
+        if not folder_path.is_dir():
+            return {
+                "ok": False,
+                "message": "The selected path is not a folder.",
+                "updatedPlaylistIds": [],
+                "playlists": [],
+            }
+
+        with self.sync_lock:
+            state, should_refresh_manager = self.poll_sync_process_locked()
+            should_refresh_manager = self.poll_playlist_tasks_locked() or should_refresh_manager
+
+            if self.is_long_task_running_locked(state):
+                return {
+                    "ok": False,
+                    "message": "Cannot recover a playlist while a sync or download is running.",
+                    "updatedPlaylistIds": [],
+                    "playlists": [],
+                }
+
+        self.refresh_after_completed_sync(should_refresh_manager)
+        self.refresh_after_completed_playlist_tasks(should_refresh_manager)
+
+        with redirect_stdout(sys.stderr):
+            with self.manager_lock:
+                if not hasattr(self.manager, "update_path"):
+                    return {
+                        "ok": False,
+                        "message": "Playlist folder recovery is not available in this build.",
+                        "updatedPlaylistIds": [],
+                        "playlists": [],
+                    }
+
+                playlists_before = self.manager.list_playlists()
+                target_playlist = next(
+                    (playlist for playlist in playlists_before if playlist.id == playlist_id),
+                    None,
+                )
+
+                if target_playlist is None:
+                    return {
+                        "ok": False,
+                        "message": "Playlist not found.",
+                        "updatedPlaylistIds": [],
+                        "playlists": [],
+                    }
+
+                old_root = self.playlist_root_folder(target_playlist)
+                target_ids: List[str] = []
+
+                for playlist in playlists_before:
+                    if playlist.id == playlist_id:
+                        target_ids.append(playlist.id)
+                        continue
+
+                    if old_root is None:
+                        continue
+
+                    other_root = self.playlist_root_folder(playlist)
+
+                    if other_root == old_root and self.is_playlist_path_missing(playlist):
+                        target_ids.append(playlist.id)
+
+                updated_ids: List[str] = []
+
+                for target_id in target_ids:
+                    try:
+                        updated = self.manager.update_path(str(folder_path), target_id)
+                    except Exception as exc:
+                        log(f"failed to update path for {target_id}: {exc}")
+                        updated = False
+
+                    if bool(updated):
+                        updated_ids.append(target_id)
+
+                playlists_after = self.manager.list_playlists()
+
+        if updated_ids:
+            self.managers_loaded = False
+            updated_playlists = [
+                self.safe_map_core_playlist(playlist, cover_wait_seconds=1.0)
+                for playlist in playlists_after
+                if playlist.id in set(updated_ids)
+            ]
+            count = len(updated_ids)
+            return {
+                "ok": True,
+                "message": "Recovered " + str(count) + " playlist" + ("s" if count > 1 else "") + ".",
+                "updatedPlaylistIds": updated_ids,
+                "playlists": updated_playlists,
+            }
+
+        return {
+            "ok": False,
+            "message": "No matching YouSync data was found in the selected folder.",
+            "updatedPlaylistIds": [],
+            "playlists": [],
+        }
 
     def recover_existing_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         folder = str(payload.get("folder", "")).strip()
@@ -1010,7 +1240,7 @@ class YouSyncWorker:
         self.managers_loaded = False
 
         recovered_playlists = [
-            bridge.map_core_playlist(playlist, cover_wait_seconds=1.0)
+            self.safe_map_core_playlist(playlist, cover_wait_seconds=1.0)
             for playlist in playlists
             if playlist.id not in before_ids
         ]
@@ -1926,6 +2156,12 @@ class YouSyncWorker:
 
         if command == "list":
             return self.list()
+
+        if command == "list_missing_playlists":
+            return self.list_missing_playlists(payload)
+
+        if command == "update_playlist_folder":
+            return self.update_playlist_folder(payload)
 
         if command == "playlist_details":
             return self.playlist_details(payload)

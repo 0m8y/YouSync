@@ -637,17 +637,6 @@ p {
   margin-left: auto;
 }
 
-.add-playlist-menu-wrap {
-  position: relative;
-  display: flex;
-}
-
-.add-playlist-menu {
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 190px;
-}
-
 .topbar-actions button {
   height: 32px;
   padding: 0 12px;
@@ -1579,5 +1568,198 @@ p {
   .playlist-table-header,
   .playlist-row {
     grid-template-columns: 44px minmax(180px, 1fr) 96px 68px 112px 96px 64px;
+  }
+}
+
+.recovery-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(14px);
+}
+
+.recovery-modal {
+  width: min(760px, 100%);
+  max-height: min(680px, calc(100vh - 56px));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 12px;
+  background: rgba(14, 14, 15, 0.98);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+.recovery-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recovery-modal-header h2 {
+  margin: 4px 0 0;
+  color: #f2f2f3;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+.recovery-modal-close {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0.5px solid #2c2c32;
+  border-radius: 999px;
+  background: #1c1c1f;
+  color: #8c8c96;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+}
+
+.recovery-modal-close:hover {
+  border-color: #3f3f48;
+  background: #222226;
+  color: #f2f2f3;
+}
+
+.recovery-modal-description {
+  max-width: 650px;
+  margin: 0;
+  color: #8c8c96;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.recovery-playlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.recovery-playlist-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 10px;
+  background: #161618;
+}
+
+.recovery-playlist-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recovery-playlist-info strong {
+  color: #f2f2f3;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+
+.recovery-playlist-info span {
+  width: fit-content;
+  padding: 3px 9px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 999px;
+  background: #1c1c1f;
+  color: #8c8c96;
+  font-size: 11px;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.recovery-playlist-info code {
+  max-width: 100%;
+  overflow: hidden;
+  color: #8c8c96;
+  font-family: "SF Mono", "Roboto Mono", monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recovery-playlist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.recovery-playlist-actions button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0.5px solid #2c2c32;
+  border-radius: 8px;
+  background: #1c1c1f;
+  color: #8c8c96;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+}
+
+.recovery-playlist-actions button:hover:not(:disabled) {
+  border-color: #3f3f48;
+  background: #222226;
+  color: #f2f2f3;
+}
+
+.recovery-playlist-actions button:first-child {
+  border-color: #3f3f48;
+  background: #222226;
+  color: #f2f2f3;
+}
+
+.recovery-playlist-actions button:first-child:hover:not(:disabled) {
+  background: #2a2a2f;
+}
+
+.recovery-playlist-actions button:disabled {
+  color: #46464f;
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.recovery-playlist-actions .danger {
+  border-color: rgba(138, 58, 58, 0.48);
+  background: rgba(138, 58, 58, 0.12);
+  color: #f0a3a3;
+}
+
+.recovery-playlist-actions .danger:hover:not(:disabled) {
+  border-color: rgba(138, 58, 58, 0.7);
+  background: rgba(138, 58, 58, 0.24);
+  color: #ffd0d0;
+}
+
+@media (max-width: 760px) {
+  .recovery-playlist-card {
+    grid-template-columns: 1fr;
+  }
+
+  .recovery-playlist-actions {
+    justify-content: flex-start;
   }
 }

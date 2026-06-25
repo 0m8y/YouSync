@@ -128,6 +128,18 @@ export type PlaylistSummary = {
   lastSynced: string;
 };
 
+export type BrokenPlaylist = PlaylistSummary & {
+  missingPath?: string | null;
+  missingCachePath?: string | null;
+};
+
+export type UpdatePlaylistFolderResult = {
+  ok: boolean;
+  message: string;
+  updatedPlaylistIds?: string[];
+  playlists?: PlaylistSummary[];
+};
+
 export type PlaylistTrack = {
   index: number;
   title: string;
@@ -220,6 +232,32 @@ export async function recoverExistingPlaylist(folder: string): Promise<RecoverEx
     return {
       ok: false,
       message: bridgeError(error),
+      playlists: [],
+    };
+  }
+}
+
+export async function listMissingPlaylists(): Promise<BrokenPlaylist[]> {
+  try {
+    return await invoke<BrokenPlaylist[]>("list_missing_playlists");
+  } catch (error) {
+    console.warn("[YouSync] bridge list_missing_playlists failed", bridgeError(error));
+    return [];
+  }
+}
+
+export async function updatePlaylistFolder(
+  playlistId: string,
+  folder: string
+): Promise<UpdatePlaylistFolderResult> {
+  try {
+    return await invoke<UpdatePlaylistFolderResult>("update_playlist_folder", { playlistId, folder });
+  } catch (error) {
+    console.warn("[YouSync] bridge update_playlist_folder failed", bridgeError(error));
+    return {
+      ok: false,
+      message: bridgeError(error),
+      updatedPlaylistIds: [],
       playlists: [],
     };
   }
