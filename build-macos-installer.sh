@@ -5,7 +5,7 @@ print_help() {
   echo "YouSync macOS installer builder"
   echo ""
   echo "Usage:"
-  echo "  ./build-macos-installer.sh              Clean then build"
+  echo "  ./build-macos-installer.sh              Clean then build .app + official Tauri DMG"
   echo "  ./build-macos-installer.sh --install    Clean, build, then copy app to /Applications"
   echo "  ./build-macos-installer.sh --clean      Clean only"
   echo "  ./build-macos-installer.sh -c           Clean only"
@@ -95,6 +95,9 @@ clean_outputs() {
   rm -rf "$DESKTOP_DIR/build/yousync_worker_macos"
   rm -rf "$DESKTOP_DIR/build/pyinstaller-cache"
 
+  echo "🧹 Detaching old mounted YouSync DMG if present..."
+  hdiutil detach "/Volumes/YouSync" -force >/dev/null 2>&1 || true
+
   echo ""
   echo "✅ Clean completed."
 }
@@ -120,6 +123,9 @@ else
   ARCH_NAME="$ARCH"
 fi
 
+DMG_OUTPUT="$MACOS_INSTALLER_DIR/YouSyncInstaller-macOS-v$VERSION-$ARCH_NAME.dmg"
+APP_OUTPUT="$MACOS_INSTALLER_DIR/YouSync.app"
+
 echo ""
 echo "Root:         $ROOT_DIR"
 echo "Project:      $PROJECT_DIR"
@@ -133,14 +139,36 @@ echo "🔨 Building Python worker sidecar..."
 "$WORKER_BUILD_SCRIPT"
 
 echo ""
-echo "🔨 Building Tauri macOS app..."
-npm run tauri -- build --bundles app
+echo "🔨 Building Tauri macOS app + official DMG..."
+echo "Command: npm run tauri -- build"
+echo ""
+
+BUILD_LOG="$DESKTOP_DIR/build/tauri-build-macos.log"
+mkdir -p "$DESKTOP_DIR/build"
+
+if ! npm run tauri -- build 2>&1 | tee "$BUILD_LOG"; then
+  echo ""
+  echo "❌ Tauri build failed."
+  echo "Build log:"
+  echo "$BUILD_LOG"
+  echo ""
+
+  if [ -f "$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh" ]; then
+    echo "Debug: bundle_dmg.sh exists here:"
+    echo "$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh"
+    echo ""
+    echo "You can inspect it with:"
+    echo "  cat \"$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh\""
+  fi
+
+  exit 1
+fi
 
 echo ""
 echo "📦 Searching generated artifacts..."
 
-APP_BUNDLE=$(find "$TAURI_DIR/target/release/bundle/macos" -name "YouSync.app" -type d | head -n 1 || true)
 DMG_FILE=$(find "$TAURI_DIR/target/release/bundle/dmg" -name "*.dmg" -type f | head -n 1 || true)
+APP_BUNDLE=$(find "$TAURI_DIR/target/release/bundle/macos" -name "YouSync.app" -type d | head -n 1 || true)
 
 if [ -z "$APP_BUNDLE" ]; then
   echo "❌ No YouSync.app found in:"
@@ -148,22 +176,22 @@ if [ -z "$APP_BUNDLE" ]; then
   exit 1
 fi
 
-DMG_OUTPUT="$MACOS_INSTALLER_DIR/YouSyncInstaller-macOS-v$VERSION-$ARCH_NAME.dmg"
-APP_OUTPUT="$MACOS_INSTALLER_DIR/YouSync.app"
-
-if [ -n "$DMG_FILE" ]; then
-  echo "📁 Copying DMG..."
-  cp "$DMG_FILE" "$DMG_OUTPUT"
-else
-  echo "⚠️ No DMG generated, skipping DMG copy."
-  DMG_OUTPUT=""
+if [ -z "$DMG_FILE" ]; then
+  echo "❌ No DMG file found in:"
+  echo "$TAURI_DIR/target/release/bundle/dmg"
+  exit 1
 fi
 
+echo "📁 Copying DMG..."
+rm -f "$DMG_OUTPUT"
+cp "$DMG_FILE" "$DMG_OUTPUT"
+
 echo "📁 Copying .app bundle..."
+rm -rf "$APP_OUTPUT"
 ditto "$APP_BUNDLE" "$APP_OUTPUT"
 
 echo ""
-echo "🔍 Worker inside generated .app:"
+echo "🔍 Worker inside generated installer .app:"
 find "$APP_OUTPUT/Contents" -type f | grep -Ei "worker|aarch64|yousync" | while read f; do
   echo "$f"
   ls -lh "$f"

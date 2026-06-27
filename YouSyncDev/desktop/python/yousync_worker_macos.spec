@@ -37,6 +37,7 @@ hiddenimports = [
     "selenium",
     "youtube_search",
     "yt_dlp",
+    "certifi",
 ]
 
 hiddenimports += collect_submodules("pytubefix")
@@ -58,7 +59,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(desktop_dir / "python" / "pyinstaller_runtime_hook.py")],
     excludes=["customtkinter", "tkinter"],
     noarchive=False,
     optimize=0,

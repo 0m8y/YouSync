@@ -12,6 +12,69 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+
+def configure_ssl_certificates() -> None:
+    """Configure a CA bundle for urllib/requests inside the packaged app.
+
+    The Python interpreter embedded by PyInstaller does not always inherit a
+    usable macOS certificate store on another machine. pytubefix uses urllib,
+    so a missing CA bundle makes every YouTube HTTPS request fail with:
+    SSL: CERTIFICATE_VERIFY_FAILED.
+    """
+
+    def is_file(path_value: Optional[str]) -> bool:
+        if not path_value:
+            return False
+
+        try:
+            return Path(path_value).is_file()
+        except Exception:
+            return False
+
+    current_ssl_cert = os.environ.get("SSL_CERT_FILE")
+    current_requests_bundle = os.environ.get("REQUESTS_CA_BUNDLE")
+
+    if is_file(current_ssl_cert) and is_file(current_requests_bundle):
+        return
+
+    candidates: List[Path] = []
+
+    try:
+        import certifi
+
+        candidates.append(Path(certifi.where()))
+    except Exception:
+        pass
+
+    bundle_dir = getattr(sys, "_MEIPASS", "")
+    if bundle_dir:
+        bundle_path = Path(bundle_dir)
+        candidates.extend(
+            [
+                bundle_path / "certifi" / "cacert.pem",
+                bundle_path / "certifi" / "cacert.pemc",
+                bundle_path / "cacert.pem",
+            ]
+        )
+
+    candidates.extend(
+        [
+            Path("/etc/ssl/cert.pem"),
+            Path("/private/etc/ssl/cert.pem"),
+        ]
+    )
+
+    for candidate in candidates:
+        if candidate.is_file():
+            cert_path = str(candidate)
+            os.environ["SSL_CERT_FILE"] = cert_path
+            os.environ["REQUESTS_CA_BUNDLE"] = cert_path
+            os.environ["CURL_CA_BUNDLE"] = cert_path
+            return
+
+
+configure_ssl_certificates()
+
 import yousync_bridge as bridge
 
 ORIGINAL_STDOUT = sys.stdout
