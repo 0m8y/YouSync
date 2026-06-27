@@ -94,47 +94,221 @@ def get_selenium_driver_for_apple(url: str) -> webdriver.Chrome:
 
     return driver
 
-def get_soundloud_song_link(html_content: str) -> Optional[str]:
-    soup = BeautifulSoup(html_content, 'html.parser')
-    track_link_tag = soup.select_one('a[data-testid="internal-track-link"]')
+def normalize_spotify_track_url(raw_url: str | None) -> Optional[str]:
+    if raw_url is None:
+        return None
 
-    if track_link_tag:
-        track_link = track_link_tag.get('href')
-        full_link = re.sub(r'^.*(/track)', r'https://open.spotify.com\1', track_link)
-        return full_link
+    match = re.search(r"open\.spotify\.com/track/([a-zA-Z0-9]+)", raw_url)
+    if match:
+        return f"https://open.spotify.com/track/{match.group(1)}"
+
+    match = re.search(r"(?:^|/)track/([a-zA-Z0-9]+)", raw_url)
+    if match:
+        return f"https://open.spotify.com/track/{match.group(1)}"
+
     return None
 
 
-def get_spotify_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[Optional[str]]:
+def dedupe_spotify_track_urls(urls: List[Optional[str]]) -> List[str]:
+    unique_urls: List[str] = []
+    seen: set[str] = set()
+
+    for url in urls:
+        normalized_url = normalize_spotify_track_url(url)
+
+        if normalized_url is None or normalized_url in seen:
+            continue
+
+        seen.add(normalized_url)
+        unique_urls.append(normalized_url)
+
+    return unique_urls
+
+
+def get_spotify_urls_from_html(html_content: str) -> List[str]:
+    """Return only the official playlist tracks exposed by Spotify metadata.
+
+    Spotify pages also contain many other /track/ links in the rendered DOM
+    (recommendations, player state, scripts, etc.). Those links must not be
+    considered playlist items. The stable source for a public playlist is:
+
+        <meta name="music:song" content="https://open.spotify.com/track/...">
+    """
+    soup = BeautifulSoup(html_content, 'html.parser')
+    urls: List[Optional[str]] = []
+
+    for meta in soup.find_all('meta', attrs={'name': 'music:song'}):
+        urls.append(meta.get('content'))
+
+    return dedupe_spotify_track_urls(urls)
+
+
+def get_spotify_total_songs_from_html(html_content: str) -> int:
+    soup = BeautifulSoup(html_content, 'html.parser')
+    song_count_meta = soup.find('meta', attrs={'name': 'music:song_count'})
+
+    if song_count_meta is not None:
+        try:
+            return int(str(song_count_meta.get('content', '')).strip())
+        except ValueError:
+            pass
+
+    descriptions = []
+
+    for attrs in (
+        {'property': 'og:description'},
+        {'name': 'description'},
+        {'name': 'twitter:description'},
+    ):
+        tag = soup.find('meta', attrs=attrs)
+        if tag is not None:
+            descriptions.append(str(tag.get('content', '')))
+
+    for description in descriptions:
+        match = re.search(r'(\d+)\s*(?:items?|titres?|songs?|tracks?)', description, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+    return 0
+
+
+def get_spotify_meta_content_from_html(
+    html_content: str,
+    *,
+    name: str | None = None,
+    property_: str | None = None,
+) -> Optional[str]:
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    if name is not None:
+        tag = soup.find('meta', attrs={'name': name})
+    else:
+        tag = soup.find('meta', attrs={'property': property_})
+
+    if tag is None:
+        return None
+
+    content = tag.get('content')
+    if not content:
+        return None
+
+    return str(content).strip()
+
+
+def get_soundloud_song_link(html_content: str) -> Optional[str]:
+    """Legacy helper used with a single Spotify track row innerHTML."""
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    for link in soup.find_all('a', href=True):
+        normalized_url = normalize_spotify_track_url(link.get('href'))
+        if normalized_url is not None:
+            return normalized_url
+
+    match = re.search(r'(?:https://open\.spotify\.com)?/track/[a-zA-Z0-9]+', html_content)
+    if match:
+        return normalize_spotify_track_url(match.group(0))
+
+    return None
+
+
+def collect_spotify_track_row_urls_from_driver(driver: webdriver.Chrome) -> List[str]:
+    urls: List[Optional[str]] = []
+
+    try:
+        rows = driver.find_elements(By.XPATH, "//div[@data-testid='tracklist-row']")
+        for row in rows:
+            urls.append(get_soundloud_song_link(row.get_attribute('innerHTML')))
+    except Exception as e:
+        print(f"⚠️ Unable to collect Spotify track rows: {e}")
+
+    try:
+        hrefs = driver.execute_script(
+            "return Array.from(document.querySelectorAll('[data-testid=\\\"tracklist-row\\\"] a[href*=\\\"/track/\\\"]')).map((a) => a.href);"
+        )
+        if isinstance(hrefs, list):
+            urls.extend(str(href) for href in hrefs)
+    except Exception as e:
+        print(f"⚠️ Unable to collect Spotify row links with JavaScript: {e}")
+
+    return dedupe_spotify_track_urls(urls)
+
+
+def get_spotify_url_list(driver: webdriver.Chrome, total_songs: int, iterator: int = 0) -> List[str]:
     print("searching songs...")
-    song_list = []
-    if iterator == 30:
-        raise Exception("Impossible to get all playlist sound url")
-    songs = WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.XPATH, "//div[@data-testid='tracklist-row']")))
-    song_count = 0
-    for song in songs:
-        song_count += 1
-        song_list.append(get_soundloud_song_link(song.get_attribute('innerHTML')))
-        if song_count >= total_songs:
-            return song_list
-    return get_spotify_url_list(driver, total_songs, iterator + 1)
+
+    # First, use only official playlist metadata from the currently rendered page.
+    metadata_urls = get_spotify_urls_from_html(driver.page_source)
+    if metadata_urls:
+        if total_songs > 0:
+            return metadata_urls[:total_songs]
+        return metadata_urls
+
+    urls = collect_spotify_track_row_urls_from_driver(driver)
+
+    if total_songs > 0 and len(urls) >= total_songs:
+        return urls[:total_songs]
+
+    stable_rounds = 0
+    max_rounds = 30
+
+    for _ in range(max_rounds):
+        previous_count = len(urls)
+
+        try:
+            driver.execute_script(
+                "const scroller = document.querySelector('[data-testid=\\\"playlist-tracklist\\\"]') || document.querySelector('[data-testid=\\\"virtuoso-scroller\\\"]') || document.scrollingElement || document.body; scroller.scrollTop = scroller.scrollHeight; window.scrollTo(0, document.body.scrollHeight);"
+            )
+        except Exception:
+            try:
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            except Exception:
+                pass
+
+        time.sleep(0.8)
+
+        metadata_urls = get_spotify_urls_from_html(driver.page_source)
+        if metadata_urls:
+            if total_songs > 0:
+                return metadata_urls[:total_songs]
+            return metadata_urls
+
+        urls = collect_spotify_track_row_urls_from_driver(driver)
+
+        if total_songs > 0 and len(urls) >= total_songs:
+            return urls[:total_songs]
+
+        if len(urls) == previous_count:
+            stable_rounds += 1
+            if stable_rounds >= 3:
+                break
+        else:
+            stable_rounds = 0
+
+    return urls[:total_songs] if total_songs > 0 else urls
 
 
 def get_spotify_total_songs(driver: webdriver.Chrome) -> int:
     time.sleep(0.5)
 
+    total_from_metadata = get_spotify_total_songs_from_html(driver.page_source)
+    if total_from_metadata > 0:
+        print(f"{total_from_metadata} songs found in Spotify metadata")
+        return total_from_metadata
+
     try:
-        elements = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.eJbkaBhDfq9NfV5_QS8V > span[data-encore-id="text"]'))
+        element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'span[data-encore-id="text"]'))
         )
 
-        print(elements.text)  # Devrait afficher "143 titres"
-        return int(elements.text.split()[0])
+        match = re.search(r'(\d+)\s*(?:titres?|songs?|tracks?|items?)', element.text, re.IGNORECASE)
+        if match:
+            print(element.text)
+            return int(match.group(1))
 
     except (TimeoutException, NoSuchElementException, ValueError) as e:
         print(f"❌ Erreur lors de la récupération du nombre de morceaux : {e}")
-        return 0  # Retourne 0 en cas d'erreur
 
+    return 0
 
 def scroll_down_apple_page(driver: webdriver.Chrome) -> None:
     last_height = driver.execute_script("return document.getElementById('scrollable-page').scrollHeight")

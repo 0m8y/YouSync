@@ -1650,9 +1650,20 @@ class YouSyncWorker:
             log(f"failed to refresh manager after sync: {exc}")
 
     def start_sync_process(self, args: List[str]) -> subprocess.Popen[Any]:
-        script_path = Path(__file__).resolve()
+        if getattr(sys, "frozen", False):
+            # In the packaged macOS app sys.executable is already the
+            # PyInstaller sidecar. It is not a Python interpreter, so passing
+            # "-u <script.py>" makes the child start as a normal stdin worker
+            # instead of executing --sync-child / --download-missing-child.
+            command = [sys.executable, *args]
+        else:
+            script_path = Path(__file__).resolve()
+            command = [sys.executable, "-u", str(script_path), *args]
+
+        log(f"starting child worker: {command[0]} {' '.join(args)}")
+
         return subprocess.Popen(
-            [sys.executable, "-u", str(script_path), *args],
+            command,
             cwd=str(bridge.project_root()),
             stdin=subprocess.DEVNULL,
             # Never keep child stdout as a pipe: the core/downloader may print a
