@@ -454,6 +454,15 @@ export async function openPlaylistsJson(): Promise<boolean> {
   }
 }
 
+export async function openLogsFolder(): Promise<string | null> {
+  try {
+    return await invoke<string>("open_logs_folder");
+  } catch (error) {
+    console.warn("[YouSync] open_logs_folder failed", bridgeError(error));
+    return null;
+  }
+}
+
 export async function getSyncStatus(playlistId: string): Promise<SyncStatus> {
   try {
     return await invoke<SyncStatus>("get_sync_status", { playlistId });

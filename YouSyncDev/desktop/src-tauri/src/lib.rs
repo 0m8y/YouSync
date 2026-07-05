@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -97,6 +98,99 @@ struct WorkerProcess {
     stdout: BufReader<ChildStdout>,
 }
 
+fn user_home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+}
+
+fn logs_folder_path() -> Result<PathBuf, String> {
+    if cfg!(target_os = "macos") {
+        return user_home_dir()
+            .map(|home| home.join("Library").join("Logs").join("YouSync"))
+            .ok_or_else(|| "Could not resolve the user home folder.".to_string());
+    }
+
+    if cfg!(windows) {
+        if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+            return Ok(PathBuf::from(local_app_data).join("YouSync").join("logs"));
+        }
+
+        if let Some(app_data) = std::env::var_os("APPDATA") {
+            return Ok(PathBuf::from(app_data).join("YouSync").join("logs"));
+        }
+
+        return user_home_dir()
+            .map(|home| home.join("AppData").join("Local").join("YouSync").join("logs"))
+            .ok_or_else(|| "Could not resolve a logs folder.".to_string());
+    }
+
+    if let Some(xdg_state_home) = std::env::var_os("XDG_STATE_HOME") {
+        return Ok(PathBuf::from(xdg_state_home).join("yousync").join("logs"));
+    }
+
+    user_home_dir()
+        .map(|home| home.join(".local").join("state").join("yousync").join("logs"))
+        .ok_or_else(|| "Could not resolve a logs folder.".to_string())
+}
+
+fn write_logs_info_file(logs_dir: &Path) -> Result<(), String> {
+    let readme_dir = logs_dir.join("README");
+    fs::create_dir_all(&readme_dir)
+        .map_err(|error| format!("Failed to create logs README folder: {error}"))?;
+
+    let info_path = readme_dir.join("logs-info.txt");
+
+    if info_path.is_file() {
+        return Ok(());
+    }
+
+    let content = [
+        "YouSync logs",
+        "",
+        "Persistent application and worker logs are stored in this folder.",
+        "",
+        "Temporary runtime/progress job files are stored separately in:",
+        "/tmp/yousync_jobs",
+        "",
+        "You can delete temporary job files when YouSync is not running.",
+        "",
+    ]
+    .join("\n");
+
+    fs::write(&info_path, content)
+        .map_err(|error| format!("Failed to write logs info file: {error}"))
+}
+
+fn ensure_logs_folder() -> Result<PathBuf, String> {
+    let logs_dir = logs_folder_path()?;
+
+    fs::create_dir_all(&logs_dir)
+        .map_err(|error| format!("Failed to create logs folder: {error}"))?;
+    write_logs_info_file(&logs_dir)?;
+
+    Ok(logs_dir)
+}
+
+fn prepare_worker_logs() -> (Option<PathBuf>, Stdio) {
+    match ensure_logs_folder() {
+        Ok(logs_dir) => {
+            let log_path = logs_dir.join("yousync-worker.log");
+            match OpenOptions::new().create(true).append(true).open(&log_path) {
+                Ok(file) => (Some(logs_dir), Stdio::from(file)),
+                Err(error) => {
+                    eprintln!("[YouSync] Failed to open worker log file: {error}");
+                    (Some(logs_dir), Stdio::inherit())
+                }
+            }
+        }
+        Err(error) => {
+            eprintln!("[YouSync] Failed to prepare logs folder: {error}");
+            (None, Stdio::inherit())
+        }
+    }
+}
+
 impl WorkerProcess {
     fn new(app_handle: &AppHandle) -> Result<Self, String> {
         let launch = worker_launch(app_handle)?;
@@ -108,10 +202,16 @@ impl WorkerProcess {
             }
             WorkerLaunch::Sidecar { path } => Command::new(path),
         };
+        let (logs_dir, worker_stderr) = prepare_worker_logs();
+
+        if let Some(logs_dir) = logs_dir {
+            command.env("YOUSYNC_LOGS_DIR", logs_dir.as_os_str());
+        }
+
         let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(worker_stderr)
             .spawn()
             .map_err(|error| match launch {
                 WorkerLaunch::Python { python, .. } => {
@@ -463,6 +563,13 @@ fn open_playlists_json() -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_logs_folder() -> Result<String, String> {
+    let logs_dir = ensure_logs_folder()?;
+    open_target(&logs_dir.to_string_lossy())?;
+    Ok(logs_dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
     open_playlist_folder(path)
 }
@@ -523,6 +630,7 @@ pub fn run() {
             open_external_url,
             open_local_file,
             open_playlists_json,
+            open_logs_folder,
             open_folder,
             open_url
         ])

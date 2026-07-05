@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { CSSProperties } from "react";
 import { useSettings } from "../context/SettingsContext";
 import { useToast } from "../components/ToastProvider";
-import { openPlaylistsJson } from "../services/playlistService";
+import { openLogsFolder, openPlaylistsJson } from "../services/playlistService";
 import type { AppTheme, AudioQuality } from "../services/settingsService";
 
 const ACCENT_COLORS = [
@@ -61,6 +61,17 @@ function SettingsPage() {
     }
 
     showToast("playlists.json could not be opened.", "error");
+  }
+
+  async function handleOpenLogsFolder() {
+    const logsPath = await openLogsFolder();
+
+    if (logsPath) {
+      showToast("Opening logs folder.", "success");
+      return;
+    }
+
+    showToast("Logs folder could not be opened.", "error");
   }
 
   function handleMaxParallelDownloads(value: string) {
@@ -230,6 +241,16 @@ function SettingsPage() {
               <em>Only extra frontend debug logs are controlled by this setting.</em>
             </span>
           </label>
+
+          <div className="settings-control">
+            <label>Logs folder</label>
+            <button className="settings-inline-button" type="button" onClick={handleOpenLogsFolder}>
+              Open logs folder
+            </button>
+            <p className="settings-hint">
+              Persistent logs are stored in ~/Library/Logs/YouSync on macOS. Runtime jobs stay in /tmp/yousync_jobs.
+            </p>
+          </div>
 
           <button className="settings-inline-button" type="button" onClick={handleResetSettings}>
             Reset settings

@@ -29,7 +29,6 @@ const PLATFORM_FILTERS: Array<{ value: PlatformFilter; label: string }> = [
   { value: "youtube", label: "YouTube" },
   { value: "spotify", label: "Spotify" },
   { value: "apple", label: "Apple" },
-  { value: "soundcloud", label: "SoundCloud" },
 ];
 
 function progressLabel(progress: LongTaskProgress | null) {

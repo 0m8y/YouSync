@@ -1732,8 +1732,9 @@ class YouSyncWorker:
             # Never keep child stdout as a pipe: the core/downloader may print a
             # lot during sync. If the pipe fills, the child blocks forever and
             # the worker keeps thinking that "A sync is already running".
-            # Progress is already reported through the progress JSON file.
-            stdout=subprocess.DEVNULL,
+            # Redirect stdout to stderr so Tauri can persist child logs in the
+            # same worker log file. Progress is still reported through JSON.
+            stdout=sys.stderr,
             stderr=sys.stderr,
         )
 
