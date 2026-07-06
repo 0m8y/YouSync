@@ -5,7 +5,7 @@ print_help() {
   echo "YouSync macOS installer builder"
   echo ""
   echo "Usage:"
-  echo "  ./build-macos-installer.sh              Clean then build .app + official Tauri DMG"
+  echo "  ./build-macos-installer.sh              Clean then build .app + unsigned GitHub-style DMG"
   echo "  ./build-macos-installer.sh --install    Clean, build, then copy app to /Applications"
   echo "  ./build-macos-installer.sh --clean      Clean only"
   echo "  ./build-macos-installer.sh -c           Clean only"
@@ -61,6 +61,8 @@ WORKER_BUILD_SCRIPT="$DESKTOP_DIR/scripts/build-python-worker-macos.sh"
 INSTALLER_ROOT="$ROOT_DIR/installer"
 MACOS_INSTALLER_DIR="$INSTALLER_ROOT/YouSyncInstaller-macOS"
 
+DMG_STAGE_DIR="$DESKTOP_DIR/build/dmg-root"
+
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "❌ This script must be run on macOS." >&2
   exit 1
@@ -91,6 +93,9 @@ clean_outputs() {
   echo "🧹 Cleaning previous macOS installer output..."
   rm -rf "$MACOS_INSTALLER_DIR"
 
+  echo "🧹 Cleaning previous DMG staging folder..."
+  rm -rf "$DMG_STAGE_DIR"
+
   echo "🧹 Cleaning previous PyInstaller worker build cache..."
   rm -rf "$DESKTOP_DIR/build/yousync_worker_macos"
   rm -rf "$DESKTOP_DIR/build/pyinstaller-cache"
@@ -100,6 +105,46 @@ clean_outputs() {
 
   echo ""
   echo "✅ Clean completed."
+}
+
+ad_hoc_sign_app() {
+  APP_PATH="$1"
+
+  echo ""
+  echo "🔏 Preparing GitHub-style ad-hoc signature..."
+  echo "App: $APP_PATH"
+
+  echo "🧹 Removing quarantine/provenance attributes from built app..."
+  xattr -cr "$APP_PATH" 2>/dev/null || true
+
+  echo "🧹 Removing old/broken signatures..."
+  find "$APP_PATH/Contents/MacOS" -type f | while read f; do
+    codesign --remove-signature "$f" >/dev/null 2>&1 || true
+  done
+  codesign --remove-signature "$APP_PATH" >/dev/null 2>&1 || true
+  rm -rf "$APP_PATH/Contents/_CodeSignature"
+
+  echo "🔏 Signing nested executables ad-hoc..."
+  find "$APP_PATH/Contents/MacOS" -type f | while read f; do
+    if file "$f" | grep -q "Mach-O"; then
+      echo "Signing: $f"
+      codesign --force --sign - --timestamp=none "$f"
+    fi
+  done
+
+  echo "🔏 Signing .app bundle ad-hoc..."
+  codesign --force --deep --sign - --timestamp=none "$APP_PATH"
+
+  echo ""
+  echo "🧪 Checking signature..."
+  codesign -vvv --deep --strict "$APP_PATH"
+
+  echo ""
+  echo "🧪 Gatekeeper assessment, expected to be rejected because not notarized:"
+  spctl --assess --type execute --verbose=4 "$APP_PATH" || true
+
+  echo ""
+  echo "✅ Ad-hoc signature completed"
 }
 
 if [ "$SKIP_CLEAN" = false ]; then
@@ -139,35 +184,24 @@ echo "🔨 Building Python worker sidecar..."
 "$WORKER_BUILD_SCRIPT"
 
 echo ""
-echo "🔨 Building Tauri macOS app + official DMG..."
-echo "Command: npm run tauri -- build"
+echo "🔨 Building Tauri macOS .app only..."
+echo "Command: npm run tauri -- build --bundles app"
 echo ""
 
 BUILD_LOG="$DESKTOP_DIR/build/tauri-build-macos.log"
 mkdir -p "$DESKTOP_DIR/build"
 
-if ! npm run tauri -- build 2>&1 | tee "$BUILD_LOG"; then
+if ! npm run tauri -- build --bundles app 2>&1 | tee "$BUILD_LOG"; then
   echo ""
-  echo "❌ Tauri build failed."
+  echo "❌ Tauri app build failed."
   echo "Build log:"
   echo "$BUILD_LOG"
-  echo ""
-
-  if [ -f "$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh" ]; then
-    echo "Debug: bundle_dmg.sh exists here:"
-    echo "$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh"
-    echo ""
-    echo "You can inspect it with:"
-    echo "  cat \"$TAURI_DIR/target/release/bundle/dmg/bundle_dmg.sh\""
-  fi
-
   exit 1
 fi
 
 echo ""
-echo "📦 Searching generated artifacts..."
+echo "📦 Searching generated .app..."
 
-DMG_FILE=$(find "$TAURI_DIR/target/release/bundle/dmg" -name "*.dmg" -type f | head -n 1 || true)
 APP_BUNDLE=$(find "$TAURI_DIR/target/release/bundle/macos" -name "YouSync.app" -type d | head -n 1 || true)
 
 if [ -z "$APP_BUNDLE" ]; then
@@ -176,19 +210,11 @@ if [ -z "$APP_BUNDLE" ]; then
   exit 1
 fi
 
-if [ -z "$DMG_FILE" ]; then
-  echo "❌ No DMG file found in:"
-  echo "$TAURI_DIR/target/release/bundle/dmg"
-  exit 1
-fi
-
-echo "📁 Copying DMG..."
-rm -f "$DMG_OUTPUT"
-cp "$DMG_FILE" "$DMG_OUTPUT"
-
 echo "📁 Copying .app bundle..."
 rm -rf "$APP_OUTPUT"
 ditto "$APP_BUNDLE" "$APP_OUTPUT"
+
+ad_hoc_sign_app "$APP_OUTPUT"
 
 echo ""
 echo "🔍 Worker inside generated installer .app:"
@@ -197,6 +223,32 @@ find "$APP_OUTPUT/Contents" -type f | grep -Ei "worker|aarch64|yousync" | while 
   ls -lh "$f"
   shasum -a 256 "$f"
 done
+
+echo ""
+echo "💿 Creating GitHub-style DMG..."
+
+rm -rf "$DMG_STAGE_DIR"
+mkdir -p "$DMG_STAGE_DIR"
+
+ditto "$APP_OUTPUT" "$DMG_STAGE_DIR/YouSync.app"
+ln -s /Applications "$DMG_STAGE_DIR/Applications"
+
+rm -f "$DMG_OUTPUT"
+
+hdiutil create \
+  -volname "YouSync" \
+  -srcfolder "$DMG_STAGE_DIR" \
+  -ov \
+  -format UDZO \
+  "$DMG_OUTPUT"
+
+echo ""
+echo "🧹 Removing quarantine from local DMG output..."
+xattr -cr "$DMG_OUTPUT" 2>/dev/null || true
+
+echo ""
+echo "✅ DMG created:"
+echo "$DMG_OUTPUT"
 
 if [ "$INSTALL_APP" = true ]; then
   echo ""
@@ -219,6 +271,10 @@ if [ "$INSTALL_APP" = true ]; then
   done
 
   echo ""
+  echo "🧪 Checking installed app signature..."
+  codesign -vvv --deep --strict "/Applications/YouSync.app"
+
+  echo ""
   echo "✅ Installed:"
   echo "/Applications/YouSync.app"
 fi
@@ -234,4 +290,9 @@ echo "$DMG_OUTPUT"
 echo ""
 echo "App:"
 echo "$APP_OUTPUT"
+echo ""
+echo "Expected on another Mac:"
+echo "  - Not notarized, so macOS may block first launch."
+echo "  - It should NOT say damaged because signature is cleaned and ad-hoc signed."
+echo "  - User can use right click > Open or Privacy & Security > Open Anyway."
 echo ""
