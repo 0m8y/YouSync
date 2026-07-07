@@ -545,21 +545,34 @@ fn open_local_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_playlists_json() -> Result<(), String> {
-    let project_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let playlists_json = project_root.join("core/playlists.json");
+fn open_playlists_json(state: State<'_, WorkerState>) -> Result<(), String> {
+    let response = call_python_worker(state.inner(), "playlists_json_path", json!({}))?;
+    let raw_path = response
+        .get("path")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+
+    if raw_path.is_empty() {
+        return Err("playlists.json path could not be resolved.".to_string());
+    }
+
+    let playlists_json = PathBuf::from(raw_path);
 
     if playlists_json.is_file() {
         return open_target(&playlists_json.to_string_lossy());
     }
 
-    let core_folder = project_root.join("core");
+    let parent = playlists_json
+        .parent()
+        .ok_or_else(|| "playlists.json folder could not be resolved.".to_string())?;
 
-    if core_folder.is_dir() {
-        return open_target(&core_folder.to_string_lossy());
-    }
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Failed to create playlists.json folder: {error}"))?;
+    fs::write(&playlists_json, "{\"playlists\":[]}")
+        .map_err(|error| format!("Failed to create playlists.json: {error}"))?;
 
-    Err("playlists.json could not be found.".to_string())
+    open_target(&playlists_json.to_string_lossy())
 }
 
 #[tauri::command]

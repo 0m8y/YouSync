@@ -1273,6 +1273,16 @@ class YouSyncWorker:
             if self.is_playlist_path_missing(playlist)
         ]
 
+    def playlists_json_path(self, _payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        with self.manager_lock:
+            path = Path(str(getattr(self.manager, "json_filepath", ""))).expanduser()
+
+        return {
+            "path": str(path),
+            "folder": str(path.parent),
+            "exists": path.is_file(),
+        }
+
     def update_playlist_folder(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         playlist_id = str(payload.get("playlist_id") or payload.get("playlistId") or "").strip()
         folder = str(payload.get("folder", "")).strip()
@@ -3068,6 +3078,9 @@ class YouSyncWorker:
 
         if command == "list_missing_playlists":
             return self.list_missing_playlists(payload)
+
+        if command == "playlists_json_path":
+            return self.playlists_json_path(payload)
 
         if command == "update_playlist_folder":
             return self.update_playlist_folder(payload)
