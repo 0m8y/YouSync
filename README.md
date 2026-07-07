@@ -1,4 +1,4 @@
-![YouSync Logo](YouSyncDev/desktop/src-tauri/icons/YouSyncLogo.png)
+![YouSync Logo](YouSyncDev/desktop/src-tauri/icons/icon.png)
 
 <p align="center">
   <strong>Synchronize your music playlists with your computer.</strong><br>
@@ -26,8 +26,6 @@ YouSync is distributed under the MIT License.
 ---
 
 ## Preview
-
-> Add the screenshots below to `docs/screenshots/` in the repository.
 
 <p align="center">
   <img src="docs/screenshots/yousync-playlists.png" alt="YouSync playlists page" width="850">
