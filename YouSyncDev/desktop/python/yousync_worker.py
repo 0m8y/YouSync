@@ -748,8 +748,14 @@ def run_download_missing_child(playlist_id: str, progress_path: Optional[str] = 
         return 1
 
 
-def run_redownload_track_child(playlist_id: str, track_index: int, progress_path: Optional[str] = None) -> int:
+def run_redownload_track_child(
+    playlist_id: str,
+    track_url: str,
+    fallback_track_index: int = 0,
+    progress_path: Optional[str] = None,
+) -> int:
     """Redownload one track in an isolated Python process."""
+    track_url = str(track_url or "").strip()
     progress_state = {
         "jobType": "redownload_track",
         "playlistId": playlist_id,
@@ -761,8 +767,30 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
         "currentTrack": "",
         "failedCount": 0,
         "message": "Preparing track redownload...",
+        "trackUrl": track_url,
+        "trackIndex": fallback_track_index,
         "playlists": {},
     }
+
+    def result_payload(ok: bool, message: str, track_index: int = 0) -> Dict[str, Any]:
+        return {
+            "ok": ok,
+            "playlistId": playlist_id,
+            "trackUrl": track_url or None,
+            "trackIndex": track_index or fallback_track_index,
+            "message": message,
+        }
+
+    def audio_manager_url(audio_manager: Any) -> str:
+        try:
+            value = audio_manager.get_url()
+            if value:
+                return str(value).strip()
+        except Exception:
+            pass
+
+        metadata = getattr(audio_manager, "metadata", None)
+        return str(getattr(metadata, "url", "") or "").strip()
 
     try:
         bridge.ensure_project_root_on_path()
@@ -777,12 +805,8 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
             progress_state["playlistTitle"] = playlist_title
 
             if playlist is None:
-                result = {
-                    "ok": False,
-                    "playlistId": playlist_id,
-                    "trackIndex": track_index,
-                    "message": f"Playlist with ID {playlist_id} not found.",
-                }
+                message = f"Playlist with ID {playlist_id} not found."
+                result = result_payload(False, message)
                 write_playlist_progress(
                     progress_path,
                     progress_state,
@@ -793,21 +817,35 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
                         current=0,
                         total=1,
                         failed_count=1,
-                        message=result["message"],
+                        message=message,
                     ),
                 )
                 write_child_result(result)
                 return 1
 
             audio_managers = manager.get_audio_managers(playlist_id) or []
+            audio_manager = None
+            resolved_track_index = 0
 
-            if track_index < 1 or track_index > len(audio_managers):
-                result = {
-                    "ok": False,
-                    "playlistId": playlist_id,
-                    "trackIndex": track_index,
-                    "message": "Track not found.",
-                }
+            if track_url:
+                for index, candidate in enumerate(audio_managers, start=1):
+                    if audio_manager_url(candidate) == track_url:
+                        audio_manager = candidate
+                        resolved_track_index = index
+                        break
+
+            # Keep a fallback for older callers, but prefer track_url because UI
+            # indexes can be filtered/reordered and audio_managers used to be
+            # loaded concurrently in a non-deterministic order.
+            if audio_manager is None and 1 <= fallback_track_index <= len(audio_managers):
+                candidate = audio_managers[fallback_track_index - 1]
+                if not track_url or audio_manager_url(candidate) == track_url:
+                    audio_manager = candidate
+                    resolved_track_index = fallback_track_index
+
+            if audio_manager is None:
+                message = "Track not found."
+                result = result_payload(False, message)
                 write_playlist_progress(
                     progress_path,
                     progress_state,
@@ -818,13 +856,12 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
                         current=0,
                         total=1,
                         failed_count=1,
-                        message=result["message"],
+                        message=message,
                     ),
                 )
                 write_child_result(result)
                 return 1
 
-            audio_manager = audio_managers[track_index - 1]
             title = audio_title(audio_manager)
             write_playlist_progress(
                 progress_path,
@@ -869,14 +906,7 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
                 message=message,
             ),
         )
-        write_child_result(
-            {
-                "ok": True,
-                "playlistId": playlist_id,
-                "trackIndex": track_index,
-                "message": message,
-            }
-        )
+        write_child_result(result_payload(True, message, resolved_track_index))
         return 0
     except Exception as exc:
         message = "Track redownload failed."
@@ -893,15 +923,8 @@ def run_redownload_track_child(playlist_id: str, track_index: int, progress_path
                 message=message,
             ),
         )
-        write_child_result(
-            {
-                "ok": False,
-                "playlistId": playlist_id,
-                "trackIndex": track_index,
-                "message": message,
-            }
-        )
-        log(f"redownload track child crashed for {playlist_id} / {track_index}: {exc}")
+        write_child_result(result_payload(False, message))
+        log(f"redownload track child crashed for {playlist_id} / {track_url or fallback_track_index}: {exc}")
         return 1
 
 
@@ -2031,17 +2054,30 @@ class YouSyncWorker:
         playlist_id = str(
             payload.get("playlist_id") or payload.get("playlistId") or ""
         ).strip()
+        track_url = str(
+            payload.get("track_url") or payload.get("trackUrl") or ""
+        ).strip()
 
         try:
-            track_index = int(payload.get("track_index") or payload.get("trackIndex") or 0)
+            fallback_track_index = int(payload.get("track_index") or payload.get("trackIndex") or 0)
         except (TypeError, ValueError):
-            track_index = 0
+            fallback_track_index = 0
 
         if not playlist_id:
             raise ValueError("A playlist id is required.")
 
-        if track_index < 1:
-            raise ValueError("A valid track index is required.")
+        if not track_url and fallback_track_index < 1:
+            raise ValueError("A valid track URL is required.")
+
+        def cache_audio_url(audio: Dict[str, Any]) -> str:
+            for key in ["url", "source_url", "sourceUrl", "webpage_url", "webpageUrl", "video_url", "videoUrl"]:
+                value = audio.get(key)
+                if value is None:
+                    continue
+                text = str(value).strip()
+                if text:
+                    return text
+            return ""
 
         with self.sync_lock:
             state, should_refresh_manager = self.poll_sync_process_locked()
@@ -2053,7 +2089,8 @@ class YouSyncWorker:
                     "ok": False,
                     "started": False,
                     "playlistId": playlist_id,
-                    "trackIndex": track_index,
+                    "trackIndex": fallback_track_index,
+                    "trackUrl": track_url or None,
                     "message": "Cannot redownload this track while this playlist is syncing or downloading.",
                 }
 
@@ -2069,20 +2106,60 @@ class YouSyncWorker:
                         "ok": False,
                         "started": False,
                         "playlistId": playlist_id,
-                        "trackIndex": track_index,
+                        "trackIndex": fallback_track_index,
+                        "trackUrl": track_url or None,
                         "message": f"Playlist with ID {playlist_id} not found.",
                     }
 
                 cache = bridge.read_playlist_cache(getattr(playlist, "path", ""))
                 audios = cache.get("audios", []) if isinstance(cache, dict) else []
 
-                if not isinstance(audios, list) or track_index > len(audios):
+                if not isinstance(audios, list):
+                    audios = []
+
+                resolved_track_index = fallback_track_index
+
+                if track_url:
+                    resolved_track_index = next(
+                        (
+                            index
+                            for index, audio in enumerate(audios, start=1)
+                            if isinstance(audio, dict) and cache_audio_url(audio) == track_url
+                        ),
+                        0,
+                    )
+
+                    if resolved_track_index < 1:
+                        return {
+                            "ok": False,
+                            "started": False,
+                            "playlistId": playlist_id,
+                            "trackIndex": fallback_track_index,
+                            "trackUrl": track_url,
+                            "message": "Track not found.",
+                        }
+                elif fallback_track_index > len(audios):
                     return {
                         "ok": False,
                         "started": False,
                         "playlistId": playlist_id,
-                        "trackIndex": track_index,
+                        "trackIndex": fallback_track_index,
+                        "trackUrl": None,
                         "message": "Track not found.",
+                    }
+                elif fallback_track_index >= 1 and fallback_track_index <= len(audios):
+                    audio = audios[fallback_track_index - 1]
+                    if isinstance(audio, dict):
+                        track_url = cache_audio_url(audio)
+
+                if not track_url:
+                    return {
+                        "ok": False,
+                        "started": False,
+                        "playlistId": playlist_id,
+                        "trackIndex": fallback_track_index,
+                        "trackUrl": None,
+                        "message": "This track has no source URL and cannot be redownloaded safely.",
                     }
 
         with self.sync_lock:
@@ -2092,7 +2169,8 @@ class YouSyncWorker:
                     "ok": False,
                     "started": False,
                     "playlistId": playlist_id,
-                    "trackIndex": track_index,
+                    "trackIndex": resolved_track_index,
+                    "trackUrl": track_url,
                     "message": "This playlist is already syncing or downloading.",
                 }
 
@@ -2101,7 +2179,8 @@ class YouSyncWorker:
             process = self.start_sync_process([
                 "--redownload-track-child",
                 playlist_id,
-                str(track_index),
+                track_url,
+                str(resolved_track_index),
                 progress_path,
             ])
             task_state = {
@@ -2116,6 +2195,8 @@ class YouSyncWorker:
                 "currentTrack": "",
                 "failedCount": 0,
                 "message": "Preparing track redownload...",
+                "trackUrl": track_url,
+                "trackIndex": resolved_track_index,
                 "progressPath": progress_path,
                 "playlists": {
                     playlist_id: playlist_progress(
@@ -2131,13 +2212,15 @@ class YouSyncWorker:
                 "process": process,
                 "state": task_state,
                 "refreshed": False,
+                "reportedTerminal": False,
             }
 
         return {
             "ok": True,
             "started": True,
             "playlistId": playlist_id,
-            "trackIndex": track_index,
+            "trackIndex": resolved_track_index,
+            "trackUrl": track_url,
             "message": "Track redownload started.",
         }
 
@@ -3033,8 +3116,10 @@ class YouSyncWorker:
             sync_all_state = self.aggregate_sync_all_state_locked()
             self.sync_state = sync_all_state if sync_all_state.get("jobType") == "all" else self.sync_state
             playlists: Dict[str, Any] = {}
+            tasks_to_remove: List[str] = []
 
             for playlist_id in list(self.sync_tasks.keys()):
+                task = self.sync_tasks.get(playlist_id)
                 task_state = self.merge_playlist_task_progress_locked(playlist_id) or {}
                 task_playlists = (
                     task_state.get("playlists")
@@ -3046,18 +3131,37 @@ class YouSyncWorker:
                     if isinstance(task_playlists.get(playlist_id), dict)
                     else {}
                 )
+                status = playlist_state.get("status", task_state.get("status", "idle"))
+                phase = playlist_state.get("phase", task_state.get("phase", "idle"))
                 playlists[playlist_id] = {
                     "playlistId": playlist_id,
                     "jobType": task_state.get("jobType"),
                     "playlistTitle": task_state.get("playlistTitle", ""),
-                    "status": playlist_state.get("status", task_state.get("status", "idle")),
-                    "phase": playlist_state.get("phase", task_state.get("phase", "idle")),
+                    "status": status,
+                    "phase": phase,
                     "current": playlist_state.get("current", task_state.get("current", 0)),
                     "total": playlist_state.get("total", task_state.get("total", 0)),
                     "currentTrack": playlist_state.get("currentTrack", task_state.get("currentTrack", "")),
                     "failedCount": playlist_state.get("failedCount", task_state.get("failedCount", 0)),
                     "message": playlist_state.get("message", task_state.get("message", "")),
                 }
+
+                # Keep completed/cancelled playlist tasks visible for one poll so
+                # the UI can refresh detail/list state, then remove them from the
+                # worker to avoid completed messages such as "Track redownloaded."
+                # being re-injected on every poll.
+                if (
+                    task is not None
+                    and task.get("refreshed")
+                    and status in {"completed", "cancelled"}
+                ):
+                    if task.get("reportedTerminal"):
+                        tasks_to_remove.append(playlist_id)
+                    else:
+                        task["reportedTerminal"] = True
+
+            for playlist_id in tasks_to_remove:
+                self.sync_tasks.pop(playlist_id, None)
 
         self.refresh_after_completed_playlist_tasks(should_refresh_manager)
 
@@ -3153,12 +3257,13 @@ def main() -> int:
         return run_download_missing_child(sys.argv[2], progress_path)
 
     if len(sys.argv) >= 4 and sys.argv[1] == "--redownload-track-child":
+        track_url = sys.argv[3]
         try:
-            track_index = int(sys.argv[3])
-        except (TypeError, ValueError):
+            track_index = int(sys.argv[4])
+        except (TypeError, ValueError, IndexError):
             track_index = 0
-        progress_path = sys.argv[4] if len(sys.argv) >= 5 else None
-        return run_redownload_track_child(sys.argv[2], track_index, progress_path)
+        progress_path = sys.argv[5] if len(sys.argv) >= 6 else None
+        return run_redownload_track_child(sys.argv[2], track_url, track_index, progress_path)
 
     try:
         worker = YouSyncWorker()

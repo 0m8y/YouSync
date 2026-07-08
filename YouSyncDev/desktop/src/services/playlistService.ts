@@ -54,7 +54,8 @@ export type RedownloadTrackResult = {
   ok: boolean;
   started?: boolean;
   playlistId: string;
-  trackIndex: number;
+  trackIndex?: number;
+  trackUrl?: string | null;
   message?: string;
 };
 
@@ -82,7 +83,7 @@ export type SyncAllStartResult = {
 };
 
 export type LongTaskPhase = "idle" | "queued" | "syncing" | "downloading" | "completed" | "error" | "cancelled";
-export type LongTaskJobType = "single" | "all" | "download_missing" | null;
+export type LongTaskJobType = "single" | "all" | "download_missing" | "redownload_track" | null;
 
 export type PlaylistTaskProgress = {
   status: "idle" | "queued" | "syncing" | "completed" | "error" | "cancelled";
@@ -330,15 +331,24 @@ export async function downloadMissing(playlistId: string): Promise<SyncStartResu
   }
 }
 
-export async function redownloadTrack(playlistId: string, trackIndex: number): Promise<RedownloadTrackResult> {
+export async function redownloadTrack(
+  playlistId: string,
+  trackUrl: string,
+  fallbackTrackIndex?: number
+): Promise<RedownloadTrackResult> {
   try {
-    return await invoke<RedownloadTrackResult>("redownload_track", { playlistId, trackIndex });
+    return await invoke<RedownloadTrackResult>("redownload_track", {
+      playlistId,
+      trackUrl,
+      trackIndex: fallbackTrackIndex ?? 0,
+    });
   } catch (error) {
     console.warn("[YouSync] bridge redownload_track failed", bridgeError(error));
     return {
       ok: false,
       playlistId,
-      trackIndex,
+      trackIndex: fallbackTrackIndex,
+      trackUrl,
       message: bridgeError(error),
     };
   }

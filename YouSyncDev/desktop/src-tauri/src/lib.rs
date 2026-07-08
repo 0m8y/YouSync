@@ -596,12 +596,17 @@ fn open_url(url: String) -> Result<(), String> {
 fn redownload_track(
     state: State<'_, WorkerState>,
     playlist_id: String,
-    track_index: u64,
+    track_url: Option<String>,
+    track_index: Option<u64>,
 ) -> Result<Value, String> {
     call_python_worker(
         state.inner(),
         "redownload_track",
-        json!({ "playlist_id": playlist_id, "track_index": track_index }),
+        json!({
+            "playlist_id": playlist_id,
+            "track_url": track_url.unwrap_or_default(),
+            "track_index": track_index.unwrap_or_default(),
+        }),
     )
 }
 

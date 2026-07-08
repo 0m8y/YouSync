@@ -80,6 +80,10 @@ function trackSourceUrl(track: PlaylistTrack) {
   return track.sourceUrl || track.url || "";
 }
 
+function trackActionKey(track: PlaylistTrack) {
+  return trackSourceUrl(track) || track.localPath || `${track.index}:${track.title}`;
+}
+
 function canOpenTrackLocalFile(track: PlaylistTrack) {
   return Boolean(track.localPath && track.isDownloaded);
 }
@@ -88,7 +92,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
   const [detail, setDetail] = useState<PlaylistDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [trackMenuOpen, setTrackMenuOpen] = useState<number | null>(null);
+  const [trackMenuOpen, setTrackMenuOpen] = useState<string | null>(null);
   const [coverFailed, setCoverFailed] = useState(false);
   const [trackSearch, setTrackSearch] = useState("");
   const [trackStatusFilter, setTrackStatusFilter] = useState<TrackStatusFilter>("All");
@@ -553,7 +557,14 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       return;
     }
 
-    const result = await redownloadTrack(playlistId, track.index);
+    const sourceUrl = trackSourceUrl(track);
+
+    if (!sourceUrl) {
+      setToast("This track has no source URL and cannot be redownloaded safely.", "error");
+      return;
+    }
+
+    const result = await redownloadTrack(playlistId, sourceUrl, track.index);
 
     if (!result.ok) {
       setToast(result.message ?? "Track could not be redownloaded.", "error");
@@ -562,6 +573,8 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
     setToast(result.message ?? "Track redownload started.", "info");
     await refreshSyncStatuses();
+    await loadDetail(false);
+    window.dispatchEvent(new CustomEvent(PLAYLISTS_UPDATED_EVENT));
   }
 
   if (isLoading || !playlist || !detail) {
@@ -775,13 +788,14 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
       <div className="detail-track-table">
         {filteredTracks.length > 0 ? filteredTracks.map((track) => {
           const sourceUrl = trackSourceUrl(track);
+          const trackKey = trackActionKey(track);
           const canOpenLocal = canOpenTrackLocalFile(track);
-          const isTrackMenuOpen = trackMenuOpen === track.index;
+          const isTrackMenuOpen = trackMenuOpen === trackKey;
 
           return (
             <div
               className="detail-track-row"
-              key={`${track.index}-${track.title}`}
+              key={trackKey}
             >
               <span className="detail-track-num">{track.index}</span>
               <span className="detail-track-title">{track.title}</span>
@@ -811,7 +825,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
                     aria-expanded={isTrackMenuOpen}
                     onClick={() => {
                       setMenuOpen(false);
-                      setTrackMenuOpen((current) => (current === track.index ? null : track.index));
+                      setTrackMenuOpen((current) => (current === trackKey ? null : trackKey));
                     }}
                   >
                     ⋮

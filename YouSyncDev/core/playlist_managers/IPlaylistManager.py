@@ -75,7 +75,11 @@ class IPlaylistManager(ABC):
                 executor.submit(self.new_audio_manager, url) for url in urls
             ]
 
-            for future in as_completed(futures):
+            # Keep audio_managers in the same order as playlist_data.audios.
+            # The UI exposes track indexes from the persisted playlist cache, so
+            # appending managers with as_completed(...) makes index-based core
+            # operations target a different track than the one displayed.
+            for future in futures:
                 try:
                     am = future.result()
                     if am is None:
