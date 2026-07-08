@@ -7,6 +7,9 @@ print_help() {
   echo "Usage:"
   echo "  ./build-macos-installer.sh              Clean then build .app + unsigned GitHub-style DMG"
   echo "  ./build-macos-installer.sh --install    Clean, build, then copy app to /Applications"
+  echo "  ./build-macos-installer.sh --version 1.0.1 --install"
+  echo "  ./build-macos-installer.sh -version 1.0.1 --install"
+  echo "  ./build-macos-installer.sh -v 1.0.1 --install"
   echo "  ./build-macos-installer.sh --clean      Clean only"
   echo "  ./build-macos-installer.sh -c           Clean only"
   echo "  ./build-macos-installer.sh --no-clean   Build without cleaning"
@@ -17,24 +20,36 @@ print_help() {
 CLEAN_ONLY=false
 SKIP_CLEAN=false
 INSTALL_APP=false
+REQUESTED_VERSION=""
 
-for arg in "$@"; do
-  case "$arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --clean|-c)
       CLEAN_ONLY=true
+      shift
       ;;
     --no-clean)
       SKIP_CLEAN=true
+      shift
       ;;
     --install)
       INSTALL_APP=true
+      shift
+      ;;
+    --version|-version|-v)
+      if [ "$#" -lt 2 ]; then
+        echo "❌ Missing version value after $1" >&2
+        exit 1
+      fi
+      REQUESTED_VERSION="$2"
+      shift 2
       ;;
     --help|-h)
       print_help
       exit 0
       ;;
     *)
-      echo "❌ Unknown option: $arg" >&2
+      echo "❌ Unknown option: $1" >&2
       echo ""
       print_help
       exit 1
@@ -55,6 +70,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR="$ROOT_DIR/YouSyncDev"
 DESKTOP_DIR="$PROJECT_DIR/desktop"
 TAURI_DIR="$DESKTOP_DIR/src-tauri"
+VERSION_FILE="$ROOT_DIR/VERSION"
 
 WORKER_BUILD_SCRIPT="$DESKTOP_DIR/scripts/build-python-worker-macos.sh"
 
@@ -62,6 +78,68 @@ INSTALLER_ROOT="$ROOT_DIR/installer"
 MACOS_INSTALLER_DIR="$INSTALLER_ROOT/YouSyncInstaller-macOS"
 
 DMG_STAGE_DIR="$DESKTOP_DIR/build/dmg-root"
+
+validate_version() {
+  VERSION_TO_VALIDATE="$1"
+
+  if ! printf '%s' "$VERSION_TO_VALIDATE" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    echo "❌ Invalid version: $VERSION_TO_VALIDATE" >&2
+    echo "Expected SemVer format: MAJOR.MINOR.PATCH, for example 1.0.1" >&2
+    exit 1
+  fi
+}
+
+read_version() {
+  if [ ! -f "$VERSION_FILE" ]; then
+    echo "❌ VERSION file not found: $VERSION_FILE" >&2
+    echo "Create it with a SemVer value, for example: 1.0.0" >&2
+    exit 1
+  fi
+
+  VERSION_FROM_FILE=$(tr -d '\r\n[:space:]' < "$VERSION_FILE")
+  validate_version "$VERSION_FROM_FILE"
+  printf '%s' "$VERSION_FROM_FILE"
+}
+
+set_version() {
+  VERSION_TO_SET="$1"
+  validate_version "$VERSION_TO_SET"
+  printf '%s\n' "$VERSION_TO_SET" > "$VERSION_FILE"
+}
+
+sync_project_versions() {
+  VERSION_TO_SYNC="$1"
+  validate_version "$VERSION_TO_SYNC"
+
+  echo ""
+  echo "🔢 Synchronizing project version..."
+  echo "Version: $VERSION_TO_SYNC"
+
+  cd "$DESKTOP_DIR"
+  npm version "$VERSION_TO_SYNC" --no-git-tag-version --allow-same-version >/dev/null
+
+  node -e '
+const fs = require("fs");
+const version = process.argv[1];
+const file = "src-tauri/tauri.conf.json";
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+data.version = version;
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+' "$VERSION_TO_SYNC"
+
+  awk -v version="$VERSION_TO_SYNC" '
+    BEGIN { in_package = 0; updated = 0 }
+    /^\[package\]$/ { in_package = 1; print; next }
+    /^\[/ && $0 != "[package]" { in_package = 0 }
+    in_package && /^version[[:space:]]*=/ && updated == 0 {
+      print "version = \"" version "\"";
+      updated = 1;
+      next;
+    }
+    { print }
+  ' "$TAURI_DIR/Cargo.toml" > "$TAURI_DIR/Cargo.toml.tmp"
+  mv "$TAURI_DIR/Cargo.toml.tmp" "$TAURI_DIR/Cargo.toml"
+}
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "❌ This script must be run on macOS." >&2
@@ -80,6 +158,10 @@ if [ ! -x "$WORKER_BUILD_SCRIPT" ]; then
   echo "Run:"
   echo "chmod +x \"$WORKER_BUILD_SCRIPT\""
   exit 1
+fi
+
+if [ -n "$REQUESTED_VERSION" ]; then
+  validate_version "$REQUESTED_VERSION"
 fi
 
 clean_outputs() {
@@ -157,9 +239,14 @@ fi
 
 mkdir -p "$MACOS_INSTALLER_DIR"
 
-cd "$DESKTOP_DIR"
+if [ -n "$REQUESTED_VERSION" ]; then
+  set_version "$REQUESTED_VERSION"
+fi
 
-VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "0.1.0")
+VERSION=$(read_version)
+sync_project_versions "$VERSION"
+
+cd "$DESKTOP_DIR"
 ARCH=$(uname -m)
 
 if [ "$ARCH" = "arm64" ]; then
@@ -175,9 +262,10 @@ echo ""
 echo "Root:         $ROOT_DIR"
 echo "Project:      $PROJECT_DIR"
 echo "Desktop:      $DESKTOP_DIR"
-echo "Version:      $VERSION"
+echo "Version: $VERSION"
 echo "Architecture: $ARCH_NAME"
 echo "Install app:  $INSTALL_APP"
+echo "DMG: $DMG_OUTPUT"
 echo ""
 
 echo "🔨 Building Python worker sidecar..."

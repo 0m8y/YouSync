@@ -31,7 +31,7 @@ function Sidebar() {
 
       <div className="ys-sidebar-footer">
         <div className="version-pill">
-          <span>v1.0.0</span>
+          <span>v{__APP_VERSION__}</span>
         </div>
       </div>
     </aside>
