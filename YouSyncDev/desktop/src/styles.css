@@ -424,7 +424,12 @@ p {
 
 .preview-cover.apple,
 .playlist-thumb.apple {
-  background: linear-gradient(135deg, #2a1a20, #3a1a2a);
+  background: linear-gradient(135deg, #2d1830, #5a2448);
+}
+
+.preview-cover.deezer,
+.playlist-thumb.deezer {
+  background: linear-gradient(135deg, #231a33, #3c1f5f);
 }
 
 .preview-cover img {
@@ -1013,6 +1018,13 @@ p {
   font-size: 11px;
 }
 
+.playlist-path {
+  overflow: hidden;
+  max-width: 38ch;
+  font-family: "SF Mono", ui-monospace, monospace;
+  white-space: nowrap;
+}
+
 .playlist-tracks,
 .playlist-date {
   text-align: right;
@@ -1481,11 +1493,10 @@ p {
 }
 
 .detail-folder-path {
-  max-width: 280px;
+  max-width: 38ch;
   overflow: hidden;
   color: #2e2e2e;
   font-family: "SF Mono", ui-monospace, monospace;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -2327,7 +2338,9 @@ p {
 
 :root[data-theme="light"] .preview-cover.spotify,
 :root[data-theme="light"] .preview-cover.youtube,
-:root[data-theme="light"] .preview-cover.apple {
+:root[data-theme="light"] .preview-cover.apple,
+:root[data-theme="light"] .preview-cover.deezer,
+:root[data-theme="light"] .playlist-thumb.deezer {
   background: color-mix(in srgb, var(--ys-accent) 10%, var(--ys-surface-2));
   color: var(--ys-text-tertiary);
 }

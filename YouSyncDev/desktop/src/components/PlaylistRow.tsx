@@ -4,6 +4,7 @@ import { getPlatform } from "../data/mockData";
 import type { LongTaskProgress } from "../services/playlistService";
 import { debugLog } from "../services/settingsService";
 import type { PlaylistListItem } from "../types/playlist";
+import { formatPathForDisplay } from "../utils/pathDisplay";
 
 type PlaylistRowProps = {
   playlist: PlaylistListItem;
@@ -85,6 +86,7 @@ function PlaylistRow({
   const hasProgress = Boolean(progress);
   const isErrorProgress = progress?.status === "error";
   const rowState = isSyncing ? "syncing" : isErrorProgress ? "error" : status.type;
+  const displayPath = formatPathForDisplay(playlist.path);
 
   return (
     <div
@@ -116,7 +118,7 @@ function PlaylistRow({
 
       <div className="playlist-info">
         <div className="playlist-name">{playlist.title}</div>
-        <div className="playlist-path">{playlist.path}</div>
+        <div className="playlist-path" title={playlist.path}>{displayPath}</div>
       </div>
 
       <div className="playlist-platform">

@@ -146,14 +146,20 @@ class SpotifyPlaylistManager(IPlaylistManager):
         metadata_urls = get_spotify_urls_from_html(html)
         metadata_total = get_spotify_total_songs_from_html(html)
 
-        if metadata_urls:
+        if metadata_urls and (metadata_total <= 0 or len(metadata_urls) >= metadata_total):
             urls = metadata_urls[:metadata_total] if metadata_total > 0 else metadata_urls
             print(f"{len(urls)} songs found from Spotify metadata.")
             return urls
 
-        # Last fallback: use Selenium track rows only. Do not scan the whole page
-        # with a global /track/ regex because Spotify also injects recommendations
-        # and player state links that are not part of the playlist.
+        if metadata_urls and metadata_total > 0:
+            print(
+                f"Spotify metadata is incomplete: {len(metadata_urls)}/{metadata_total} songs. "
+                "Falling back to playlist-scoped Selenium collection."
+            )
+
+        # Fallback: use Selenium but scope extraction to playlist rows only.
+        # Spotify can append a "Recommandés" / "Recommended" section after
+        # the playlist; those track links must not be downloaded.
         driver = get_selenium_driver_for_spotify(self.playlist_url)
         try:
             total_songs = get_spotify_total_songs(driver) or metadata_total

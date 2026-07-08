@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { debugLog } from "./settingsService";
 
-export type Platform = "youtube" | "spotify" | "apple" | "soundcloud" | "unknown";
+export type Platform = "youtube" | "spotify" | "apple" | "deezer" | "soundcloud" | "unknown";
 
 export const PLAYLISTS_UPDATED_EVENT = "yousync:playlists-updated";
 
@@ -173,6 +173,12 @@ function bridgeError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function startupLog(message: string) {
+  const startupWindow = window as Window & { __YOUSYNC_STARTUP_TIME?: number };
+  const startedAt = startupWindow.__YOUSYNC_STARTUP_TIME ?? performance.now();
+  console.log(`[startup][react][+${Math.round(performance.now() - startedAt)}ms] ${message}`);
+}
+
 export async function detectPlaylist(url: string): Promise<PlaylistDetection> {
   try {
     return await invoke<PlaylistDetection>("detect_playlist", { url });
@@ -220,7 +226,9 @@ export async function addPlaylist(
 
 export async function listPlaylists(): Promise<PlaylistSummary[]> {
   try {
+    startupLog("listPlaylists start");
     const playlists = await invoke<PlaylistSummary[]>("list_playlists");
+    startupLog("listPlaylists complete");
     debugLog("[YouSync] bridge list_playlists result", playlists.map((playlist) => ({
       id: playlist.id,
       title: playlist.title,
@@ -230,6 +238,7 @@ export async function listPlaylists(): Promise<PlaylistSummary[]> {
     })));
     return playlists;
   } catch {
+    startupLog("listPlaylists failed");
     return [];
   }
 }
@@ -514,8 +523,12 @@ export async function getSyncAllStatus(): Promise<SyncAllStatus> {
 
 export async function getSyncTasksStatus(): Promise<SyncTasksStatus> {
   try {
-    return await invoke<SyncTasksStatus>("get_sync_tasks_status");
+    startupLog("invoke get_sync_tasks_status start");
+    const status = await invoke<SyncTasksStatus>("get_sync_tasks_status");
+    startupLog("invoke get_sync_tasks_status complete");
+    return status;
   } catch (error) {
+    startupLog("invoke get_sync_tasks_status failed");
     console.warn("[YouSync] bridge get_sync_tasks_status failed", bridgeError(error));
     return {
       playlists: {},

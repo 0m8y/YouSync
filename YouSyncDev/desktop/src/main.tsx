@@ -4,6 +4,10 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles.css";
 
+const startupWindow = window as Window & { __YOUSYNC_STARTUP_TIME?: number };
+startupWindow.__YOUSYNC_STARTUP_TIME = performance.now();
+console.log("[startup][react][+0ms] main render");
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>

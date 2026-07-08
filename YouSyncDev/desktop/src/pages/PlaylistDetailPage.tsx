@@ -17,6 +17,7 @@ import {
   redownloadTrack,
 } from "../services/playlistService";
 import type { LongTaskProgress, PlaylistDetail, PlaylistTrack } from "../services/playlistService";
+import { formatPathForDisplay } from "../utils/pathDisplay";
 
 type PlaylistDetailPageProps = {
   playlistId: string;
@@ -255,6 +256,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
 
   const playlist = detail?.playlist ?? null;
   const platform = playlist ? getPlatform(playlist.platform) : null;
+  const displayPlaylistPath = playlist ? formatPathForDisplay(playlist.path) : "";
   const coverSrc = useMemo(
     () => (playlist?.coverPath ? convertFileSrc(playlist.coverPath) : null),
     [playlist?.coverPath]
@@ -638,7 +640,7 @@ function PlaylistDetailPage({ playlistId, onBack }: PlaylistDetailPageProps) {
               <span>Last synced {playlist.lastSynced || "—"}</span>
               <span className="detail-sep" />
               <span aria-hidden="true">□</span>
-              <span className="detail-folder-path">{playlist.path}</span>
+              <span className="detail-folder-path" title={playlist.path}>{displayPlaylistPath}</span>
             </div>
           </div>
 

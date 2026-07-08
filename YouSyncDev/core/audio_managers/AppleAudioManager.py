@@ -1,13 +1,8 @@
 from core.utils import get_cached_video_title
 from core.audio_managers.IAudioManager import IAudioManager
 
-from youtube_search import YoutubeSearch
-from pytubefix import YouTube
 import tempfile
 
-from moviepy.audio.io.AudioFileClip import AudioFileClip
-import requests
-from bs4 import BeautifulSoup
 import re
 import os
 import time
@@ -17,7 +12,7 @@ class AppleAudioManager(IAudioManager):
     def __init__(self, url, path_to_save_audio, data_filepath, lock):
         self.url = url
         self.soup = None
-        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url, True)
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url)
 
         super().__init__(url, path_to_save_audio, data_filepath, self.__extract_apple_id(url), cached_title, lock)
 
@@ -26,6 +21,9 @@ class AppleAudioManager(IAudioManager):
     def __ensure_soup_loaded(self):
         if self.soup:
             return
+        import requests
+        from bs4 import BeautifulSoup
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
@@ -42,6 +40,8 @@ class AppleAudioManager(IAudioManager):
         return None
 
     def __get_youtube_url_from_apple(self):
+        from youtube_search import YoutubeSearch
+
         title = self.__extract_title(self.url)
         artist = self.__extract_artist()
         video_search = str(title + " " + artist).replace(" ", "+")
@@ -50,12 +50,18 @@ class AppleAudioManager(IAudioManager):
 
     #Override Function
     def download_audio(self):
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
+        from pytubefix import YouTube
+
         youtube_url = self.__get_youtube_url_from_apple()
         yt = YouTube(youtube_url)
         audio_stream = yt.streams.filter(only_audio=True).first()
 
         temp_dir = tempfile.gettempdir()
-        downloaded_file = audio_stream.download(output_path=temp_dir)
+        downloaded_file = audio_stream.download(
+            output_path=temp_dir,
+            filename=self.safe_download_filename(getattr(audio_stream, "subtype", "mp4")),
+        )
 
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
@@ -93,15 +99,11 @@ class AppleAudioManager(IAudioManager):
     def __extract_title(self, url, file_mode: bool = False):
         self.__ensure_soup_loaded()
         raw_title = self.soup.find('meta', attrs={'name': 'apple:title'})['content']
-        if file_mode:
-            cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
-        else:
-            cleaned_title = raw_title
 
-        if not cleaned_title:
+        if not raw_title:
             return f"track_{self.__extract_apple_id(url)}"
 
-        return cleaned_title
+        return raw_title
 
     def __extract_artist(self):
         self.__ensure_soup_loaded()

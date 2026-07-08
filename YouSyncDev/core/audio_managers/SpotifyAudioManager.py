@@ -1,14 +1,9 @@
 from core.utils import get_cached_video_title
 from core.audio_managers.IAudioManager import IAudioManager
 
-from youtube_search import YoutubeSearch
-from pytubefix import YouTube
 import os
 import re
 
-from moviepy.audio.io.AudioFileClip import AudioFileClip
-import requests
-from bs4 import BeautifulSoup
 from typing import Optional
 from threading import Lock
 import tempfile
@@ -21,7 +16,7 @@ class SpotifyAudioManager(IAudioManager):
         self.url = url
         self.soup = None
 
-        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url, True)
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(url)
 
         logging.debug(f"New SpotifyAudioManager\nURL: {url}\npath_to_save_audio: {path_to_save_audio}\ndata_filepath: {data_filepath}\n")
         super().__init__(url, path_to_save_audio, data_filepath, self.__extract_spotify_id(url), cached_title, lock)
@@ -31,6 +26,9 @@ class SpotifyAudioManager(IAudioManager):
     def __ensure_soup_loaded(self):
         if self.soup is not None:
             return
+        import requests
+        from bs4 import BeautifulSoup
+
         headers = {
             "User-Agent": "... (comme avant)"
         }
@@ -47,6 +45,8 @@ class SpotifyAudioManager(IAudioManager):
         return None
 
     def __get_youtube_url_from_spotify(self) -> str:
+        from youtube_search import YoutubeSearch
+
         self.__ensure_soup_loaded()
 
         title = self.soup.find('meta', property='og:title')
@@ -65,12 +65,18 @@ class SpotifyAudioManager(IAudioManager):
 
     #Override Function
     def download_audio(self) -> None:
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
+        from pytubefix import YouTube
+
         youtube_url = self.__get_youtube_url_from_spotify()
         yt = YouTube(youtube_url)
         audio_stream = yt.streams.filter(only_audio=True).first()
 
         temp_dir = tempfile.gettempdir()
-        downloaded_file = audio_stream.download(output_path=temp_dir)
+        downloaded_file = audio_stream.download(
+            output_path=temp_dir,
+            filename=self.safe_download_filename(getattr(audio_stream, "subtype", "mp4")),
+        )
 
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
@@ -95,12 +101,7 @@ class SpotifyAudioManager(IAudioManager):
 
         raw_title = self.soup.find('meta', property='og:title')['content'].strip()
 
-        if file_mode:
-            cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
-        else:
-            cleaned_title = raw_title
-
-        return cleaned_title or f"track_{self.__extract_spotify_id(url)}"
+        return raw_title or f"track_{self.__extract_spotify_id(url)}"
 
     def __extract_artist(self) -> str:
         self.__ensure_soup_loaded()

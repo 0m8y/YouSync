@@ -21,6 +21,8 @@ YouSync is a desktop application that lets you synchronize supported music playl
 
 Add a playlist URL, choose where it should be saved, and YouSync downloads the songs in MP3 format while retrieving useful metadata such as the title, artist and cover image. Once a playlist has been added, you can synchronize it again later to download missing tracks and keep the local folder up to date.
 
+YouSync currently supports YouTube, Spotify, Apple Music and Deezer playlists.
+
 YouSync is distributed under the MIT License.
 
 ---
@@ -41,7 +43,7 @@ YouSync is distributed under the MIT License.
 
 - **Playlist synchronization**: add a playlist once, then synchronize it again later with one click.
 - **Local MP3 download**: save playlist tracks locally in MP3 format.
-- **Metadata retrieval**: automatically add metadata such as title, artist and cover artwork when available.
+- **Metadata retrieval**: automatically add metadata such as title, artist, album and cover artwork when available.
 - **Playlist library**: view all saved playlists from the app.
 - **Platform filters**: filter your playlists by source platform.
 - **Platform thumbnails**: quickly identify where each playlist comes from.
@@ -54,12 +56,12 @@ YouSync is distributed under the MIT License.
 
 ## Supported platforms
 
-| Platform | Status |f
+| Platform | Status |
 | --- | --- |
 | YouTube | Supported |
 | Spotify | Supported |
 | Apple Music | Supported |
-| Deezer | Supported Soon ! |
+| Deezer | Supported |
 | SoundCloud | Not supported |
 
 SoundCloud synchronization is not currently available. It is not listed as an upcoming feature until a reliable implementation is possible.
@@ -93,9 +95,18 @@ On macOS, the application may be blocked on first launch if the build is not not
 2. Download the macOS `.dmg` installer.
 3. Open the DMG file.
 4. Drag `YouSync.app` into the `Applications` folder.
-5. Launch YouSync from Applications.
+5. Open `YouSync.app` from the `Applications` folder.
 
-If macOS displays a security warning because the app is not notarized, use **Right click > Open** on the app the first time you launch it.
+If macOS blocks the app because the build is not notarized:
+
+1. Try to open `YouSync.app` once.
+2. Open **System Settings**.
+3. Go to **Privacy & Security**.
+4. Scroll down to the **Security** section.
+5. Click **Open Anyway** next to the YouSync warning.
+6. Confirm by clicking **Open**.
+
+After that, YouSync should open normally.
 
 ---
 
@@ -115,8 +126,10 @@ YouSync stores playlist information inside a `.yousync` folder in the selected d
 ## Technical details
 
 - **Core language**: Python
+- **Desktop app**: Tauri and a Python worker
 - **Desktop packaging**: native desktop installer builds for supported operating systems
 - **Download and metadata logic**: Python worker responsible for playlist parsing, audio download and metadata processing
+- **Playlist metadata sources**: platform-specific playlist parsers for YouTube, Spotify, Apple Music and Deezer
 - **Data storage**: playlist information is stored locally in `.yousync` folders as JSON data
 - **Main libraries used**: `pytubefix`, `selenium`, `Pillow`, `eyed3`, `moviepy`, `beautifulsoup4`, `lxml`
 
@@ -139,28 +152,3 @@ Contributions are welcome.
 
 ```bash
 git checkout -b my-new-feature
-```
-
-3. Commit your changes:
-
-```bash
-git commit -m "Add new feature"
-```
-
-4. Push your branch:
-
-```bash
-git push origin my-new-feature
-```
-
-5. Open a pull request.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-Thank you for using YouSync. If you have questions, ideas or bug reports, feel free to open an issue on GitHub.

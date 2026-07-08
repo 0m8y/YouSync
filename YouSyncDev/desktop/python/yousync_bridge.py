@@ -81,6 +81,7 @@ def install_core_import_stubs() -> None:
         "core.playlist_managers.YoutubePlaylistManager": "YoutubePlaylistManager",
         "core.playlist_managers.SpotifyPlaylistManager": "SpotifyPlaylistManager",
         "core.playlist_managers.ApplePlaylistManager": "ApplePlaylistManager",
+        "core.playlist_managers.DeezerPlaylistManager": "DeezerPlaylistManager",
     }
 
     for module_name, class_name in stub_specs.items():
@@ -462,6 +463,19 @@ def spotify_playlist_id(url: str) -> Optional[str]:
     return None
 
 
+def deezer_playlist_id(url: str) -> Optional[str]:
+    parsed = parsed_url(url)
+    segments = [segment for segment in parsed.path.split("/") if segment]
+
+    if len(segments) >= 2 and segments[0] == "playlist":
+        return segments[1]
+
+    if len(segments) >= 3 and segments[1] == "playlist":
+        return segments[2]
+
+    return None
+
+
 def youtube_playlist_id(url: str) -> Optional[str]:
     return parse_qs(parsed_url(url).query).get("list", [None])[0]
 
@@ -529,6 +543,32 @@ def spotify_preview_from_web_api(url: str) -> Optional[Dict[str, Any]]:
     return preview_response(
         platform="spotify",
         title=data.get("name"),
+        tracks=tracks if isinstance(tracks, int) else None,
+        cover_url=cover_url,
+    )
+
+
+def deezer_preview_from_api(url: str) -> Optional[Dict[str, Any]]:
+    playlist_id = deezer_playlist_id(url)
+    if not playlist_id:
+        return None
+
+    data = fetch_json_with_headers(f"https://api.deezer.com/playlist/{playlist_id}")
+
+    if not isinstance(data, dict) or data.get("error"):
+        return None
+
+    cover_url = (
+        data.get("picture_xl")
+        or data.get("picture_big")
+        or data.get("picture_medium")
+        or data.get("picture")
+    )
+    tracks = data.get("nb_tracks")
+
+    return preview_response(
+        platform="deezer",
+        title=data.get("title"),
         tracks=tracks if isinstance(tracks, int) else None,
         cover_url=cover_url,
     )
@@ -674,6 +714,7 @@ def clean_preview_title(title: Optional[str], platform: str) -> str:
         "youtube": [" - YouTube", " - youtube"],
         "spotify": [" | Spotify", " - playlist by Spotify"],
         "apple": [" - Apple Music", " on Apple Music"],
+        "deezer": [" | Deezer", " - Deezer"],
     }
 
     for suffix in suffixes.get(platform, []):
@@ -808,6 +849,17 @@ def is_apple_music_playlist_url(url: str) -> bool:
     return re.search(r"/[a-z]{2}/(playlist|album)/", path) is not None
 
 
+def is_deezer_playlist_url(url: str) -> bool:
+    parsed = parsed_url(url)
+    host = parsed.netloc.lower()
+
+    if host not in {"deezer.com", "www.deezer.com"}:
+        return False
+
+    playlist_id = deezer_playlist_id(url)
+    return bool(playlist_id and playlist_id.isdigit())
+
+
 def preview_from_metadata(url: str, platform: str) -> Dict[str, Any]:
     html = fetch_html(url)
     metadata = extract_metadata(html)
@@ -927,6 +979,21 @@ def preview_apple(url: str) -> Dict[str, Any]:
     return preview_from_metadata(url, "apple")
 
 
+def preview_deezer(url: str) -> Dict[str, Any]:
+    if not is_deezer_playlist_url(url):
+        return unsupported_preview("deezer", "Use a public Deezer playlist URL.")
+
+    try:
+        api_preview = deezer_preview_from_api(url)
+
+        if api_preview is not None:
+            return api_preview
+    except Exception:
+        pass
+
+    return unsupported_preview("deezer", "Deezer playlist could not be found or is not public.")
+
+
 def detect_platform(url: str) -> Dict[str, Any]:
     normalized = url.strip().lower()
 
@@ -946,6 +1013,13 @@ def detect_platform(url: str) -> Dict[str, Any]:
     if "music.apple.com" in normalized:
         supported = is_apple_music_playlist_url(url)
         response = {"platform": "apple", "supported": supported}
+        if not supported:
+            response["reason"] = "unknown"
+        return response
+
+    if "deezer.com" in normalized:
+        supported = is_deezer_playlist_url(url)
+        response = {"platform": "deezer", "supported": supported}
         if not supported:
             response["reason"] = "unknown"
         return response
@@ -978,6 +1052,9 @@ def preview_playlist(payload: Dict[str, Any]) -> Any:
         if platform == "apple":
             return unsupported_preview("apple", "Use a public Apple Music share link.")
 
+        if platform == "deezer":
+            return unsupported_preview("deezer", "Use a public Deezer playlist URL.")
+
         return {
             "platform": "unknown",
             "tracks": None,
@@ -989,6 +1066,7 @@ def preview_playlist(payload: Dict[str, Any]) -> Any:
         "youtube": preview_youtube,
         "spotify": preview_spotify,
         "apple": preview_apple,
+        "deezer": preview_deezer,
     }
     preview_function = preview_functions.get(platform)
 
@@ -1051,6 +1129,7 @@ def add_playlist(payload: Dict[str, Any]) -> Dict[str, Any]:
             "youtube": Platform.YOUTUBE,
             "spotify": Platform.SPOTIFY,
             "apple": Platform.APPLE,
+            "deezer": Platform.DEEZER,
         }
         platform = platform_map.get(detection["platform"])
 

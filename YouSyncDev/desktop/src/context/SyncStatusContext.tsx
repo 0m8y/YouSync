@@ -15,13 +15,17 @@ import type {
   SyncAllStatus,
   SyncStartResult,
   SyncStatus,
+  SyncTasksStatus,
 } from "../services/playlistService";
 
 const SYNC_STATUS_POLL_MS = 1500;
 
+type WorkerConnectionState = "idle" | "starting" | "ready" | "error";
+
 type SyncStatusContextValue = {
   syncProgressById: Record<string, SyncStatus>;
   syncAllProgress: SyncAllStatus | null;
+  workerState: WorkerConnectionState;
   isSyncingAll: boolean;
   hasActiveIndividualSyncs: boolean;
   statusVersion: number;
@@ -45,14 +49,36 @@ function isTerminalProgress(progress?: LongTaskProgress | null) {
   return progress?.status === "completed" || progress?.status === "cancelled" || progress?.status === "error";
 }
 
+function startupLog(message: string) {
+  const startupWindow = window as Window & { __YOUSYNC_STARTUP_TIME?: number };
+  const startedAt = startupWindow.__YOUSYNC_STARTUP_TIME ?? performance.now();
+  console.log(`[startup][react][+${Math.round(performance.now() - startedAt)}ms] ${message}`);
+}
+
 export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const [syncProgressById, setSyncProgressById] = useState<Record<string, SyncStatus>>({});
   const [syncAllProgress, setSyncAllProgress] = useState<SyncAllStatus | null>(null);
+  const [workerState, setWorkerState] = useState<WorkerConnectionState>("idle");
+  const [pollingEnabled, setPollingEnabled] = useState(false);
   const [statusVersion, setStatusVersion] = useState(0);
   const previousActiveIds = useRef<Set<string>>(new Set());
+  const hasActiveTasksRef = useRef(false);
 
   const refreshSyncStatuses = useCallback(async () => {
-    const status = await getSyncTasksStatus();
+    startupLog("getSyncTasksStatus start");
+    setWorkerState((state) => (state === "ready" ? state : "starting"));
+    let status: SyncTasksStatus;
+
+    try {
+      status = await getSyncTasksStatus();
+      setWorkerState("ready");
+      startupLog("getSyncTasksStatus complete");
+    } catch {
+      setWorkerState("error");
+      startupLog("getSyncTasksStatus failed");
+      return;
+    }
+
     const nextProgressById = status.playlists ?? {};
     const nextActiveIds = new Set(
       Object.entries(nextProgressById)
@@ -64,8 +90,14 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     );
 
     previousActiveIds.current = nextActiveIds;
+    const hasActiveTasks = nextActiveIds.size > 0 || isActiveProgress(status.syncAll ?? null);
+    hasActiveTasksRef.current = hasActiveTasks;
     setSyncProgressById(nextProgressById);
     setSyncAllProgress(status.syncAll ?? null);
+
+    if (hasActiveTasks) {
+      setPollingEnabled(true);
+    }
 
     if (completedSinceLastPoll) {
       setStatusVersion((version) => version + 1);
@@ -73,18 +105,33 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    startupLog("SyncStatusProvider mounted");
+  }, []);
+
+  useEffect(() => {
+    if (!pollingEnabled) {
+      return;
+    }
+
     let cancelled = false;
     let timeoutId: number | null = null;
+    startupLog("SyncStatusProvider polling started");
 
     async function poll() {
       await refreshSyncStatuses();
 
-      if (!cancelled) {
+      if (cancelled) {
+        return;
+      }
+
+      if (hasActiveTasksRef.current) {
         timeoutId = window.setTimeout(poll, SYNC_STATUS_POLL_MS);
+      } else {
+        setPollingEnabled(false);
       }
     }
 
-    void poll();
+    timeoutId = window.setTimeout(poll, 0);
 
     return () => {
       cancelled = true;
@@ -93,7 +140,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [refreshSyncStatuses]);
+  }, [pollingEnabled, refreshSyncStatuses]);
 
   useEffect(() => {
     const clearableIds = Object.entries(syncProgressById)
@@ -134,6 +181,9 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     const result = await syncPlaylistService(playlistId);
 
     if (result.started) {
+      hasActiveTasksRef.current = true;
+      setWorkerState("ready");
+      setPollingEnabled(true);
       setSyncProgressById((current) => ({
         ...current,
         [playlistId]: {
@@ -152,6 +202,9 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     const result = await downloadMissingService(playlistId);
 
     if (result.started) {
+      hasActiveTasksRef.current = true;
+      setWorkerState("ready");
+      setPollingEnabled(true);
       setSyncProgressById((current) => ({
         ...current,
         [playlistId]: {
@@ -192,6 +245,9 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     const result = await syncAllPlaylists();
 
     if (result.started) {
+      hasActiveTasksRef.current = true;
+      setWorkerState("ready");
+      setPollingEnabled(true);
       setSyncAllProgress({
         playlistIds: result.playlistIds,
         status: "syncing",
@@ -259,6 +315,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SyncStatusContextValue>(() => ({
     syncProgressById,
     syncAllProgress,
+    workerState,
     isSyncingAll,
     hasActiveIndividualSyncs,
     statusVersion,
@@ -283,6 +340,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     syncAllProgress,
     syncPlaylist,
     syncProgressById,
+    workerState,
   ]);
 
   return (

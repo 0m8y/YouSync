@@ -6,11 +6,27 @@ import subprocess
 import sys
 import threading
 import tempfile
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+WORKER_START_TIME = time.perf_counter()
+
+
+def startup_log(message: str) -> None:
+    elapsed_ms = int((time.perf_counter() - WORKER_START_TIME) * 1000)
+    timestamp_ms = int(time.time() * 1000)
+    print(
+        f"[startup][worker][+{elapsed_ms}ms][ts={timestamp_ms}] {message}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+startup_log("process entered")
 
 
 def configure_ssl_certificates() -> None:
@@ -73,9 +89,13 @@ def configure_ssl_certificates() -> None:
             return
 
 
+startup_log("configure_ssl_certificates start")
 configure_ssl_certificates()
+startup_log("configure_ssl_certificates complete")
 
+startup_log("import yousync_bridge start")
 import yousync_bridge as bridge
+startup_log("import yousync_bridge complete")
 
 ORIGINAL_STDOUT = sys.stdout
 
@@ -930,13 +950,19 @@ def run_redownload_track_child(
 
 class YouSyncWorker:
     def __init__(self) -> None:
+        startup_log("bridge.ensure_project_root_on_path start")
         bridge.ensure_project_root_on_path()
+        startup_log("bridge.ensure_project_root_on_path complete")
 
         with redirect_stdout(sys.stderr):
+            startup_log("import CentralManager start")
             from core.CentralManager import CentralManager, Platform
+            startup_log("import CentralManager complete")
 
             self.platform_enum = Platform
+            startup_log('CentralManager("playlists.json") start')
             self.manager = CentralManager("playlists.json")
+            startup_log('CentralManager("playlists.json") complete')
 
         self.managers_loaded = False
         self.sync_lock = threading.Lock()
@@ -962,6 +988,7 @@ class YouSyncWorker:
             "progressPath": None,
             "playlists": {},
         }
+        startup_log("ready")
         log("started")
 
     def detect(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -985,7 +1012,7 @@ class YouSyncWorker:
         detection = bridge.detect_platform(url)
         platform = detection.get("platform") if isinstance(detection, dict) else "unknown"
 
-        if platform not in {"youtube", "spotify", "apple", "soundcloud"}:
+        if platform not in {"youtube", "spotify", "apple", "deezer", "soundcloud"}:
             platform = "unknown"
 
         return {
@@ -1200,6 +1227,7 @@ class YouSyncWorker:
             "youtube": self.platform_enum.YOUTUBE,
             "spotify": self.platform_enum.SPOTIFY,
             "apple": self.platform_enum.APPLE,
+            "deezer": self.platform_enum.DEEZER,
         }
         platform = platform_map.get(detection["platform"])
 

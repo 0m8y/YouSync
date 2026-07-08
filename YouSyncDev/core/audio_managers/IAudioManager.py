@@ -1,11 +1,10 @@
 import os
 import shutil
-import requests
-import eyed3.id3
 from threading import Lock
 from typing import Dict, Any
 from abc import ABC, abstractmethod
 
+from core.utils import sanitize_path_component
 from core.storage.AudioMetadata import AudioMetadata
 from core.storage.AudioDataStore import AudioDataStore
 
@@ -19,10 +18,11 @@ class IAudioManager(ABC):
         self.path_to_save_audio = path_to_save_audio
 
         self.data_store = AudioDataStore(data_filepath, lock)
+        safe_audio_path = self.__build_audio_path(video_title)
 
         self.metadata = AudioMetadata(
             url=url,
-            path_to_save_audio_with_title=os.path.join(self.path_to_save_audio, f"{video_title}.mp3"),
+            path_to_save_audio_with_title=safe_audio_path,
             video_title=video_title,
             title="", artist="", album="", image_url=""
         )
@@ -31,6 +31,7 @@ class IAudioManager(ABC):
         existing = next((item for item in data if item.url == self.url), None)
         if existing:
             self.__from_dict(existing)
+            self.__ensure_safe_audio_path()
         else:
             self.data_store.update_audio(self.metadata)
 
@@ -53,7 +54,19 @@ class IAudioManager(ABC):
     def download_audio(self) -> None:
         pass
 
+    def safe_download_filename(self, extension: str = "mp4") -> str:
+        safe_extension = sanitize_path_component(extension, fallback="mp4", max_length=12).lstrip(".")
+        safe_stem = sanitize_path_component(
+            f"{self.id or 'audio'}_{self.metadata.video_title}",
+            fallback=f"audio_{self.id or 'download'}",
+            max_length=100,
+        )
+        return f"{safe_stem}.{safe_extension or 'mp4'}"
+
     def register_metadata(self, title: str, artist: str, album: str, image_url: str) -> None:
+        import requests
+        import eyed3.id3
+
         self.metadata.title = title
         self.metadata.artist = artist
         self.metadata.album = album
@@ -88,6 +101,20 @@ class IAudioManager(ABC):
 
     def __update_is_downloaded(self) -> None:
         self.metadata.is_downloaded = True
+        self.data_store.update_audio(self.metadata)
+
+    def __build_audio_path(self, title: str) -> str:
+        safe_filename = sanitize_path_component(title, fallback=f"track_{self.id or 'untitled'}")
+        return os.path.join(self.path_to_save_audio, f"{safe_filename}.mp3")
+
+    def __ensure_safe_audio_path(self) -> None:
+        safe_audio_path = self.__build_audio_path(self.metadata.video_title)
+        current_path = self.metadata.path_to_save_audio_with_title
+
+        if current_path == safe_audio_path or os.path.exists(current_path):
+            return
+
+        self.metadata.path_to_save_audio_with_title = safe_audio_path
         self.data_store.update_audio(self.metadata)
 
     def delete(self) -> None:

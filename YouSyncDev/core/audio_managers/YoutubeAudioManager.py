@@ -1,11 +1,7 @@
 from core.audio_managers.IAudioManager import IAudioManager
 from core.utils import extract_json_object, get_cached_video_title, get_cached_video_id
 
-from moviepy.audio.io.AudioFileClip import AudioFileClip
-from bs4 import BeautifulSoup
-from pytubefix import YouTube
 from threading import Lock
-import requests
 import tempfile
 import json
 import os
@@ -16,7 +12,7 @@ class YoutubeAudioManager(IAudioManager):
     def __init__(self, url: str, path_to_save_audio: str, data_filepath: str, lock: Lock) -> None:
         self.url = url
         self.yt = None
-        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title(True)
+        cached_title = get_cached_video_title(url, data_filepath) or self.__extract_title()
         video_id = get_cached_video_id(url, data_filepath) or self.__get_video_id()
         super().__init__(url, path_to_save_audio, data_filepath, video_id, cached_title, lock)
 
@@ -25,6 +21,8 @@ class YoutubeAudioManager(IAudioManager):
     def __ensure_youtube_loaded(self):
         if self.yt:
             return
+        from pytubefix import YouTube
+
         self.yt = YouTube(self.url)
 
     def __get_video_id(self):
@@ -33,11 +31,16 @@ class YoutubeAudioManager(IAudioManager):
 
     #Override Function
     def download_audio(self) -> None:
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
+
         self.__ensure_youtube_loaded()
         audio_stream = self.yt.streams.filter(only_audio=True).first()
 
         temp_dir = tempfile.gettempdir()
-        downloaded_file = audio_stream.download(output_path=temp_dir)
+        downloaded_file = audio_stream.download(
+            output_path=temp_dir,
+            filename=self.safe_download_filename(getattr(audio_stream, "subtype", "mp4")),
+        )
 
         audio_clip = AudioFileClip(downloaded_file)
         audio_clip.write_audiofile(self.metadata.path_to_save_audio_with_title)
@@ -46,6 +49,9 @@ class YoutubeAudioManager(IAudioManager):
 
     #Override Function
     def add_metadata(self) -> None:
+        import requests
+        from bs4 import BeautifulSoup
+
         self.__ensure_youtube_loaded()
 
         print("Adding Metada...")
@@ -222,12 +228,7 @@ class YoutubeAudioManager(IAudioManager):
         self.__ensure_youtube_loaded()
 
         raw_title = self.yt.title
-
-        if file_mode:
-            # Supprime les caractères interdits dans les noms de fichiers
-            cleaned_title = raw_title.translate(str.maketrans('', '', '|:"/\\?*<>')).strip()
-        else:
-            cleaned_title = raw_title.strip()
+        cleaned_title = raw_title.strip()
 
         if not cleaned_title:
             return f"track_{self.yt.video_id}"
