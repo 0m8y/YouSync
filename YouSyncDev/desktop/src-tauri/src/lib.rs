@@ -1,0 +1,808 @@
+use serde_json::{json, Value};
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Manager, State};
+
+const WORKER_SIDECAR_NAME: &str = "yousync-worker";
+static STARTUP_INSTANT: OnceLock<Instant> = OnceLock::new();
+
+fn startup_elapsed_ms() -> u128 {
+    STARTUP_INSTANT
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn unix_time_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
+}
+
+fn append_log_file(filename: &str, line: &str) {
+    if let Ok(logs_dir) = ensure_logs_folder() {
+        let log_path = logs_dir.join(filename);
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+            let _ = writeln!(file, "{line}");
+        }
+    }
+}
+
+fn startup_log(message: &str) {
+    let line = format!(
+        "[startup][tauri][+{}ms][ts={}] {}",
+        startup_elapsed_ms(),
+        unix_time_ms(),
+        message
+    );
+    eprintln!("{line}");
+    append_log_file("yousync-tauri.log", &line);
+}
+
+fn python_executable() -> PathBuf {
+    let project_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let venv_python = if cfg!(windows) {
+        project_root.join(".venv/Scripts/python.exe")
+    } else {
+        project_root.join(".venv/bin/python")
+    };
+
+    if venv_python.exists() {
+        return venv_python;
+    }
+
+    if cfg!(windows) {
+        PathBuf::from("python")
+    } else {
+        PathBuf::from("python3")
+    }
+}
+
+fn worker_script_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../python/yousync_worker.py")
+}
+
+enum WorkerLaunch {
+    Python { python: PathBuf, script: PathBuf },
+    Sidecar { path: PathBuf },
+}
+
+fn sidecar_candidates(app_handle: &AppHandle) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        candidates.push(resource_dir.join(WORKER_SIDECAR_NAME));
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            candidates.push(exe_dir.join(WORKER_SIDECAR_NAME));
+
+            #[cfg(target_os = "macos")]
+            if let Some(contents_dir) = exe_dir.parent() {
+                candidates.push(contents_dir.join("Resources").join(WORKER_SIDECAR_NAME));
+            }
+        }
+    }
+
+    candidates
+}
+
+fn packaged_worker_sidecar(app_handle: &AppHandle) -> Option<PathBuf> {
+    sidecar_candidates(app_handle)
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
+fn worker_launch(app_handle: &AppHandle) -> Result<WorkerLaunch, String> {
+    startup_log("worker sidecar resolution start");
+    let script = worker_script_path();
+
+    if cfg!(debug_assertions) && script.is_file() {
+        let python = python_executable();
+        startup_log(&format!(
+            "worker launch resolved dev python='{}' script='{}'",
+            python.display(),
+            script.display()
+        ));
+        return Ok(WorkerLaunch::Python { python, script });
+    }
+
+    if let Some(path) = packaged_worker_sidecar(app_handle) {
+        startup_log(&format!(
+            "worker launch resolved sidecar='{}'",
+            path.display()
+        ));
+        return Ok(WorkerLaunch::Sidecar { path });
+    }
+
+    if script.is_file() {
+        let python = python_executable();
+        startup_log(&format!(
+            "worker launch resolved fallback python='{}' script='{}'",
+            python.display(),
+            script.display()
+        ));
+        return Ok(WorkerLaunch::Python { python, script });
+    }
+
+    Err(format!(
+        "Could not find YouSync worker sidecar '{}' or source worker '{}'.",
+        WORKER_SIDECAR_NAME,
+        script.display()
+    ))
+}
+
+struct WorkerProcess {
+    child: Child,
+    stdin: ChildStdin,
+    stdout: BufReader<ChildStdout>,
+}
+
+fn user_home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+}
+
+fn logs_folder_path() -> Result<PathBuf, String> {
+    if cfg!(target_os = "macos") {
+        return user_home_dir()
+            .map(|home| home.join("Library").join("Logs").join("YouSync"))
+            .ok_or_else(|| "Could not resolve the user home folder.".to_string());
+    }
+
+    if cfg!(windows) {
+        if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+            return Ok(PathBuf::from(local_app_data).join("YouSync").join("logs"));
+        }
+
+        if let Some(app_data) = std::env::var_os("APPDATA") {
+            return Ok(PathBuf::from(app_data).join("YouSync").join("logs"));
+        }
+
+        return user_home_dir()
+            .map(|home| {
+                home.join("AppData")
+                    .join("Local")
+                    .join("YouSync")
+                    .join("logs")
+            })
+            .ok_or_else(|| "Could not resolve a logs folder.".to_string());
+    }
+
+    if let Some(xdg_state_home) = std::env::var_os("XDG_STATE_HOME") {
+        return Ok(PathBuf::from(xdg_state_home).join("yousync").join("logs"));
+    }
+
+    user_home_dir()
+        .map(|home| {
+            home.join(".local")
+                .join("state")
+                .join("yousync")
+                .join("logs")
+        })
+        .ok_or_else(|| "Could not resolve a logs folder.".to_string())
+}
+
+fn write_logs_info_file(logs_dir: &Path) -> Result<(), String> {
+    let readme_dir = logs_dir.join("README");
+    fs::create_dir_all(&readme_dir)
+        .map_err(|error| format!("Failed to create logs README folder: {error}"))?;
+
+    let info_path = readme_dir.join("logs-info.txt");
+
+    if info_path.is_file() {
+        return Ok(());
+    }
+
+    let content = [
+        "YouSync logs",
+        "",
+        "Persistent application and worker logs are stored in this folder.",
+        "",
+        "Temporary runtime/progress job files are stored separately in:",
+        "/tmp/yousync_jobs",
+        "",
+        "You can delete temporary job files when YouSync is not running.",
+        "",
+    ]
+    .join("\n");
+
+    fs::write(&info_path, content)
+        .map_err(|error| format!("Failed to write logs info file: {error}"))
+}
+
+fn ensure_logs_folder() -> Result<PathBuf, String> {
+    let logs_dir = logs_folder_path()?;
+
+    fs::create_dir_all(&logs_dir)
+        .map_err(|error| format!("Failed to create logs folder: {error}"))?;
+    write_logs_info_file(&logs_dir)?;
+
+    Ok(logs_dir)
+}
+
+fn prepare_worker_logs() -> (Option<PathBuf>, Stdio) {
+    match ensure_logs_folder() {
+        Ok(logs_dir) => {
+            let log_path = logs_dir.join("yousync-worker.log");
+            match OpenOptions::new().create(true).append(true).open(&log_path) {
+                Ok(file) => (Some(logs_dir), Stdio::from(file)),
+                Err(error) => {
+                    eprintln!("[YouSync] Failed to open worker log file: {error}");
+                    (Some(logs_dir), Stdio::inherit())
+                }
+            }
+        }
+        Err(error) => {
+            eprintln!("[YouSync] Failed to prepare logs folder: {error}");
+            (None, Stdio::inherit())
+        }
+    }
+}
+
+impl WorkerProcess {
+    fn new(app_handle: &AppHandle) -> Result<Self, String> {
+        let launch = worker_launch(app_handle)?;
+        let mut command = match &launch {
+            WorkerLaunch::Python { python, script } => {
+                let mut command = Command::new(python);
+                command.arg("-u").arg(script);
+                command
+            }
+            WorkerLaunch::Sidecar { path } => Command::new(path),
+        };
+        let (logs_dir, worker_stderr) = prepare_worker_logs();
+
+        if let Some(logs_dir) = logs_dir {
+            command.env("YOUSYNC_LOGS_DIR", logs_dir.as_os_str());
+        }
+
+        startup_log("worker spawn start");
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(worker_stderr)
+            .spawn()
+            .map_err(|error| match launch {
+                WorkerLaunch::Python { python, .. } => {
+                    format!(
+                        "Failed to start Python worker with '{}': {error}",
+                        python.display()
+                    )
+                }
+                WorkerLaunch::Sidecar { path } => {
+                    format!(
+                        "Failed to start YouSync worker sidecar '{}': {error}",
+                        path.display()
+                    )
+                }
+            })?;
+        startup_log("worker spawn complete");
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "Failed to open Python worker stdin".to_string())?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "Failed to open Python worker stdout".to_string())?;
+
+        Ok(Self {
+            child,
+            stdin,
+            stdout: BufReader::new(stdout),
+        })
+    }
+}
+
+impl Drop for WorkerProcess {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+struct WorkerState {
+    app_handle: AppHandle,
+    process: Arc<Mutex<Option<WorkerProcess>>>,
+    next_id: Arc<AtomicU64>,
+}
+
+impl WorkerState {
+    fn new(app_handle: AppHandle) -> Self {
+        Self {
+            app_handle,
+            process: Arc::new(Mutex::new(None)),
+            next_id: Arc::new(AtomicU64::new(1)),
+        }
+    }
+
+    fn ensure_process<'a>(
+        &'a self,
+        slot: &'a mut Option<WorkerProcess>,
+    ) -> Result<&'a mut WorkerProcess, String> {
+        if let Some(process) = slot.as_mut() {
+            match process.child.try_wait() {
+                Ok(Some(status)) => {
+                    startup_log(&format!(
+                        "worker process exited with status {status}; restarting"
+                    ));
+                    *slot = None;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    startup_log(&format!(
+                        "worker process status check failed: {error}; restarting"
+                    ));
+                    *slot = None;
+                }
+            }
+        }
+
+        if slot.is_none() {
+            startup_log("worker lazy start requested");
+            *slot = Some(WorkerProcess::new(&self.app_handle)?);
+        }
+
+        slot.as_mut()
+            .ok_or_else(|| "Python worker could not be started".to_string())
+    }
+}
+
+impl Clone for WorkerState {
+    fn clone(&self) -> Self {
+        Self {
+            app_handle: self.app_handle.clone(),
+            process: self.process.clone(),
+            next_id: self.next_id.clone(),
+        }
+    }
+}
+
+fn call_python_worker(state: &WorkerState, command: &str, payload: Value) -> Result<Value, String> {
+    let request_id = state.next_id.fetch_add(1, Ordering::Relaxed).to_string();
+    let request = json!({
+        "id": request_id,
+        "command": command,
+        "payload": payload,
+    });
+    let request_line = serde_json::to_string(&request)
+        .map_err(|error| format!("Failed to serialize worker request: {error}"))?
+        + "\n";
+    let mut process_slot = state
+        .process
+        .lock()
+        .map_err(|_| "Python worker lock is poisoned".to_string())?;
+    let process = state.ensure_process(&mut process_slot)?;
+
+    process
+        .stdin
+        .write_all(request_line.as_bytes())
+        .map_err(|error| format!("Failed to write Python worker request: {error}"))?;
+    process
+        .stdin
+        .flush()
+        .map_err(|error| format!("Failed to flush Python worker request: {error}"))?;
+
+    let mut response_line = String::new();
+    let bytes_read = process
+        .stdout
+        .read_line(&mut response_line)
+        .map_err(|error| format!("Failed to read Python worker response: {error}"))?;
+    startup_log("worker response received");
+
+    if bytes_read == 0 || response_line.trim().is_empty() {
+        return Err("Python worker returned no JSON response".to_string());
+    }
+
+    let response: Value = serde_json::from_str(response_line.trim())
+        .map_err(|error| format!("Python worker returned invalid JSON: {error}"))?;
+
+    let response_id = response.get("id").and_then(Value::as_str).unwrap_or("");
+    if response_id != request_id {
+        return Err(format!(
+            "Python worker response id mismatch: expected {request_id}, got {response_id}"
+        ));
+    }
+
+    if response.get("ok").and_then(Value::as_bool) == Some(true) {
+        return Ok(response.get("data").cloned().unwrap_or(Value::Null));
+    }
+
+    Err(response
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("Python worker command failed")
+        .to_string())
+}
+
+async fn call_python_worker_async(
+    state: WorkerState,
+    command: &'static str,
+    payload: Value,
+) -> Result<Value, String> {
+    startup_log(&format!("call_python_worker command received: {command}"));
+    startup_log("worker call moved to blocking thread");
+
+    let result =
+        tauri::async_runtime::spawn_blocking(move || call_python_worker(&state, command, payload))
+            .await
+            .map_err(|error| format!("Python worker task failed: {error}"))?;
+
+    startup_log(&format!("worker call completed: {command}"));
+    result
+}
+
+#[tauri::command]
+async fn detect_playlist(state: State<'_, WorkerState>, url: String) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "detect", json!({ "url": url })).await
+}
+
+#[tauri::command]
+async fn preview_playlist(state: State<'_, WorkerState>, url: String) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "preview", json!({ "url": url })).await
+}
+
+#[tauri::command]
+async fn add_playlist(
+    state: State<'_, WorkerState>,
+    url: String,
+    folder: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "add",
+        json!({ "url": url, "folder": folder }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn list_playlists(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "list", json!({})).await
+}
+
+#[tauri::command]
+async fn list_missing_playlists(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "list_missing_playlists", json!({})).await
+}
+
+#[tauri::command]
+async fn update_playlist_folder(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    folder: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "update_playlist_folder",
+        json!({ "playlist_id": playlist_id, "folder": folder }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn recover_existing_playlist(
+    state: State<'_, WorkerState>,
+    folder: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "recover_existing_playlist",
+        json!({ "folder": folder }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn move_playlist_folder(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    folder: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "move_playlist_folder",
+        json!({ "playlist_id": playlist_id, "folder": folder }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn get_playlist_details(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "playlist_details",
+        json!({ "playlist_id": playlist_id }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn sync_playlist(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "sync",
+        json!({ "playlist_id": playlist_id }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn download_missing(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "download_missing",
+        json!({ "playlist_id": playlist_id }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn delete_playlist(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    delete_local_files: Option<bool>,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "delete_playlist",
+        json!({ "playlist_id": playlist_id, "delete_local_files": delete_local_files.unwrap_or(false) }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cancel_playlist_sync(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "cancel_playlist_sync",
+        json!({ "playlist_id": playlist_id }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn get_sync_status(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "sync_status",
+        json!({ "playlist_id": playlist_id }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn sync_all_playlists(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "sync_all", json!({})).await
+}
+
+#[tauri::command]
+async fn get_sync_all_status(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "sync_all_status", json!({})).await
+}
+
+#[tauri::command]
+async fn get_sync_tasks_status(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "sync_tasks_status", json!({})).await
+}
+
+#[tauri::command]
+async fn cancel_sync_all(state: State<'_, WorkerState>) -> Result<Value, String> {
+    call_python_worker_async(state.inner().clone(), "cancel_sync_all", json!({})).await
+}
+
+fn open_target(target: &str) -> Result<(), String> {
+    if target.trim().is_empty() {
+        return Err("No target provided.".to_string());
+    }
+
+    let status = if cfg!(target_os = "macos") {
+        Command::new("open").arg(target).status()
+    } else if cfg!(windows) {
+        Command::new("cmd")
+            .args(["/C", "start", "", target])
+            .status()
+    } else {
+        Command::new("xdg-open").arg(target).status()
+    }
+    .map_err(|error| format!("Failed to open target: {error}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Open command failed".to_string())
+    }
+}
+
+fn playlist_folder_from_path(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+
+    if trimmed.is_empty() {
+        return Err("No folder path provided.".to_string());
+    }
+
+    let input_path = PathBuf::from(trimmed);
+    let mut folder = if input_path.is_dir() {
+        input_path
+    } else if let Some(parent) = input_path.parent() {
+        parent.to_path_buf()
+    } else {
+        return Err("Invalid folder path.".to_string());
+    };
+
+    if folder.file_name().and_then(|name| name.to_str()) == Some(".yousync") {
+        if let Some(parent) = folder.parent() {
+            folder = parent.to_path_buf();
+        }
+    }
+
+    if !folder.exists() {
+        return Err("Folder does not exist.".to_string());
+    }
+
+    if !folder.is_dir() {
+        return Err("Target is not a folder.".to_string());
+    }
+
+    Ok(folder)
+}
+
+#[tauri::command]
+fn open_playlist_folder(path: String) -> Result<(), String> {
+    let folder = playlist_folder_from_path(&path)?;
+    open_target(&folder.to_string_lossy())
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    open_target(&url)
+}
+
+#[tauri::command]
+fn open_local_file(path: String) -> Result<(), String> {
+    let file_path = PathBuf::from(path.trim());
+
+    if !file_path.is_file() {
+        return Err("Local file does not exist.".to_string());
+    }
+
+    open_target(&file_path.to_string_lossy())
+}
+
+#[tauri::command]
+async fn open_playlists_json(state: State<'_, WorkerState>) -> Result<(), String> {
+    let response =
+        call_python_worker_async(state.inner().clone(), "playlists_json_path", json!({})).await?;
+    let raw_path = response
+        .get("path")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+
+    if raw_path.is_empty() {
+        return Err("playlists.json path could not be resolved.".to_string());
+    }
+
+    let playlists_json = PathBuf::from(raw_path);
+
+    if playlists_json.is_file() {
+        return open_target(&playlists_json.to_string_lossy());
+    }
+
+    let parent = playlists_json
+        .parent()
+        .ok_or_else(|| "playlists.json folder could not be resolved.".to_string())?;
+
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Failed to create playlists.json folder: {error}"))?;
+    fs::write(&playlists_json, "{\"playlists\":[]}")
+        .map_err(|error| format!("Failed to create playlists.json: {error}"))?;
+
+    open_target(&playlists_json.to_string_lossy())
+}
+
+#[tauri::command]
+fn open_logs_folder() -> Result<String, String> {
+    let logs_dir = ensure_logs_folder()?;
+    open_target(&logs_dir.to_string_lossy())?;
+    Ok(logs_dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    open_playlist_folder(path)
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    open_external_url(url)
+}
+
+#[tauri::command]
+async fn redownload_track(
+    state: State<'_, WorkerState>,
+    playlist_id: String,
+    track_url: Option<String>,
+    track_index: Option<u64>,
+) -> Result<Value, String> {
+    call_python_worker_async(
+        state.inner().clone(),
+        "redownload_track",
+        json!({
+            "playlist_id": playlist_id,
+            "track_url": track_url.unwrap_or_default(),
+            "track_index": track_index.unwrap_or_default(),
+        }),
+    )
+    .await
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    startup_log("app run function entered");
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            startup_log("app setup start");
+            app.manage(WorkerState::new(app.handle().clone()));
+            startup_log("worker state managed");
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            detect_playlist,
+            preview_playlist,
+            add_playlist,
+            list_playlists,
+            list_missing_playlists,
+            update_playlist_folder,
+            recover_existing_playlist,
+            move_playlist_folder,
+            get_playlist_details,
+            sync_playlist,
+            download_missing,
+            delete_playlist,
+            cancel_playlist_sync,
+            get_sync_status,
+            sync_all_playlists,
+            get_sync_all_status,
+            get_sync_tasks_status,
+            cancel_sync_all,
+            redownload_track,
+            open_playlist_folder,
+            open_external_url,
+            open_local_file,
+            open_playlists_json,
+            open_logs_folder,
+            open_folder,
+            open_url
+        ]);
+    startup_log("app run");
+    builder
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

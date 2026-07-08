@@ -1,19 +1,66 @@
 MyPlaylistTest
 data
+!YouSyncDev/desktop/src/data/
+!YouSyncDev/desktop/src/data/*.ts
 dist/
 build/
 
 *.mp3
 *.mp4
 
-*.json
-!launch.json
-!settings.json
-*.log
-txt.Txt
-temp_files/
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
 
+# Debug / temp
+debug_*.py
+*_debug*.html
+*.log
+*.tmp
 .DS_Store
 
-.venv/
+# Node / React / Vite
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+.env
+.env.*
+!.env.example
+
+# Tauri / Rust
+YouSyncDev/desktop/src-tauri/target/
+YouSyncDev/desktop/src-tauri/gen/
+YouSyncDev/desktop/src-tauri/Cargo.lock
+
+# Build outputs
+YouSyncDev/desktop/dist/
+YouSyncDev/desktop/build/
+YouSyncDev/desktop/out/
+
+# YouSync local data
+YouSyncDev/core/playlists.json
+YouSyncDev/playlists.json
+*.yousync/
+.yousync/
+
+# IDE
+.vscode/
+.idea/
+
+# YouSync desktop generated files
+YouSyncDev/desktop/src-tauri/target/
+YouSyncDev/desktop/node_modules/
+YouSyncDev/desktop/dist/
+YouSyncDev/desktop/src-tauri/gen/

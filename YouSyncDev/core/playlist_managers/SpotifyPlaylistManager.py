@@ -1,30 +1,102 @@
 from core.playlist_managers.IPlaylistManager import IPlaylistManager
 from concurrent.futures import ThreadPoolExecutor
 from core.audio_managers.SpotifyAudioManager import SpotifyAudioManager
-from core.utils import get_spotify_playlist_id, get_selenium_driver_for_spotify, get_spotify_total_songs, get_spotify_url_list
+from core.utils import (
+    get_spotify_meta_content_from_html,
+    get_spotify_playlist_id,
+    get_spotify_total_songs,
+    get_spotify_total_songs_from_html,
+    get_spotify_url_list,
+    get_spotify_urls_from_html,
+    get_selenium_driver_for_spotify,
+)
 import logging
-import requests
-from typing import List, Optional
-from bs4 import BeautifulSoup
 import re
+import time
+from typing import Dict, List, Optional
+from urllib.parse import quote
+
+import requests
+from bs4 import BeautifulSoup
 
 
 class SpotifyPlaylistManager(IPlaylistManager):
 
     def __init__(self, playlist_url: str, path_to_save_audio: str) -> None:
         self.playlist_url = playlist_url
-        self.soup = None
+        self.soup: Optional[BeautifulSoup] = None
+        self._oembed_data: Optional[Dict[str, str]] = None
         logging.debug("Initializing SpotifyPlaylistManager")
         super().__init__(playlist_url, path_to_save_audio, get_spotify_playlist_id(playlist_url))
 
 #----------------------------------------GETTER----------------------------------------#
 
-    def __ensure_soup_loaded(self):
-        if self.soup is not None:
+    def __load_spotify_selenium_soup(self) -> None:
+        driver = get_selenium_driver_for_spotify(self.playlist_url)
+        html = ""
+
+        try:
+            # Spotify first returns a generic shell, then hydrates playlist metadata.
+            # Wait until the stable playlist meta tags are present.
+            for _ in range(24):
+                html = driver.page_source
+
+                has_title = get_spotify_meta_content_from_html(html, property_="og:title") is not None
+                has_tracks = len(get_spotify_urls_from_html(html)) > 0
+
+                if has_title or has_tracks:
+                    break
+
+                time.sleep(0.5)
+
+            self.soup = BeautifulSoup(html, "lxml")
+        finally:
+            driver.quit()
+
+    def __ensure_soup_loaded(self, force_reload: bool = False) -> None:
+        if self.soup is not None and not force_reload:
             return
-        response = requests.get(self.playlist_url)
-        response.encoding = 'utf-8'
-        self.soup = BeautifulSoup(response.text, 'lxml')
+
+        self.__load_spotify_selenium_soup()
+
+    def __get_meta_content(self, *, name: str | None = None, property_: str | None = None) -> Optional[str]:
+        self.__ensure_soup_loaded()
+
+        if self.soup is None:
+            return None
+
+        if name is not None:
+            tag = self.soup.find("meta", attrs={"name": name})
+        else:
+            tag = self.soup.find("meta", attrs={"property": property_})
+
+        if tag is None:
+            return None
+
+        content = tag.get("content")
+        if not content:
+            return None
+
+        return str(content).strip()
+
+    def __load_oembed_data(self) -> Dict[str, str]:
+        if self._oembed_data is not None:
+            return self._oembed_data
+
+        self._oembed_data = {}
+
+        try:
+            oembed_url = f"https://open.spotify.com/oembed?url={quote(self.playlist_url, safe='')}"
+            response = requests.get(oembed_url, timeout=15)
+            response.raise_for_status()
+            payload = response.json()
+
+            if isinstance(payload, dict):
+                self._oembed_data = payload
+        except Exception as e:
+            logging.warning(f"Unable to retrieve Spotify oEmbed metadata: {e}")
+
+        return self._oembed_data
 
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[SpotifyAudioManager]:
@@ -41,22 +113,61 @@ class SpotifyPlaylistManager(IPlaylistManager):
 
     # Override Method
     def get_playlist_title(self) -> str:
-        self.__ensure_soup_loaded()
-        return self.soup.find('meta', property='og:title')['content']
+        title = self.__get_meta_content(property_="og:title")
+
+        if title:
+            return title
+
+        oembed_title = self.__load_oembed_data().get("title")
+        if oembed_title:
+            return str(oembed_title).strip()
+
+        return "Spotify playlist"
 
     def extract_image(self) -> str:
-        self.__ensure_soup_loaded()
-        return self.soup.find('meta', property='og:image')['content']
+        image_url = self.__get_meta_content(property_="og:image")
+
+        if image_url:
+            return image_url
+
+        oembed_thumbnail = self.__load_oembed_data().get("thumbnail_url")
+        if oembed_thumbnail:
+            return str(oembed_thumbnail).strip()
+
+        raise ValueError("Unable to find Spotify playlist cover image.")
 
     # Override Method
     def get_video_urls(self) -> List[str]:
+        # Force a fresh Selenium render for update, otherwise an old cached soup may
+        # miss tracks added after the manager was initialized.
+        self.__ensure_soup_loaded(force_reload=True)
+
+        html = str(self.soup) if self.soup is not None else ""
+        metadata_urls = get_spotify_urls_from_html(html)
+        metadata_total = get_spotify_total_songs_from_html(html)
+
+        if metadata_urls and (metadata_total <= 0 or len(metadata_urls) >= metadata_total):
+            urls = metadata_urls[:metadata_total] if metadata_total > 0 else metadata_urls
+            print(f"{len(urls)} songs found from Spotify metadata.")
+            return urls
+
+        if metadata_urls and metadata_total > 0:
+            print(
+                f"Spotify metadata is incomplete: {len(metadata_urls)}/{metadata_total} songs. "
+                "Falling back to playlist-scoped Selenium collection."
+            )
+
+        # Fallback: use Selenium but scope extraction to playlist rows only.
+        # Spotify can append a "Recommandés" / "Recommended" section after
+        # the playlist; those track links must not be downloaded.
         driver = get_selenium_driver_for_spotify(self.playlist_url)
-        driver.execute_script("document.body.style.zoom = '0.001'")
-        total_songs = get_spotify_total_songs(driver)
-        urls = get_spotify_url_list(driver, total_songs)
-        print(f"{len(urls)} songs found.")
-        driver.quit()
-        return urls
+        try:
+            total_songs = get_spotify_total_songs(driver) or metadata_total
+            urls = get_spotify_url_list(driver, total_songs)
+            print(f"{len(urls)} songs found.")
+            return urls
+        finally:
+            driver.quit()
 
 #----------------------------------Download Process-------------------------------------#
 

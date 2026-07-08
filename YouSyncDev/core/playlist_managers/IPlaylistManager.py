@@ -75,9 +75,15 @@ class IPlaylistManager(ABC):
                 executor.submit(self.new_audio_manager, url) for url in urls
             ]
 
-            for future in as_completed(futures):
+            # Keep audio_managers in the same order as playlist_data.audios.
+            # The UI exposes track indexes from the persisted playlist cache, so
+            # appending managers with as_completed(...) makes index-based core
+            # operations target a different track than the one displayed.
+            for future in futures:
                 try:
                     am = future.result()
+                    if am is None:
+                        continue
                     self.audio_managers.append(am)
                 except Exception as e:
                     logging.error(f"Error while loading audio manager: {e}", exc_info=True)
@@ -128,19 +134,34 @@ class IPlaylistManager(ABC):
         new_urls = self.get_video_urls()
         old_urls = [audio.url for audio in self.playlist_data.audios]
 
-        # Add new videos
+        # Add new videos. A single unavailable/private/deleted video must not
+        # abort the whole playlist synchronization. Platform-specific
+        # new_audio_manager implementations may return None when the audio
+        # cannot be initialized, for example when YouTube/pytubefix reports
+        # that a video is unavailable.
         for url in new_urls:
             if url not in old_urls:
                 print("New video: " + url)
-                am = self.new_audio_manager(url)
-                am.update_data()
-                self.playlist_data.audios.append(am.metadata)
-                self.audio_managers.append(am)
+                try:
+                    am = self.new_audio_manager(url)
+                    if am is None:
+                        logging.warning(f"Skipping unavailable audio: {url}")
+                        continue
+
+                    am.update_data()
+                    self.playlist_data.audios.append(am.metadata)
+                    self.audio_managers.append(am)
+                except Exception as e:
+                    logging.error(f"Error while adding audio {url}: {e}", exc_info=True)
+                    continue
 
         # Remove deleted videos
         for old_url in list(old_urls):
             if old_url not in new_urls:
-                self.__remove_audio(old_url)
+                try:
+                    self.__remove_audio(old_url)
+                except Exception as e:
+                    logging.error(f"Error while removing audio {old_url}: {e}", exc_info=True)
 
         # Save playlist data
         self.data_store.save(self.playlist_data)
@@ -151,17 +172,42 @@ class IPlaylistManager(ABC):
 
     def update_path(self, new_path: str) -> None:
         old_path = self.path_to_save_audio
+        new_path = os.path.abspath(os.path.expanduser(new_path))
+
+        check_yousync_folder(os.path.join(new_path, ".yousync"))
+
         self.path_to_save_audio = new_path
-
-        for am in self.audio_managers:
-            am.update_path(new_path, old_path)
-
         self.playlist_data.path_to_save_audio = new_path
 
         new_json_path = os.path.join(new_path, ".yousync", f"{self.id}.json")
         self.playlist_data_filepath = new_json_path
         self.data_store.filepath = new_json_path
 
+        updated_audios_by_url = {}
+
+        for am in self.audio_managers:
+            if am is None:
+                continue
+
+            if hasattr(am, "data_store"):
+                am.data_store.filepath = new_json_path
+
+            am.update_path(new_path, old_path)
+            updated_audios_by_url[am.get_url()] = am.metadata
+
+        refreshed_audios = []
+        seen_urls = set()
+
+        for audio in self.playlist_data.audios:
+            updated_audio = updated_audios_by_url.get(audio.url, audio)
+            refreshed_audios.append(updated_audio)
+            seen_urls.add(updated_audio.url)
+
+        for url, metadata in updated_audios_by_url.items():
+            if url not in seen_urls:
+                refreshed_audios.append(metadata)
+
+        self.playlist_data.audios = refreshed_audios
         self.data_store.save(self.playlist_data)
 
     # ==================================================================================

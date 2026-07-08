@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 @dataclass
 class AudioMetadata:
@@ -12,6 +12,7 @@ class AudioMetadata:
     artist: str = ""
     album: str = ""
     image_url: str = ""
+    duration: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return self.__dict__
