@@ -179,9 +179,64 @@ function startupLog(message: string) {
   console.log(`[startup][react][+${Math.round(performance.now() - startedAt)}ms] ${message}`);
 }
 
+
+function sleepForWorkerRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function invokePreviewCommandWithWorkerRetry<T>(
+  command: string,
+  payload: Record<string, unknown>,
+  retries = 2,
+  delays = [650, 1400]
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await invoke<T>(command, payload);
+    } catch (error) {
+      lastError = error;
+      startupLog(command + " failed on attempt " + String(attempt + 1) + ": " + bridgeError(error));
+
+      if (attempt >= retries) {
+        break;
+      }
+
+      await sleepForWorkerRetry(delays[Math.min(attempt, delays.length - 1)] ?? 1000);
+    }
+  }
+
+  throw lastError;
+}
+
+let previewWorkerWarmupPromise: Promise<void> | null = null;
+
+export function warmupPreviewWorker(): Promise<void> {
+  if (!previewWorkerWarmupPromise) {
+    startupLog("preview worker warmup start");
+
+    previewWorkerWarmupPromise = invokePreviewCommandWithWorkerRetry<PlaylistDetection>(
+      "detect_playlist",
+      { url: "" },
+      1,
+      [800]
+    )
+      .then(() => {
+        startupLog("preview worker warmup complete");
+      })
+      .catch((error) => {
+        startupLog("preview worker warmup failed: " + bridgeError(error));
+        previewWorkerWarmupPromise = null;
+      });
+  }
+
+  return previewWorkerWarmupPromise;
+}
+
 export async function detectPlaylist(url: string): Promise<PlaylistDetection> {
   try {
-    return await invoke<PlaylistDetection>("detect_playlist", { url });
+    return await invokePreviewCommandWithWorkerRetry<PlaylistDetection>("detect_playlist", { url });
   } catch (error) {
     return {
       platform: "unknown",
@@ -193,7 +248,7 @@ export async function detectPlaylist(url: string): Promise<PlaylistDetection> {
 
 export async function previewPlaylist(url: string): Promise<PlaylistPreview | null> {
   try {
-    return await invoke<PlaylistPreview | null>("preview_playlist", { url });
+    return await invokePreviewCommandWithWorkerRetry<PlaylistPreview | null>("preview_playlist", { url });
   } catch {
     return null;
   }

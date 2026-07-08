@@ -12,7 +12,8 @@ import {
   addPlaylist,
   detectPlaylist,
   listPlaylists,
-  previewPlaylist
+  previewPlaylist,
+  warmupPreviewWorker
 } from "../services/playlistService";
 import { debugLog } from "../services/settingsService";
 import type { DetectionStatus, PlatformId, PlaylistPreview } from "../types/playlist";
@@ -49,6 +50,18 @@ function HomePage() {
     }
   }, [folder, settings.defaultPlaylistFolder]);
 
+
+  useEffect(() => {
+    // Warm the lazy Python worker only when Add Playlist is open.
+    // This keeps the global app startup fast, while making the first pasted
+    // playlist link work even if PyInstaller/Python is still cold-starting.
+    const timeout = window.setTimeout(() => {
+      void warmupPreviewWorker();
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const requestId = previewRequestId.current + 1;
@@ -72,7 +85,17 @@ function HomePage() {
 
     async function updateDetection() {
       try {
-        const detection = await detectPlaylist(nextUrl);
+        let detection = await detectPlaylist(nextUrl);
+
+        if (!isStale() && detection.reason === "unknown") {
+          await warmupPreviewWorker();
+
+          if (isStale()) {
+            return;
+          }
+
+          detection = await detectPlaylist(nextUrl);
+        }
 
         if (isStale()) {
           return;
@@ -99,7 +122,17 @@ function HomePage() {
           return;
         }
 
-        const nextPreview = await previewPlaylist(nextUrl);
+        let nextPreview = await previewPlaylist(nextUrl);
+
+        if (!isStale() && (!nextPreview || nextPreview.supported === false)) {
+          await warmupPreviewWorker();
+
+          if (isStale()) {
+            return;
+          }
+
+          nextPreview = await previewPlaylist(nextUrl);
+        }
 
         if (isStale()) {
           return;

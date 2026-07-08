@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 import json
 import os
 import shutil
@@ -14,6 +14,29 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 WORKER_START_TIME = time.perf_counter()
+
+def configure_utf8_stdio() -> None:
+    """Force UTF-8 stdio on Windows.
+
+    Without this, Windows PowerShell / Rust child pipes can expose cp1252 streams.
+    Playlist titles with emojis then crash JSON responses with:
+    'charmap' codec can't encode character.
+    """
+
+    for stream_name in ("stdin", "stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+configure_utf8_stdio()
 
 
 def startup_log(message: str) -> None:
@@ -3325,3 +3348,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

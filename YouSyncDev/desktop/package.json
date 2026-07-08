@@ -1,28 +1,28 @@
 {
-  "name": "yousync-desktop",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:worker:macos": "sh scripts/build-python-worker-macos.sh",
-    "build:macos": "npm run build:worker:macos && npm run tauri -- build",
-    "tauri": "tauri"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.0"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.6.3",
-    "vite": "^6.0.3"
-  }
+    "name": "yousync-desktop",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "build:worker:macos": "sh scripts/build-python-worker-macos.sh",
+        "build:macos": "npm run build:worker:macos && npm run tauri -- build",
+        "tauri": "tauri"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2.0.0",
+        "@tauri-apps/plugin-dialog": "^2.7.1",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^7.18.0"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.0.0",
+        "@types/react": "^18.3.12",
+        "@types/react-dom": "^18.3.1",
+        "@vitejs/plugin-react": "^4.3.4",
+        "typescript": "^5.6.3",
+        "vite": "^6.0.3"
+    }
 }
