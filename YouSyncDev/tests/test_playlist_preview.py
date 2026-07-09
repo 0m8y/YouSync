@@ -20,6 +20,8 @@ spec.loader.exec_module(bridge)
 URL_YOUTUBE_PLAYLIST = "https://www.youtube.com/playlist?list=PLsOoDQgfBdd17erA74nVTQE4g7O1tjW6k"
 URL_YOUTUBE_REGRESSION = "https://www.youtube.com/playlist?list=PLsOoDQgfBdd2LWKtXBXZvyFjMQQktogAz"
 URL_SPOTIFY_PLAYLIST = "https://open.spotify.com/playlist/5UkD1s2ZTwRvzCFz84t3aF"
+URL_SPOTIFY_RADIO_PLAYLIST = "https://open.spotify.com/playlist/37i9dQZF1E4lSd84kB4j3i"
+URL_SPOTIFY_NORMAL_PLAYLIST = "https://open.spotify.com/playlist/37i9dQZF1DWYRdd9noPgqB"
 URL_APPLE_PLAYLIST = "https://music.apple.com/fr/playlist/yousync-test/pl.u-38oWjr3tqpA3GX?l=en-GB"
 
 
@@ -31,7 +33,7 @@ EXPECTED_PREVIEWS = {
     },
     URL_SPOTIFY_PLAYLIST: {
         "platform": "spotify",
-        "tracks": None,
+        "tracks": 4,
         "title": "YouSync Test",
     },
     URL_APPLE_PLAYLIST: {
@@ -183,3 +185,41 @@ def test_preview_does_not_import_selenium_or_playlist_managers():
     assert_valid_preview(result, EXPECTED_PREVIEWS[URL_YOUTUBE_PLAYLIST])
     assert "selenium" not in sys.modules
     assert not any(name.startswith("core.playlist_managers") for name in imported_modules)
+
+
+@pytest.mark.parametrize(
+    ("url", "expected_title", "minimum_tracks"),
+    [
+        (URL_SPOTIFY_RADIO_PLAYLIST, "Franglish Radio", 50),
+        (URL_SPOTIFY_NORMAL_PLAYLIST, "Feel Good", 60),
+    ],
+)
+def test_spotify_preview_uses_embed_track_list_for_radio_and_normal_playlists(
+    url: str,
+    expected_title: str,
+    minimum_tracks: int,
+):
+    result = bridge.preview_playlist({"url": url})
+
+    assert isinstance(result, dict)
+    assert result.get("supported") is True
+    assert result.get("platform") == "spotify"
+    assert result.get("title") == expected_title
+    assert isinstance(result.get("tracks"), int)
+    assert result["tracks"] >= minimum_tracks
+    assert result.get("coverUrl")
+    assert "selenium" not in sys.modules
+
+
+def test_spotify_embed_track_list_has_no_duplicates_or_playlist_id_false_positive():
+    from core.utils import get_spotify_playlist_data_from_embed, get_spotify_playlist_id
+
+    data = get_spotify_playlist_data_from_embed(URL_SPOTIFY_RADIO_PLAYLIST)
+    playlist_id = get_spotify_playlist_id(URL_SPOTIFY_RADIO_PLAYLIST)
+    urls = data.get("track_urls")
+
+    assert isinstance(urls, list)
+    assert len(urls) == 50
+    assert len(urls) == len(set(urls))
+    assert all("/track/" in url for url in urls)
+    assert all(playlist_id not in url for url in urls)

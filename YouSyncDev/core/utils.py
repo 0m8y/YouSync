@@ -97,10 +97,10 @@ def get_youtube_playlist_id(playlist_url: str) -> Optional[str]:
 
 
 def get_spotify_playlist_id(playlist_url: str) -> Optional[str]:
-    pattern = r"(track|playlist)/([a-zA-Z0-9]+)"
+    pattern = r"(?:^|/)(?:intl-[a-z]{2}/)?(?:track|playlist)/([a-zA-Z0-9]+)"
     match = re.search(pattern, playlist_url)
     if match:
-        return match.group(2)
+        return match.group(1)
     return None
 
 
@@ -432,6 +432,131 @@ def get_spotify_meta_content_from_html(
         return None
 
     return str(content).strip()
+
+
+SPOTIFY_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
+
+def get_spotify_embed_url(playlist_url: str) -> Optional[str]:
+    playlist_id = get_spotify_playlist_id(playlist_url)
+    if not playlist_id:
+        return None
+
+    return f"https://open.spotify.com/embed/playlist/{playlist_id}"
+
+
+def get_spotify_embed_next_data(html_content: str) -> Optional[Dict[str, Any]]:
+    soup = BeautifulSoup(html_content, "html.parser")
+    script = soup.find("script", attrs={"id": "__NEXT_DATA__"})
+
+    if script is None or script.string is None:
+        return None
+
+    try:
+        payload = json.loads(script.string)
+    except json.JSONDecodeError:
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def get_spotify_embed_entity(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+
+    entity = (
+        payload.get("props", {})
+        .get("pageProps", {})
+        .get("state", {})
+        .get("data", {})
+        .get("entity", {})
+    )
+
+    return entity if isinstance(entity, dict) else {}
+
+
+def get_spotify_embed_track_list(payload: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    entity = get_spotify_embed_entity(payload)
+    track_list = entity.get("trackList")
+
+    if not isinstance(track_list, list):
+        return []
+
+    return [track for track in track_list if isinstance(track, dict)]
+
+
+def get_spotify_track_url_from_embed_item(track: Dict[str, Any]) -> Optional[str]:
+    candidates = [
+        track.get("uri"),
+        track.get("trackUri"),
+        track.get("url"),
+        track.get("href"),
+        track.get("shareUrl"),
+        track.get("externalUrl"),
+    ]
+
+    external_urls = track.get("external_urls")
+    if isinstance(external_urls, dict):
+        candidates.append(external_urls.get("spotify"))
+
+    track_id = track.get("id")
+    if isinstance(track_id, str) and re.fullmatch(r"[a-zA-Z0-9]{16,32}", track_id):
+        candidates.append(f"https://open.spotify.com/track/{track_id}")
+
+    for candidate in candidates:
+        normalized_url = normalize_spotify_track_url(candidate)
+        if normalized_url:
+            return normalized_url
+
+    return None
+
+
+def get_spotify_playlist_data_from_embed(playlist_url: str) -> Dict[str, Any]:
+    embed_url = get_spotify_embed_url(playlist_url)
+    if not embed_url:
+        return {
+            "track_urls": [],
+            "track_count": 0,
+            "title": None,
+            "image": None,
+            "source": "spotify_embed",
+        }
+
+    response = requests.get(embed_url, headers=SPOTIFY_HEADERS, timeout=20)
+    response.raise_for_status()
+    response.encoding = response.encoding or "utf-8"
+    html = response.text
+    payload = get_spotify_embed_next_data(html)
+    entity = get_spotify_embed_entity(payload)
+    track_list = get_spotify_embed_track_list(payload)
+    track_urls = dedupe_spotify_track_urls([
+        get_spotify_track_url_from_embed_item(track)
+        for track in track_list
+    ])
+
+    images = entity.get("images")
+    image = None
+    if isinstance(images, list):
+        for candidate in images:
+            if isinstance(candidate, dict) and candidate.get("url"):
+                image = str(candidate["url"]).strip()
+                break
+
+    return {
+        "track_urls": track_urls,
+        "track_count": len(track_urls),
+        "declared_count": len(track_list) if track_list else None,
+        "title": entity.get("name") or entity.get("title"),
+        "image": image,
+        "source": "spotify_embed",
+    }
 
 
 def get_soundloud_song_link(html_content: str) -> Optional[str]:

@@ -4,6 +4,7 @@ from core.audio_managers.SpotifyAudioManager import SpotifyAudioManager
 from core.utils import (
     get_spotify_meta_content_from_html,
     get_spotify_playlist_id,
+    get_spotify_playlist_data_from_embed,
     get_spotify_total_songs,
     get_spotify_total_songs_from_html,
     get_spotify_url_list,
@@ -98,6 +99,19 @@ class SpotifyPlaylistManager(IPlaylistManager):
 
         return self._oembed_data
 
+    def __load_embed_data(self) -> Dict[str, object]:
+        try:
+            data = get_spotify_playlist_data_from_embed(self.playlist_url)
+            logging.debug(
+                "Spotify embed source found %s tracks for %s",
+                data.get("track_count", 0),
+                self.playlist_url,
+            )
+            return data
+        except Exception as e:
+            logging.debug(f"Unable to retrieve Spotify embed data: {e}")
+            return {"track_urls": [], "track_count": 0}
+
     # Override Method
     def new_audio_manager(self, url: str) -> Optional[SpotifyAudioManager]:
         try:
@@ -118,6 +132,10 @@ class SpotifyPlaylistManager(IPlaylistManager):
         if title:
             return title
 
+        embed_title = self.__load_embed_data().get("title")
+        if embed_title:
+            return str(embed_title).strip()
+
         oembed_title = self.__load_oembed_data().get("title")
         if oembed_title:
             return str(oembed_title).strip()
@@ -129,6 +147,10 @@ class SpotifyPlaylistManager(IPlaylistManager):
 
         if image_url:
             return image_url
+
+        embed_image = self.__load_embed_data().get("image")
+        if embed_image:
+            return str(embed_image).strip()
 
         oembed_thumbnail = self.__load_oembed_data().get("thumbnail_url")
         if oembed_thumbnail:
@@ -145,11 +167,22 @@ class SpotifyPlaylistManager(IPlaylistManager):
         html = str(self.soup) if self.soup is not None else ""
         metadata_urls = get_spotify_urls_from_html(html)
         metadata_total = get_spotify_total_songs_from_html(html)
+        embed_data = self.__load_embed_data()
+        embed_urls = embed_data.get("track_urls")
+        if not isinstance(embed_urls, list):
+            embed_urls = []
 
         if metadata_urls and (metadata_total <= 0 or len(metadata_urls) >= metadata_total):
             urls = metadata_urls[:metadata_total] if metadata_total > 0 else metadata_urls
-            print(f"{len(urls)} songs found from Spotify metadata.")
-            return urls
+            if len(urls) >= len(embed_urls):
+                print(f"{len(urls)} songs found from Spotify metadata.")
+                logging.debug(
+                    "Spotify source counts: metadata=%s embed=%s selenium=not_used total=%s",
+                    len(metadata_urls),
+                    len(embed_urls),
+                    metadata_total,
+                )
+                return urls
 
         if metadata_urls and metadata_total > 0:
             print(
@@ -163,9 +196,50 @@ class SpotifyPlaylistManager(IPlaylistManager):
         driver = get_selenium_driver_for_spotify(self.playlist_url)
         try:
             total_songs = get_spotify_total_songs(driver) or metadata_total
-            urls = get_spotify_url_list(driver, total_songs)
-            print(f"{len(urls)} songs found.")
-            return urls
+            selenium_urls = get_spotify_url_list(driver, total_songs)
+            effective_total = max(total_songs, metadata_total, len(embed_urls))
+            candidates = [
+                ("metadata", metadata_urls),
+                ("embed", [str(url) for url in embed_urls]),
+                ("selenium", selenium_urls),
+            ]
+            usable_candidates = [
+                (source, urls)
+                for source, urls in candidates
+                if urls
+            ]
+
+            if effective_total > 0:
+                complete_candidates = [
+                    (source, urls)
+                    for source, urls in usable_candidates
+                    if len(urls) >= effective_total
+                ]
+                if complete_candidates:
+                    source, urls = complete_candidates[0]
+                    selected_urls = urls[:effective_total]
+                else:
+                    source, selected_urls = max(
+                        usable_candidates or [("selenium", selenium_urls)],
+                        key=lambda item: len(item[1]),
+                    )
+            else:
+                source, selected_urls = max(
+                    usable_candidates or [("selenium", selenium_urls)],
+                    key=lambda item: len(item[1]),
+                )
+
+            logging.debug(
+                "Spotify source counts: metadata=%s embed=%s selenium=%s total=%s selected=%s selected_count=%s",
+                len(metadata_urls),
+                len(embed_urls),
+                len(selenium_urls),
+                effective_total,
+                source,
+                len(selected_urls),
+            )
+            print(f"{len(selected_urls)} songs found from Spotify {source}.")
+            return selected_urls
         finally:
             driver.quit()
 

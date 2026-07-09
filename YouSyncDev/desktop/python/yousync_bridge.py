@@ -458,8 +458,11 @@ def extract_first_int(patterns: List[str], text: str) -> Optional[int]:
 def spotify_playlist_id(url: str) -> Optional[str]:
     parsed = parsed_url(url)
     segments = [segment for segment in parsed.path.split("/") if segment]
-    if len(segments) >= 2 and segments[0] == "playlist":
-        return segments[1]
+
+    for index, segment in enumerate(segments):
+        if segment == "playlist" and index + 1 < len(segments):
+            return segments[index + 1]
+
     return None
 
 
@@ -959,11 +962,23 @@ def preview_spotify(url: str) -> Dict[str, Any]:
         data = fetch_json(
             f"https://open.spotify.com/oembed?url={quote(url, safe='')}"
         )
+        tracks = None
+
+        try:
+            ensure_project_root_on_path()
+            from core.utils import get_spotify_playlist_data_from_embed
+
+            embed_data = get_spotify_playlist_data_from_embed(url)
+            embed_tracks = embed_data.get("track_count")
+            if isinstance(embed_tracks, int) and embed_tracks > 0:
+                tracks = embed_tracks
+        except Exception:
+            tracks = None
 
         return preview_response(
             platform="spotify",
             title=data.get("title"),
-            tracks=None,
+            tracks=tracks,
             cover_url=data.get("thumbnail_url"),
         )
     except Exception:
